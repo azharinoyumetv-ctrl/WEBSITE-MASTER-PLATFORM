@@ -33,7 +33,7 @@ export default async function SiteHomePage() {
   const catalogRes = await getCatalogItems(tenantId)
   const catalogItems = catalogRes.success ? catalogRes.items : []
 
-  if (blocks.length === 0) {
+  if (tenantId === 'default') {
     const primaryColor = websiteRes.website?.themeConfig 
       ? (typeof websiteRes.website.themeConfig === 'string' 
           ? JSON.parse(websiteRes.website.themeConfig) 
@@ -41,6 +41,11 @@ export default async function SiteHomePage() {
       : '#4f46e5'
 
     return <LandingClient primaryColor={primaryColor} />
+  }
+
+  if (blocks.length === 0) {
+    // Other tenants that don't have a configured landing page get a basic fallback
+    return <div className="p-20 text-center text-slate-500">Welcome to this store. This page is currently empty.</div>
   }
 
   return (
