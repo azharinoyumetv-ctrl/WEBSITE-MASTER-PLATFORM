@@ -279,31 +279,31 @@ test.describe('Website Master Platform E2E Audit', () => {
     await expect(page.locator('table')).toContainText('e2e-catalog-test');
 
     // Verify existing e2e-catalog page on public site dynamic routing
-    await page.goto('http://dagangos.localhost:3000/e2e-catalog');
+    await page.goto('http://dagangos.localhost:4000/e2e-catalog');
     await expect(page).toHaveTitle(/E2E Catalog/i);
   });
 
   test('16. Public Pages — Products & Shop (no 404)', async ({ page }) => {
     // Visit /products from public site (subdomain aware)
-    await page.goto('http://dagangos.localhost:3000/products');
+    await page.goto('http://dagangos.localhost:4000/products');
     // Should not be a 404 page — should show the Products page
     await expect(page).not.toHaveTitle(/404/i);
     const body = await page.locator('body').textContent();
-    expect(body).toMatch(/Product|Shop|Plan|DagangOS/i);
+    expect(body).toMatch(/Landing Page|Starter|Rp|Company Profile/i);
 
-    await page.goto('http://dagangos.localhost:3000/shop');
+    await page.goto('http://dagangos.localhost:4000/shop');
     await expect(page).not.toHaveTitle(/404/i);
     const shopBody = await page.locator('body').textContent();
     expect(shopBody).toMatch(/Shop|Plan|DagangOS/i);
   });
 
   test('17. Public Pages — About & Contact (no 404)', async ({ page }) => {
-    await page.goto('http://dagangos.localhost:3000/about');
+    await page.goto('http://dagangos.localhost:4000/about');
     await expect(page).not.toHaveTitle(/404/i);
     const aboutBody = await page.locator('body').textContent();
     expect(aboutBody).toMatch(/About|Mission|DagangOS/i);
 
-    await page.goto('http://dagangos.localhost:3000/contact');
+    await page.goto('http://dagangos.localhost:4000/contact');
     await expect(page).not.toHaveTitle(/404/i);
     const contactBody = await page.locator('body').textContent();
     expect(contactBody).toMatch(/Contact|Email|Message/i);

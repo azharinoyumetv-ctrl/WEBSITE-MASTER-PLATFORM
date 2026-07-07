@@ -7,8 +7,10 @@ import { signIn } from 'next-auth/react'
 import { Globe, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
+import { useTranslations } from 'next-intl'
 
 export default function LoginPage() {
+  const t = useTranslations('Auth')
   const router = useRouter()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -55,32 +57,31 @@ export default function LoginPage() {
             <Globe className="w-5 h-5 text-white" />
           </div>
           <div>
-            <p className="text-white font-bold text-lg leading-none">DagangOS</p>
-            <p className="text-indigo-300 text-xs">Digital Indonesia</p>
+            <p className="text-white font-bold text-lg leading-none">{t('logo_title')}</p>
+            <p className="text-indigo-300 text-xs">{t('logo_subtitle')}</p>
           </div>
         </div>
 
         {/* Hero text */}
         <div className="relative">
           <h1 className="text-5xl font-bold text-white leading-tight mb-6">
-            Build websites<br />
+            {t('hero_title_1')}<br />
             at{' '}
             <span className="bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
-              scale
+              {t('hero_title_2')}
             </span>
           </h1>
           <p className="text-slate-400 text-lg max-w-md leading-relaxed">
-            Enterprise-grade multi-tenant platform powering SMEs and enterprises 
-            across 15 integrated modules — from catalog to CRM.
+            {t('hero_desc')}
           </p>
 
           {/* Feature list */}
           <div className="mt-8 space-y-3">
             {[
-              'Multi-tenant with PostgreSQL RLS isolation',
-              'JWT Ed25519 + Argon2id security',
-              '15 fully integrated business modules',
-              'Real-time theming with CSS variable injection',
+              t('feat_1'),
+              t('feat_2'),
+              t('feat_3'),
+              t('feat_4'),
             ].map((feature) => (
               <div key={feature} className="flex items-center gap-3">
                 <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
@@ -93,16 +94,15 @@ export default function LoginPage() {
         {/* Testimonial */}
         <div className="relative glass-dark rounded-xl p-5 max-w-md">
           <p className="text-slate-300 text-sm leading-relaxed italic">
-            "This platform transformed how we deliver websites to our clients. 
-            What used to take weeks now takes hours."
+            {t('testimonial')}
           </p>
           <div className="flex items-center gap-3 mt-3">
             <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
               <span className="text-white text-xs font-bold">FA</span>
             </div>
             <div>
-              <p className="text-white text-sm font-medium">Azhari</p>
-              <p className="text-slate-400 text-xs">Founder, DagangOS Digital Indonesia</p>
+              <p className="text-white text-sm font-medium">{t('testimonial_author')}</p>
+              <p className="text-slate-400 text-xs">{t('testimonial_title')}</p>
             </div>
           </div>
         </div>
@@ -116,18 +116,18 @@ export default function LoginPage() {
             <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
               <Globe className="w-4.5 h-4.5 text-white" />
             </div>
-            <p className="text-white font-bold text-lg">DagangOS</p>
+            <p className="text-white font-bold text-lg">{t('logo_title')}</p>
           </div>
 
           <div>
-            <h2 className="text-2xl font-bold text-white mb-1">Welcome back</h2>
-            <p className="text-slate-400 text-sm">Sign in to your tenant workspace</p>
+            <h2 className="text-2xl font-bold text-white mb-1">{t('welcome')}</h2>
+            <p className="text-slate-400 text-sm">{t('signin_subtitle')}</p>
           </div>
 
           <form onSubmit={handleLogin} className="mt-8 space-y-4">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">Email address</label>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">{t('email_label')}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                 <input
@@ -147,9 +147,9 @@ export default function LoginPage() {
             {/* Password */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium text-slate-300">Password</label>
+                <label className="block text-sm font-medium text-slate-300">{t('password_label')}</label>
                 <Link href="/auth/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
-                  Forgot password?
+                  {t('forgot_password')}
                 </Link>
               </div>
               <div className="relative">
@@ -183,12 +183,14 @@ export default function LoginPage() {
               </div>
             )}
             
-            {/* Demo Hint */}
-            <div className="text-xs text-slate-500 bg-white/5 p-3 rounded-lg border border-white/5">
-              <p>Demo credentials:</p>
-              <p>Email: <span className="font-mono text-slate-300">admin@dagangos.com</span></p>
-              <p>Password: <span className="font-mono text-slate-300">password123</span></p>
-            </div>
+            {/* Demo Hint (only visible in development/test environments) */}
+            {process.env.NODE_ENV !== 'production' && (
+              <div className="text-xs text-slate-500 bg-white/5 p-3 rounded-lg border border-white/5">
+                <p>{t('demo_hint')}</p>
+                <p>{t('demo_email')} <span className="font-mono text-slate-300">admin@dagangos.com</span></p>
+                <p>{t('demo_password')} <span className="font-mono text-slate-300">password123</span></p>
+              </div>
+            )}
 
 
             {/* Submit */}
@@ -203,10 +205,10 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Authenticating...</span>
+                  <span>{t('btn_logging_in')}</span>
                 </>
               ) : (
-                'Sign in to workspace'
+                t('btn_login')
               )}
             </button>
           </form>

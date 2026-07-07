@@ -170,6 +170,30 @@
       { "name": "Portal Webhook API Pengembang", "price": "Rp 750.000 /bln", "desc": "Buat webhook kustom dan hasilkan kunci API untuk aplikasi eksternal." }
     ]
   },
+  "Auth": {
+    "logo_title": "DagangOS",
+    "logo_subtitle": "Digital Indonesia",
+    "hero_title_1": "Membangun situs web",
+    "hero_title_2": "skala besar",
+    "hero_desc": "Platform multi-penyewa kelas perusahaan yang memberdayakan UKM dan korporasi di 15 modul terintegrasi — dari katalog hingga CRM.",
+    "feat_1": "Multi-penyewa dengan isolasi PostgreSQL RLS",
+    "feat_2": "Keamanan JWT Ed25519 + Argon2id",
+    "feat_3": "15 modul bisnis terintegrasi penuh",
+    "feat_4": "Tema waktu nyata dengan injeksi variabel CSS",
+    "testimonial": "\"Platform ini mengubah cara kami menghadirkan situs web kepada klien. Apa yang dulu membutuhkan waktu berminggu-minggu kini hanya membutuhkan waktu beberapa jam.\"",
+    "testimonial_author": "Azhari",
+    "testimonial_title": "Founder, DagangOS Digital Indonesia",
+    "welcome": "Selamat datang kembali",
+    "signin_subtitle": "Masuk ke area kerja penyewa Anda",
+    "email_label": "Alamat email",
+    "password_label": "Kata Sandi",
+    "forgot_password": "Lupa kata sandi?",
+    "btn_login": "Masuk ke area kerja",
+    "btn_logging_in": "Mengautentikasi...",
+    "demo_hint": "Kredensial demo:",
+    "demo_email": "Email:",
+    "demo_password": "Kata Sandi:"
+  },
   "Language": {
     "select": "Bahasa"
   }

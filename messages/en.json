@@ -170,6 +170,30 @@
       { "name": "Developer API Webhooks Portal", "price": "Rp 750.000 /mo", "desc": "Create custom webhooks and generate API keys for external apps." }
     ]
   },
+  "Auth": {
+    "logo_title": "DagangOS",
+    "logo_subtitle": "Digital Indonesia",
+    "hero_title_1": "Build websites",
+    "hero_title_2": "scale",
+    "hero_desc": "Enterprise-grade multi-tenant platform powering SMEs and enterprises across 15 integrated modules — from catalog to CRM.",
+    "feat_1": "Multi-tenant with PostgreSQL RLS isolation",
+    "feat_2": "JWT Ed25519 + Argon2id security",
+    "feat_3": "15 fully integrated business modules",
+    "feat_4": "Real-time theming with CSS variable injection",
+    "testimonial": "\"This platform transformed how we deliver websites to our clients. What used to take weeks now takes hours.\"",
+    "testimonial_author": "Azhari",
+    "testimonial_title": "Founder, DagangOS Digital Indonesia",
+    "welcome": "Welcome back",
+    "signin_subtitle": "Sign in to your tenant workspace",
+    "email_label": "Email address",
+    "password_label": "Password",
+    "forgot_password": "Forgot password?",
+    "btn_login": "Sign in to workspace",
+    "btn_logging_in": "Authenticating...",
+    "demo_hint": "Demo credentials:",
+    "demo_email": "Email:",
+    "demo_password": "Password:"
+  },
   "Language": {
     "select": "Language"
   }
