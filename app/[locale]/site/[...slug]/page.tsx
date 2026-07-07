@@ -73,7 +73,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
               <div className="space-y-6">
                 {[
                   { label: t('contact_email'), value: 'hello@dagangosdigi.id', icon: '✉️' },
-                  { label: t('contact_phone'), value: '+62 21 5000 0000', icon: '📞' },
+                  { label: t('contact_phone'), value: '+62 899 9155 182', icon: '📞' },
                   { label: t('contact_address'), value: 'Jakarta, Indonesia', icon: '📍' },
                   { label: t('contact_hours'), value: t('hours_value'), icon: '🕐' },
                 ].map((item) => (
