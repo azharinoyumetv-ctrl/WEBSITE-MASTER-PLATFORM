@@ -50,3 +50,13 @@ This task list outlines the steps required to transition the **Website Master Pl
 - `[ ]` **5. Production Sanity Check**
   - `[ ]` Verify homepage renders in both English (`/en`) and Indonesian (`/id`)
   - `[ ]` Run e2e/smoke tests against the VPS IP/domain to ensure tenant onboarding is fully operational
+
+- `[ ]` **6. Automated WhatsApp Cloud API Alerts (Ongoing)**
+  - `[ ]` Wait for Meta approval of template `dagangos_peringatan_dukungan`
+  - `[ ]` Add WhatsApp API credentials (`WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_TEMPLATE_NAME`, `PA_WHATSAPP_NUMBER`) to VPS `.env`
+  - `[ ]` Integrate `lib/whatsapp.ts` into backend actions (e.g. trigger alert on contact form submission)
+
+- `[ ]` **7. Postponed: Native AI Support Chatbot & PA Handoff**
+  - `[ ]` Review and approve the custom AI support chatbot design and database migration
+  - `[ ]` Set up Webhook integration to alert PA when user chat is escalated by AI
+
