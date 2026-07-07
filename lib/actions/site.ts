@@ -4,18 +4,31 @@ import prisma from "@/lib/prisma"
 
 export async function submitContactForm(tenantId: string, data: { name: string, email: string, subject: string, message: string }) {
   try {
+    let resolvedTenantId = tenantId
+    if (tenantId === 'default') {
+      const defaultTenant = await prisma.systemTenant.findFirst({
+        where: { subdomain: 'default' }
+      })
+      if (defaultTenant) {
+        resolvedTenantId = defaultTenant.id
+      } else {
+        console.log('Contact submission received for default tenant, but default tenant is not seeded:', data)
+        return { success: true }
+      }
+    }
+
     // 1. Create or Update CRM Contact
     const [firstName, ...lastNames] = data.name.split(' ')
     const lastName = lastNames.join(' ')
     
     let contact = await prisma.tenantCrmContact.findFirst({
-      where: { tenantId, email: data.email }
+      where: { tenantId: resolvedTenantId, email: data.email }
     })
 
     if (!contact) {
       contact = await prisma.tenantCrmContact.create({
         data: {
-          tenantId,
+          tenantId: resolvedTenantId,
           email: data.email,
           firstName: firstName || '',
           lastName: lastName || '',
@@ -27,7 +40,7 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
     // 2. Add to Timeline
     await prisma.tenantCrmTimeline.create({
       data: {
-        tenantId,
+        tenantId: resolvedTenantId,
         contactId: contact.id,
         eventType: 'contact_form_submitted',
         sourceModule: 'website',
@@ -41,7 +54,7 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
 
     // 3. Trigger Webhooks for "contact.message_received"
     const activeWebhooks = await prisma.tenantApiWebhook.findMany({
-      where: { tenantId, isActive: true }
+      where: { tenantId: resolvedTenantId, isActive: true }
     })
     
     const webhooksToTrigger = activeWebhooks.filter(w => {
@@ -52,7 +65,7 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
     // Fire webhook requests asynchronously in the background
     const payload = {
       event: 'contact.message_received',
-      tenantId,
+      tenantId: resolvedTenantId,
       timestamp: new Date().toISOString(),
       data: {
         contact: {
