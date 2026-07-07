@@ -32,9 +32,9 @@ This task list outlines the steps required to transition the **Website Master Pl
     ```bash
     npm run build
     ```
-  - `[ ]` Start the application with PM2:
+  - `[ ]` Start the application with PM2 (it will run on port 4000 automatically via the npm scripts):
     ```bash
-    pm2 start npm --name "website-master" -- start
+    pm2 start npm --name "website-master-store" -- run start
     pm2 save
     pm2 startup
     ```
