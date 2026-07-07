@@ -72,7 +72,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
               <h2 className="text-2xl font-bold text-slate-900 mb-8">{t('get_in_touch')}</h2>
               <div className="space-y-6">
                 {[
-                  { label: t('contact_email'), value: 'hello@dagangosdigi.id', icon: '✉️' },
+                  { label: t('contact_email'), value: 'contact@dagangos.com', icon: '✉️' },
                   { label: t('contact_phone'), value: '+62 899 9155 182', icon: '📞' },
                   { label: t('contact_address'), value: 'Jakarta, Indonesia', icon: '📍' },
                   { label: t('contact_hours'), value: t('hours_value'), icon: '🕐' },
