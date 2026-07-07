@@ -9,8 +9,19 @@ export default async function SiteHomePage() {
   const headersList = await headers()
   const tenantDomain = headersList.get('x-tenant-id') || 'default'
 
-  // Get website config to get tenantId
+  // Get website config to get tenantId (and theme for default tenant)
   const websiteRes = await getPublicWebsiteConfig(tenantDomain)
+  
+  if (tenantDomain === 'default') {
+    const primaryColor = websiteRes.website?.themeConfig 
+      ? (typeof websiteRes.website.themeConfig === 'string' 
+          ? JSON.parse(websiteRes.website.themeConfig) 
+          : websiteRes.website.themeConfig).colors?.primary || '#4f46e5'
+      : '#4f46e5'
+
+    return <LandingClient primaryColor={primaryColor} />
+  }
+
   if (!websiteRes.success || !websiteRes.tenantId) {
     return <div className="p-20 text-center text-slate-500">Site Not Found</div>
   }
@@ -32,16 +43,6 @@ export default async function SiteHomePage() {
   // Get catalog items for catalog_grid block
   const catalogRes = await getCatalogItems(tenantId)
   const catalogItems = catalogRes.success ? catalogRes.items : []
-
-  if (tenantId === 'default') {
-    const primaryColor = websiteRes.website?.themeConfig 
-      ? (typeof websiteRes.website.themeConfig === 'string' 
-          ? JSON.parse(websiteRes.website.themeConfig) 
-          : websiteRes.website.themeConfig).colors?.primary || '#4f46e5'
-      : '#4f46e5'
-
-    return <LandingClient primaryColor={primaryColor} />
-  }
 
   if (blocks.length === 0) {
     // Other tenants that don't have a configured landing page get a basic fallback

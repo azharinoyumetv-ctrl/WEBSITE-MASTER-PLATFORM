@@ -35,7 +35,7 @@ export default async function TenantDetailsPage({ params }: { params: { tenantId
           </h1>
           <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
             <Globe className="w-3.5 h-3.5" />
-            {tenant.customDomain || `${tenant.subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'shop.dagangos.com'}`}
+            {tenant.customDomain || `${tenant.subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'}`}
           </p>
         </div>
       </div>
