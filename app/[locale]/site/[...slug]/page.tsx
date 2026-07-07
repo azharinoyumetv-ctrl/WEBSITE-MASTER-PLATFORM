@@ -249,8 +249,8 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
     }
   }
 
-  // Force shop and products to show pricing plans
-  if (slug === 'shop' || slug === 'products') {
+  // Force standard pages to use fallback templates for absolute localization
+  if (['shop', 'products', 'about', 'contact'].includes(slug)) {
     return renderFallbackPage(slug, siteTitle, primaryColor, tenantId || '', params.locale, t)
   }
 

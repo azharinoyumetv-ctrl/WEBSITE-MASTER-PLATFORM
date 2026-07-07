@@ -27,6 +27,7 @@ This task list outlines the steps required to transition the **Website Master Pl
     ```
   - `[ ]` Install dependencies on the server (`npm ci --production`)
   - `[ ]` Set up the production `.env` file with secure secrets and DATABASE_URL
+  - `[ ]` Configure `NEXT_PUBLIC_BASE_DOMAIN="store.dagangos.com"` in `.env` (Matches your live platform domain)
   - `[ ]` Build the Next.js application:
     ```bash
     npm run build
