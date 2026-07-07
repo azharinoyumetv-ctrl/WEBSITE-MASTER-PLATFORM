@@ -152,7 +152,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900">{tenant.companyName}</p>
-                          <p className="text-xs text-slate-400 font-mono">{tenant.subdomain}.shop.dagangos.com</p>
+                          <p className="text-xs text-slate-400 font-mono">{tenant.subdomain}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'shop.dagangos.com'}</p>
                         </div>
                       </div>
                     </td>
@@ -251,7 +251,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                     className="form-input flex-1" 
                   />
                   <div className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500 whitespace-nowrap">
-                    .shop.dagangos.com
+                    .{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'shop.dagangos.com'}
                   </div>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">Alphanumeric + hyphens only. Cannot be: admin, api, system</p>

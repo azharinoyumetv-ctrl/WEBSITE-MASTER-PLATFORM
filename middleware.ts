@@ -64,7 +64,7 @@ function handleRouting(request: NextRequest) {
   let tenantId = 'default'
   if (isPublicSite || pathname.startsWith('/api')) {
     // Determine tenant even for API routes if they are public facing or admin
-    const BASE_DOMAIN = 'shop.dagangos.com'
+    const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'shop.dagangos.com'
     const hostnameWithoutPort = hostname.split(':')[0]
     
     if (hostname === BASE_DOMAIN || hostnameWithoutPort === 'localhost' || hostname.startsWith('www.')) {

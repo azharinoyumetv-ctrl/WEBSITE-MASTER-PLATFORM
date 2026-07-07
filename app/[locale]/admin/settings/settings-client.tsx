@@ -135,7 +135,7 @@ export function SettingsClient({ initialWebsite, initialTenant, tenantId }: { in
                     <label className="form-label">Platform Subdomain</label>
                     <div className="flex">
                       <input type="text" className="form-input rounded-r-none border-r-0 bg-slate-50 text-slate-500 font-mono" defaultValue={initialTenant?.subdomain || ''} disabled />
-                      <div className="px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-r-lg text-sm text-slate-500 font-mono">.shop.dagangos.com</div>
+                      <div className="px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-r-lg text-sm text-slate-500 font-mono">.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'shop.dagangos.com'}</div>
                     </div>
                     <p className="text-xs text-slate-400 mt-1">Contact support to change your base subdomain.</p>
                   </div>
