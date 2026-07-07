@@ -20,18 +20,34 @@ export default async function SiteLayout({
   const t = await getTranslations('SiteNav')
   const tStore = await getTranslations('Storefront')
   
-  if (!res.success || !res.website || !res.tenant) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Site Not Found</h1>
-          <p className="text-slate-500">This website is currently inactive or does not exist.</p>
-        </div>
-      </div>
-    )
-  }
+  let website: any = null
+  let tenant: any = null
 
-  const { website, tenant } = res
+  if (tenantDomain === 'default') {
+    website = {
+      siteTitle: 'Website Master Platform',
+      themeConfig: { colors: { primary: '#4F46E5', secondary: '#10B981', background: '#FFFFFF', text: '#0F172A', accent: '#F59E0B' } }
+    }
+    tenant = {
+      id: 'default',
+      companyName: 'Master Platform Default',
+      subdomain: 'store',
+      customDomain: null
+    }
+  } else {
+    if (!res.success || !res.website || !res.tenant) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-slate-50">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-slate-800 mb-2">Site Not Found</h1>
+            <p className="text-slate-500">This website is currently inactive or does not exist.</p>
+          </div>
+        </div>
+      )
+    }
+    website = res.website
+    tenant = res.tenant
+  }
   
   // Parse theme configuration
   let themeConfig = { colors: { primary: '#4F46E5', secondary: '#10B981', background: '#FFFFFF', text: '#0F172A', accent: '#F59E0B' } }
