@@ -1,0 +1,886 @@
+// This is your Prisma schema file
+// Website Master Platform — Full Multi-Tenant Schema
+// All tables implement tenant_id isolation per PRD spec
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// CORE TENANT INFRASTRUCTURE
+// ============================================================
+
+model SystemTenant {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  companyName  String       @map("company_name") @db.VarChar(255)
+  subdomain    String       @unique @db.VarChar(63)
+  customDomain String?      @unique @map("custom_domain") @db.VarChar(255)
+  status       TenantStatus @default(active)
+  plan         TenantPlan   @default(core)
+  logoUrl      String?      @map("logo_url") @db.Text
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz
+
+  // Relations
+  users              User[]
+  roles              Role[]
+  website            TenantWebsite?
+  pages              TenantPage[]
+  modules            TenantModule[]
+  auditLogs          AdminAuditLog[]
+  userProfiles       TenantUserProfile[]
+  invitations        TenantInvitation[]
+  policyRules        TenantPolicyRule[]
+  categories         TenantCategory[]
+  catalogItems       TenantCatalogItem[]
+  orders             TenantOrder[]
+  payments           TenantPayment[]
+  idempotencyKeys    PaymentIdempotencyKey[]
+  posTerminals       TenantPosTerminal[]
+  posSessions        TenantPosSession[]
+  inventoryLocations TenantInventoryLocation[]
+  inventoryBalances  TenantInventoryBalance[]
+  crmContacts        TenantCrmContact[]
+  crmTimeline        TenantCrmTimeline[]
+  bookingResources   TenantBookingResource[]
+  bookings           TenantBooking[]
+  aiConfiguration    TenantAiConfiguration?
+  aiVectors          TenantAiKnowledgeVector[]
+  notifGateways      TenantNotificationGateway[]
+  notifTemplates     TenantNotificationTemplate[]
+  analyticsEvents    TenantAnalyticsEvent[]
+  analyticsSummaries TenantAnalyticsDailySummary[]
+  apiKeys            TenantApiKey[]
+  apiWebhooks        TenantApiWebhook[]
+  authCredentials    TenantAuthCredential[]
+  refreshTokens      TenantRefreshToken[]
+  storageFiles       TenantStorageRegistry[]
+  featureOverrides   TenantFeatureOverride[]
+  tenantOrderItems   TenantOrderItem[]
+
+  @@map("system_tenants")
+}
+
+enum TenantStatus {
+  active
+  suspended
+  maintenance
+}
+
+enum TenantPlan {
+  core
+  enterprise
+  agency
+}
+
+// ============================================================
+// USERS & AUTHENTICATION
+// ============================================================
+
+model User {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String     @map("tenant_id") @db.Uuid
+  email        String     @db.VarChar(255)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  firstName    String?    @map("first_name") @db.VarChar(100)
+  lastName     String?    @map("last_name") @db.VarChar(100)
+  status       UserStatus @default(pending_verification)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant         SystemTenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles      UserRole[]
+  profile        TenantUserProfile?
+  authCredential TenantAuthCredential?
+  refreshTokens  TenantRefreshToken[]
+  uploadedFiles  TenantStorageRegistry[]
+  auditLogs      AdminAuditLog[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId, status])
+  @@map("users")
+}
+
+enum UserStatus {
+  active
+  pending_verification
+  suspended
+}
+
+model Role {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  name        String   @db.VarChar(64)
+  description String?  @db.Text
+  permissions Json     @default("{}")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant          SystemTenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles       UserRole[]
+  rolePermissions TenantRolePermission[]
+  invitations     TenantInvitation[]
+
+  @@unique([tenantId, name])
+  @@map("roles")
+}
+
+model UserRole {
+  userId String @map("user_id") @db.Uuid
+  roleId String @map("role_id") @db.Uuid
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+  @@id([userId, roleId])
+  @@map("user_roles")
+}
+
+model TenantAuthCredential {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId            String    @map("tenant_id") @db.Uuid
+  userId              String    @unique @map("user_id") @db.Uuid
+  passwordHash        String    @map("password_hash") @db.VarChar(255)
+  mfaSecretEncrypted  String?   @map("mfa_secret_encrypted") @db.Text
+  isMfaEnabled        Boolean   @default(false) @map("is_mfa_enabled")
+  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
+  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_auth_credentials")
+}
+
+model TenantRefreshToken {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash") @db.VarChar(255)
+  isRevoked Boolean  @default(false) @map("is_revoked")
+  expiresAt DateTime @map("expires_at") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([tokenHash])
+  @@map("tenant_refresh_tokens")
+}
+
+// ============================================================
+// RBAC
+// ============================================================
+
+model TenantPermissionsRegistry {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  moduleKey   String  @map("module_key") @db.VarChar(64)
+  actionKey   String  @map("action_key") @db.VarChar(64)
+  description String? @db.Text
+
+  rolePermissions TenantRolePermission[]
+
+  @@unique([moduleKey, actionKey])
+  @@map("tenant_permissions_registry")
+}
+
+model TenantRolePermission {
+  roleId       String @map("role_id") @db.Uuid
+  permissionId String @map("permission_id") @db.Uuid
+
+  role       Role                      @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission TenantPermissionsRegistry @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([roleId])
+  @@map("tenant_role_permissions")
+}
+
+model TenantPolicyRule {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  roleKey        String   @map("role_key") @db.VarChar(64)
+  moduleTarget   String   @map("module_target") @db.VarChar(64)
+  allowedActions String[] @map("allowed_actions") @db.VarChar(32)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, roleKey, moduleTarget])
+  @@index([tenantId, roleKey])
+  @@map("tenant_policy_rules")
+}
+
+// ============================================================
+// USER MANAGEMENT
+// ============================================================
+
+model TenantUserProfile {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  userId      String   @unique @map("user_id") @db.Uuid
+  phoneNumber String?  @map("phone_number") @db.VarChar(32)
+  avatarUrl   String?  @map("avatar_url") @db.Text
+  preferences Json     @default("{\"locale\":\"en\",\"timezone\":\"UTC\"}")
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, userId])
+  @@map("tenant_user_profiles")
+}
+
+model TenantInvitation {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  email          String    @db.VarChar(255)
+  invitedBy      String    @map("invited_by") @db.Uuid
+  tokenHash      String    @unique @map("token_hash") @db.VarChar(255)
+  assignedRoleId String    @map("assigned_role_id") @db.Uuid
+  expiresAt      DateTime  @map("expires_at") @db.Timestamptz
+  acceptedAt     DateTime? @map("accepted_at") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  role   Role         @relation(fields: [assignedRoleId], references: [id])
+
+  @@index([tokenHash])
+  @@map("tenant_invitations")
+}
+
+// ============================================================
+// WEBSITE MODULE
+// ============================================================
+
+model TenantWebsite {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String   @unique @map("tenant_id") @db.Uuid
+  siteTitle         String   @map("site_title") @db.VarChar(255)
+  faviconUrl        String?  @map("favicon_url") @db.Text
+  themeConfig       Json     @default("{}") @map("theme_config")
+  globalSeoMetadata Json     @default("{\"keywords\":[],\"description\":\"\"}") @map("global_seo_metadata")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_websites")
+}
+
+model TenantPage {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  slug         String   @db.VarChar(255)
+  title        String   @db.VarChar(255)
+  layoutBlocks Json     @default("[]") @map("layout_blocks")
+  seoMetadata  Json     @default("{}") @map("seo_metadata")
+  isPublished  Boolean  @default(false) @map("is_published")
+  isDeleted    Boolean  @default(false) @map("is_deleted")
+  redirectTo   String?  @map("redirect_to") @db.VarChar(255)
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, slug])
+  @@map("tenant_pages")
+}
+
+// ============================================================
+// ADMIN MODULE
+// ============================================================
+
+model TenantModule {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  moduleKey            String    @map("module_key") @db.VarChar(64)
+  isEnabled            Boolean   @default(false) @map("is_enabled")
+  configuredProperties Json      @default("{}") @map("configured_properties")
+  activatedAt          DateTime? @map("activated_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, moduleKey])
+  @@map("tenant_modules")
+}
+
+model AdminAuditLog {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  userId          String   @map("user_id") @db.Uuid
+  actionPerformed String   @map("action_performed") @db.VarChar(128)
+  targetResource  String   @map("target_resource") @db.VarChar(128)
+  ipAddress       String   @map("ip_address") @db.VarChar(45)
+  payloadChanges  Json     @default("{}") @map("payload_changes")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id])
+
+  @@index([tenantId, actionPerformed])
+  @@map("admin_audit_logs")
+}
+
+// ============================================================
+// CATALOG MODULE
+// ============================================================
+
+model TenantCategory {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  parentId        String?  @map("parent_id") @db.Uuid
+  name            String   @db.VarChar(255)
+  slug            String   @db.VarChar(255)
+  attributeSchema Json     @default("[]") @map("attribute_schema")
+  sortOrder       Int      @default(0) @map("sort_order")
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant   SystemTenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  parent   TenantCategory?     @relation("CategoryHierarchy", fields: [parentId], references: [id], onDelete: SetNull)
+  children TenantCategory[]    @relation("CategoryHierarchy")
+  items    TenantCatalogItem[]
+
+  @@unique([tenantId, slug])
+  @@map("tenant_categories")
+}
+
+model TenantCatalogItem {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  categoryId       String?  @map("category_id") @db.Uuid
+  title            String   @db.VarChar(255)
+  description      String?  @db.Text
+  basePrice        Decimal  @default(0.00) @map("base_price") @db.Decimal(12, 2)
+  sku              String?  @db.VarChar(100)
+  customAttributes Json     @default("{}") @map("custom_attributes")
+  isVisible        Boolean  @default(true) @map("is_visible")
+  imageUrls        String[] @map("image_urls")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant            SystemTenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  category          TenantCategory?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  orderItems        TenantOrderItem[]
+  inventoryBalances TenantInventoryBalance[]
+
+  @@index([tenantId, categoryId])
+  @@map("tenant_catalog_items")
+}
+
+// ============================================================
+// E-COMMERCE MODULE
+// ============================================================
+
+model TenantOrder {
+  id              String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String      @map("tenant_id") @db.Uuid
+  userId          String?     @map("user_id") @db.Uuid
+  guestEmail      String?     @map("guest_email") @db.VarChar(255)
+  orderStatus     OrderStatus @default(pending) @map("order_status")
+  totalAmount     Decimal     @map("total_amount") @db.Decimal(12, 2)
+  currency        String      @default("USD") @db.VarChar(3)
+  shippingAddress Json        @default("{}") @map("shipping_address")
+  promoCode       String?     @map("promo_code") @db.VarChar(50)
+  discountAmount  Decimal     @default(0) @map("discount_amount") @db.Decimal(12, 2)
+  notes           String?     @db.Text
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant   SystemTenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items    TenantOrderItem[]
+  payments TenantPayment[]
+
+  @@index([tenantId, orderStatus])
+  @@map("tenant_orders")
+}
+
+enum OrderStatus {
+  pending
+  paid
+  processing
+  shipped
+  completed
+  cancelled
+}
+
+model TenantOrderItem {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  orderId       String   @map("order_id") @db.Uuid
+  catalogItemId String   @map("catalog_item_id") @db.Uuid
+  quantity      Int
+  unitPrice     Decimal  @map("unit_price") @db.Decimal(12, 2)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant      SystemTenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order       TenantOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  catalogItem TenantCatalogItem @relation(fields: [catalogItemId], references: [id])
+
+  @@map("tenant_order_items")
+}
+
+// ============================================================
+// PAYMENT MODULE
+// ============================================================
+
+model TenantPayment {
+  id                    String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId              String        @map("tenant_id") @db.Uuid
+  orderId               String        @map("order_id") @db.Uuid
+  processorKey          String        @map("processor_key") @db.VarChar(64)
+  externalTransactionId String?       @unique @map("external_transaction_id") @db.VarChar(255)
+  amount                Decimal       @db.Decimal(12, 2)
+  currency              String        @default("USD") @db.VarChar(3)
+  paymentStatus         PaymentStatus @default(initiated) @map("payment_status")
+  metadata              Json          @default("{}")
+  createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order  TenantOrder  @relation(fields: [orderId], references: [id])
+
+  @@index([tenantId, paymentStatus])
+  @@map("tenant_payments")
+}
+
+enum PaymentStatus {
+  initiated
+  succeeded
+  failed
+  refunded
+  expired
+}
+
+model PaymentIdempotencyKey {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  idempotencyKey  String   @unique @map("idempotency_key") @db.VarChar(255)
+  responsePayload Json     @map("response_payload")
+  expiresAt       DateTime @map("expires_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("payment_idempotency_keys")
+}
+
+// ============================================================
+// POS MODULE
+// ============================================================
+
+model TenantPosTerminal {
+  id                 String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String         @map("tenant_id") @db.Uuid
+  terminalName       String         @map("terminal_name") @db.VarChar(100)
+  hardwareIdentifier String         @unique @map("hardware_identifier") @db.VarChar(255)
+  status             TerminalStatus @default(offline)
+  locationId         String?        @map("location_id") @db.Uuid
+  createdAt          DateTime       @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant   SystemTenant       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  sessions TenantPosSession[]
+
+  @@index([tenantId, status])
+  @@map("tenant_pos_terminals")
+}
+
+enum TerminalStatus {
+  online
+  offline
+  maintenance
+}
+
+model TenantPosSession {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String        @map("tenant_id") @db.Uuid
+  terminalId     String        @map("terminal_id") @db.Uuid
+  openedBy       String        @map("opened_by") @db.Uuid
+  closedBy       String?       @map("closed_by") @db.Uuid
+  openingBalance Decimal       @default(0.00) @map("opening_balance") @db.Decimal(12, 2)
+  closingBalance Decimal?      @map("closing_balance") @db.Decimal(12, 2)
+  status         SessionStatus @default(open)
+  openedAt       DateTime      @default(now()) @map("opened_at") @db.Timestamptz
+  closedAt       DateTime?     @map("closed_at") @db.Timestamptz
+
+  tenant   SystemTenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  terminal TenantPosTerminal @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_pos_sessions")
+}
+
+enum SessionStatus {
+  open
+  reconciled
+}
+
+// ============================================================
+// INVENTORY MODULE
+// ============================================================
+
+model TenantInventoryLocation {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  locationName      String   @map("location_name") @db.VarChar(150)
+  locationType      String   @default("warehouse") @map("location_type") @db.VarChar(50)
+  isActive          Boolean  @default(true) @map("is_active")
+  addressProperties Json     @default("{}") @map("address_properties")
+  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant   SystemTenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  balances TenantInventoryBalance[]
+
+  @@map("tenant_inventory_locations")
+}
+
+model TenantInventoryBalance {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  locationId        String   @map("location_id") @db.Uuid
+  catalogItemId     String   @map("catalog_item_id") @db.Uuid
+  quantityOnHand    Int      @default(0) @map("quantity_on_hand")
+  quantityReserved  Int      @default(0) @map("quantity_reserved")
+  lowStockThreshold Int      @default(5) @map("low_stock_threshold")
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant      SystemTenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  location    TenantInventoryLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  catalogItem TenantCatalogItem       @relation(fields: [catalogItemId], references: [id])
+
+  @@unique([locationId, catalogItemId])
+  @@index([tenantId, catalogItemId])
+  @@map("tenant_inventory_balances")
+}
+
+// ============================================================
+// CRM MODULE
+// ============================================================
+
+model TenantCrmContact {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  email          String   @db.VarChar(255)
+  phoneNumber    String?  @map("phone_number") @db.Text
+  firstName      String?  @map("first_name") @db.VarChar(100)
+  lastName       String?  @map("last_name") @db.VarChar(100)
+  tags           String[] @default([])
+  customMetadata Json     @default("{}") @map("custom_metadata")
+  totalSpend     Decimal  @default(0) @map("total_spend") @db.Decimal(12, 2)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant   SystemTenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  timeline TenantCrmTimeline[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("tenant_crm_contacts")
+}
+
+model TenantCrmTimeline {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String   @map("tenant_id") @db.Uuid
+  contactId    String   @map("contact_id") @db.Uuid
+  eventType    String   @map("event_type") @db.VarChar(64)
+  sourceModule String   @map("source_module") @db.VarChar(64)
+  eventPayload Json     @default("{}") @map("event_payload")
+  occurredAt   DateTime @map("occurred_at") @db.Timestamptz
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant  SystemTenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  contact TenantCrmContact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, contactId, occurredAt(sort: Desc)])
+  @@map("tenant_crm_timeline")
+}
+
+// ============================================================
+// BOOKING MODULE
+// ============================================================
+
+model TenantBookingResource {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String   @map("tenant_id") @db.Uuid
+  resourceName    String   @map("resource_name") @db.VarChar(255)
+  capacityPerSlot Int      @default(1) @map("capacity_per_slot")
+  bufferMinutes   Int      @default(0) @map("buffer_minutes")
+  minLeadTimeHrs  Int      @default(0) @map("min_lead_time_hrs")
+  isActive        Boolean  @default(true) @map("is_active")
+  availability    Json     @default("{}") // weekly schedule
+  createdAt       DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant   SystemTenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  bookings TenantBooking[]
+
+  @@map("tenant_booking_resources")
+}
+
+model TenantBooking {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String        @map("tenant_id") @db.Uuid
+  resourceId    String        @map("resource_id") @db.Uuid
+  customerId    String        @map("customer_id") @db.Uuid
+  bookingStatus BookingStatus @default(pending_payment) @map("booking_status")
+  startTime     DateTime      @map("start_time") @db.Timestamptz
+  endTime       DateTime      @map("end_time") @db.Timestamptz
+  metadata      Json          @default("{}")
+  notes         String?       @db.Text
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant   SystemTenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  resource TenantBookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, resourceId, startTime(sort: Desc)])
+  @@map("tenant_bookings")
+}
+
+enum BookingStatus {
+  pending_payment
+  confirmed
+  reassigned
+  completed
+  cancelled
+}
+
+// ============================================================
+// AI MODULE
+// ============================================================
+
+model TenantAiConfiguration {
+  id                      String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId                String   @unique @map("tenant_id") @db.Uuid
+  providerKey             String   @default("platform_managed") @map("provider_key") @db.VarChar(64)
+  encryptedApiSecret      String?  @map("encrypted_api_secret") @db.Text
+  selectedModelName       String   @default("gpt-4o-mini") @map("selected_model_name") @db.VarChar(100)
+  temperatureSetting      Decimal  @default(0.70) @map("temperature_setting") @db.Decimal(3, 2)
+  monthlyTokenBudget      Int      @default(1000000) @map("monthly_token_budget")
+  tokensConsumedThisMonth Int      @default(0) @map("tokens_consumed_current_month")
+  updatedAt               DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_ai_configurations")
+}
+
+model TenantAiKnowledgeVector {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  sourceModule     String   @map("source_module") @db.VarChar(64)
+  sourceResourceId String   @map("source_resource_id") @db.Uuid
+  contentChunk     String   @map("content_chunk") @db.Text
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sourceModule])
+  @@map("tenant_ai_knowledge_vectors")
+}
+
+// ============================================================
+// NOTIFICATION MODULE
+// ============================================================
+
+model TenantNotificationGateway {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId             String   @map("tenant_id") @db.Uuid
+  channelType          String   @map("channel_type") @db.VarChar(32)
+  providerName         String   @map("provider_name") @db.VarChar(64)
+  encryptedCredentials Json     @map("encrypted_credentials")
+  isActive             Boolean  @default(true) @map("is_active")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, channelType, providerName])
+  @@map("tenant_notification_gateways")
+}
+
+model TenantNotificationTemplate {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String   @map("tenant_id") @db.Uuid
+  templateKey    String   @map("template_key") @db.VarChar(64)
+  subjectLine    String?  @map("subject_line") @db.VarChar(255)
+  htmlBodyMarkup String   @map("html_body_markup") @db.Text
+  textBodyMarkup String?  @map("text_body_markup") @db.Text
+  channelType    String   @default("email") @map("channel_type") @db.VarChar(32)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, templateKey])
+  @@index([tenantId, templateKey])
+  @@map("tenant_notification_templates")
+}
+
+// ============================================================
+// ANALYTICS MODULE
+// ============================================================
+
+model TenantAnalyticsEvent {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  sessionId        String   @map("session_id") @db.VarChar(128)
+  userId           String?  @map("user_id") @db.Uuid
+  eventName        String   @map("event_name") @db.VarChar(100)
+  eventPayload     Json     @default("{}") @map("event_payload")
+  deviceProperties Json     @default("{}") @map("device_properties")
+  pageUrl          String?  @map("page_url") @db.Text
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, eventName, createdAt(sort: Desc)])
+  @@map("tenant_analytics_events")
+}
+
+model TenantAnalyticsDailySummary {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  summaryDate DateTime @map("summary_date") @db.Date
+  metricKey   String   @map("metric_key") @db.VarChar(64)
+  metricValue Decimal  @default(0.0000) @map("metric_value") @db.Decimal(16, 4)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, summaryDate, metricKey])
+  @@map("tenant_analytics_daily_summaries")
+}
+
+// ============================================================
+// API MODULE
+// ============================================================
+
+model TenantApiKey {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId     String    @map("tenant_id") @db.Uuid
+  createdBy    String    @map("created_by") @db.Uuid
+  keyName      String    @map("key_name") @db.VarChar(100)
+  keyPrefix    String    @map("key_prefix") @db.VarChar(16)
+  keyHash      String    @unique @map("key_hash") @db.VarChar(255)
+  rateLimitRpm Int       @default(60) @map("rate_limit_rpm")
+  scopes       Json      @default("[\"catalog:read\"]")
+  isActive     Boolean   @default(true) @map("is_active")
+  expiresAt    DateTime? @map("expires_at") @db.Timestamptz
+  lastUsedAt   DateTime? @map("last_used_at") @db.Timestamptz
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([keyHash])
+  @@map("tenant_api_keys")
+}
+
+model TenantApiWebhook {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  targetUrl          String   @map("target_url") @db.Text
+  secretSigningToken String   @map("secret_signing_token") @db.VarChar(255)
+  subscribedEvents   String[] @map("subscribed_events")
+  isActive           Boolean  @default(true) @map("is_active")
+  failureCount       Int      @default(0) @map("failure_count")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_api_webhooks")
+}
+
+// ============================================================
+// FILE STORAGE
+// ============================================================
+
+model TenantStorageRegistry {
+  id                String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String      @map("tenant_id") @db.Uuid
+  uploadedBy        String?     @map("uploaded_by") @db.Uuid
+  fileName          String      @map("file_name") @db.VarChar(255)
+  mimeType          String      @map("mime_type") @db.VarChar(100)
+  fileSizeBytes     BigInt      @map("file_size_bytes")
+  storageBucketPath String      @unique @map("storage_bucket_path") @db.Text
+  publicUrl         String?     @map("public_url") @db.Text
+  accessTier        StorageTier @default(public) @map("access_tier")
+  createdAt         DateTime    @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User?        @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, accessTier])
+  @@map("tenant_storage_registry")
+}
+
+enum StorageTier {
+  public
+  private
+  archived
+}
+
+// ============================================================
+// FEATURE FLAGS
+// ============================================================
+
+model SystemFeatureFlag {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  flagKey      String   @unique @map("flag_key") @db.VarChar(64)
+  description  String?  @db.Text
+  defaultState Boolean  @default(false) @map("default_state")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  overrides TenantFeatureOverride[]
+
+  @@map("system_feature_flags")
+}
+
+model TenantFeatureOverride {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String   @map("tenant_id") @db.Uuid
+  flagId            String   @map("flag_id") @db.Uuid
+  isEnabled         Boolean  @map("is_enabled")
+  rolloutPercentage Int      @default(100) @map("rollout_percentage")
+  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  flag   SystemFeatureFlag @relation(fields: [flagId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, flagId])
+  @@map("tenant_feature_overrides")
+}
+
+// ============================================================
+// BACKUP & MONITORING (System-level)
+// ============================================================
+
+model SystemAuditLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  userId     String?  @map("user_id") @db.Uuid
+  actionType String   @map("action_type") @db.VarChar(64)
+  status     String   @db.VarChar(16)
+  payload    Json?
+  ipAddress  String?  @map("ip_address") @db.VarChar(45)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("system_audit_logs")
+}
+
+model SystemBackupLedger {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  regionId          String   @map("region_id") @db.VarChar(32)
+  backupType        String   @map("backup_type") @db.VarChar(16)
+  storagePath       String   @map("storage_path") @db.Text
+  encryptionKeyId   String   @map("encryption_key_id") @db.Uuid
+  snapshotTimestamp DateTime @default(now()) @map("snapshot_timestamp") @db.Timestamptz
+  isVerified        Boolean  @default(false) @map("is_verified")
+  expiresAt         DateTime @map("expires_at") @db.Timestamptz
+
+  @@map("system_backup_ledger")
+}

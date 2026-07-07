@@ -1,0 +1,17 @@
+export const PLATFORM_MODULES = [
+  { key: 'website_module', name: 'Website', description: 'Public site renderer with dynamic theming', icon: 'Globe', category: 'core', isEnabled: true, isCore: true },
+  { key: 'admin_module', name: 'Admin Panel', description: 'Control panel for tenant management', icon: 'LayoutDashboard', category: 'core', isEnabled: true, isCore: true },
+  { key: 'user_management', name: 'User Management', description: 'Team directory, invitations, and profiles', icon: 'Users', category: 'core', isEnabled: true, isCore: true },
+  { key: 'rbac_module', name: 'Access Control', description: 'Role-based permission management', icon: 'Shield', category: 'core', isEnabled: true, isCore: true },
+  { key: 'catalog_module', name: 'Catalog', description: 'Product and service taxonomy engine', icon: 'Package', category: 'commerce', isEnabled: true, isCore: false },
+  { key: 'ecommerce_module', name: 'E-commerce', description: 'Online storefront and cart system', icon: 'ShoppingCart', category: 'commerce', isEnabled: true, isCore: false },
+  { key: 'payment_module', name: 'Payments', description: 'Multi-gateway payment processing', icon: 'CreditCard', category: 'commerce', isEnabled: true, isCore: false },
+  { key: 'pos_module', name: 'Point of Sale', description: 'In-store terminal with offline capability', icon: 'Monitor', category: 'commerce', isEnabled: false, isCore: false },
+  { key: 'inventory_module', name: 'Inventory', description: 'Multi-location stock management', icon: 'Warehouse', category: 'operations', isEnabled: true, isCore: false },
+  { key: 'crm_module', name: 'CRM', description: 'Customer directory and interaction timeline', icon: 'Users2', category: 'operations', isEnabled: true, isCore: false },
+  { key: 'booking_module', name: 'Booking', description: 'Appointment and reservation engine', icon: 'CalendarCheck', category: 'operations', isEnabled: false, isCore: false },
+  { key: 'ai_module', name: 'AI Assistant', description: 'LLM-powered content generation and search', icon: 'Sparkles', category: 'intelligence', isEnabled: false, isCore: false },
+  { key: 'notification_module', name: 'Notifications', description: 'Multi-channel notification dispatch', icon: 'Bell', category: 'intelligence', isEnabled: true, isCore: false },
+  { key: 'analytics_module', name: 'Analytics', description: 'Event tracking and business insights', icon: 'BarChart3', category: 'intelligence', isEnabled: true, isCore: false },
+  { key: 'api_module', name: 'API Portal', description: 'Developer access keys and webhooks', icon: 'Code2', category: 'developer', isEnabled: true, isCore: false },
+]

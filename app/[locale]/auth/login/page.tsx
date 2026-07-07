@@ -1,0 +1,231 @@
+'use client'
+
+import { useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { signIn } from 'next-auth/react'
+import { Globe, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, CheckCircle } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import toast from 'react-hot-toast'
+
+export default function LoginPage() {
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setIsLoading(true)
+
+    try {
+      const res = await signIn('credentials', {
+        email,
+        password,
+        redirect: false,
+      })
+
+      if (res?.error) {
+        setError(res.error)
+      } else {
+        toast.success('Login successful! Redirecting...')
+        router.push('/admin/dashboard')
+        router.refresh()
+      }
+    } catch (err) {
+      setError('An unexpected error occurred')
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
+      {/* Left panel */}
+      <div className="hidden lg:flex flex-1 flex-col justify-between p-12 relative">
+        {/* Background grid */}
+        <div className="absolute inset-0 bg-grid-pattern opacity-10" />
+        
+        {/* Logo */}
+        <div className="relative flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
+            <Globe className="w-5 h-5 text-white" />
+          </div>
+          <div>
+            <p className="text-white font-bold text-lg leading-none">DagangOS</p>
+            <p className="text-indigo-300 text-xs">Digital Indonesia</p>
+          </div>
+        </div>
+
+        {/* Hero text */}
+        <div className="relative">
+          <h1 className="text-5xl font-bold text-white leading-tight mb-6">
+            Build websites<br />
+            at{' '}
+            <span className="bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
+              scale
+            </span>
+          </h1>
+          <p className="text-slate-400 text-lg max-w-md leading-relaxed">
+            Enterprise-grade multi-tenant platform powering SMEs and enterprises 
+            across 15 integrated modules — from catalog to CRM.
+          </p>
+
+          {/* Feature list */}
+          <div className="mt-8 space-y-3">
+            {[
+              'Multi-tenant with PostgreSQL RLS isolation',
+              'JWT Ed25519 + Argon2id security',
+              '15 fully integrated business modules',
+              'Real-time theming with CSS variable injection',
+            ].map((feature) => (
+              <div key={feature} className="flex items-center gap-3">
+                <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
+                <span className="text-slate-300 text-sm">{feature}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Testimonial */}
+        <div className="relative glass-dark rounded-xl p-5 max-w-md">
+          <p className="text-slate-300 text-sm leading-relaxed italic">
+            "This platform transformed how we deliver websites to our clients. 
+            What used to take weeks now takes hours."
+          </p>
+          <div className="flex items-center gap-3 mt-3">
+            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
+              <span className="text-white text-xs font-bold">FA</span>
+            </div>
+            <div>
+              <p className="text-white text-sm font-medium">Azhari</p>
+              <p className="text-slate-400 text-xs">Founder, DagangOS Digital Indonesia</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Right panel — Login form */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12 max-w-lg lg:max-w-md">
+        <div className="w-full max-w-sm animate-slide-up">
+          {/* Mobile logo */}
+          <div className="flex items-center gap-3 mb-8 lg:hidden">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
+              <Globe className="w-4.5 h-4.5 text-white" />
+            </div>
+            <p className="text-white font-bold text-lg">DagangOS</p>
+          </div>
+
+          <div>
+            <h2 className="text-2xl font-bold text-white mb-1">Welcome back</h2>
+            <p className="text-slate-400 text-sm">Sign in to your tenant workspace</p>
+          </div>
+
+          <form onSubmit={handleLogin} className="mt-8 space-y-4">
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1.5">Email address</label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="email"
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@company.com"
+                  required
+                  className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white 
+                             placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40
+                             focus:border-indigo-500/40 transition-all text-sm"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-sm font-medium text-slate-300">Password</label>
+                <Link href="/auth/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  id="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  className="w-full pl-10 pr-11 py-3 bg-white/5 border border-white/10 rounded-xl text-white 
+                             placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40
+                             focus:border-indigo-500/40 transition-all text-sm"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
+                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
+            )}
+            
+            {/* Demo Hint */}
+            <div className="text-xs text-slate-500 bg-white/5 p-3 rounded-lg border border-white/5">
+              <p>Demo credentials:</p>
+              <p>Email: <span className="font-mono text-slate-300">admin@dagangos.com</span></p>
+              <p>Password: <span className="font-mono text-slate-300">password123</span></p>
+            </div>
+
+
+            {/* Submit */}
+            <button
+              type="submit"
+              id="login-submit"
+              disabled={isLoading}
+              className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-700 
+                         disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl 
+                         transition-all duration-200 text-sm shadow-lg shadow-indigo-900/50"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Authenticating...</span>
+                </>
+              ) : (
+                'Sign in to workspace'
+              )}
+            </button>
+          </form>
+
+          {/* Footer */}
+          <p className="mt-6 text-center text-sm text-slate-500">
+            Need an account?{' '}
+            <Link href="/auth/register" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
+              Request access
+            </Link>
+          </p>
+
+          <div className="mt-8 pt-6 border-t border-white/5">
+            <p className="text-center text-xs text-slate-600">
+              Protected by Ed25519 JWT + Argon2id · AES-256 at rest · TLS 1.3
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

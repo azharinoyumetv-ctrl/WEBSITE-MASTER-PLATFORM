@@ -1,27 +1,476 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   WEBSITE MASTER PLATFORM — DESIGN TOKEN SYSTEM
+   Tenant-injected CSS variables for multi-tenant theming
+   ============================================================ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Platform defaults (overridden per-tenant via SSR injection) */
+  --tenant-color-primary: #0F172A;
+  --tenant-color-secondary: #3B82F6;
+  --tenant-color-accent: #10B981;
+  --tenant-color-bg: #FFFFFF;
+  --tenant-color-surface: #F8FAFC;
+  --tenant-color-border: #E2E8F0;
+  --tenant-color-text: #0F172A;
+  --tenant-color-text-muted: #64748B;
+  --tenant-font-family: 'Inter', system-ui, sans-serif;
+  --tenant-font-headings: 'Inter', system-ui, sans-serif;
+  --tenant-border-radius: 0.5rem;
+  --tenant-spacing-density: 1;
+
+  /* Admin theme tokens */
+  --admin-surface-base: #F8FAFC;
+  --admin-surface-card: #FFFFFF;
+  --admin-border-accent: #E2E8F0;
+  --admin-interactive-primary: #4F46E5;
+  --admin-interactive-primary-hover: #4338CA;
+  --admin-sidebar-bg: #0F172A;
+  --admin-sidebar-text: #94A3B8;
+  --admin-sidebar-active: #FFFFFF;
+  --admin-sidebar-active-bg: rgba(255,255,255,0.1);
+
+  /* Status colors (shared) */
+  --status-success: #10B981;
+  --status-warning: #F59E0B;
+  --status-error: #EF4444;
+  --status-info: #3B82F6;
+  --status-purple: #8B5CF6;
+
+  /* Chart colors */
+  --chart-1: #3B82F6;
+  --chart-2: #10B981;
+  --chart-3: #F59E0B;
+  --chart-4: #8B5CF6;
+  --chart-5: #EC4899;
+  --chart-6: #06B6D4;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* Dark mode admin sidebar */
+.dark-sidebar {
+  background: var(--admin-sidebar-bg);
+  color: var(--admin-sidebar-text);
+}
+
+/* ============================================================
+   BASE STYLES
+   ============================================================ */
+
+@layer base {
+  * {
+    @apply border-border box-border;
+  }
+
+  html {
+    font-family: var(--tenant-font-family);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--tenant-font-family);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--tenant-font-headings);
+    font-weight: 600;
+    line-height: 1.25;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded-full;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-slate-400;
   }
 }
 
-body {
-  color: var(--foreground);
-  background: var(--background);
-  font-family: Arial, Helvetica, sans-serif;
+/* ============================================================
+   COMPONENT UTILITIES
+   ============================================================ */
+
+@layer components {
+  /* Card base */
+  .card {
+    @apply bg-white rounded-xl border border-slate-200 shadow-sm;
+  }
+
+  .card-hover {
+    @apply card transition-all duration-200 hover:shadow-md hover:border-slate-300;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-indigo-600 to-blue-500 bg-clip-text text-transparent;
+  }
+
+  /* Status badges */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-success {
+    @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-50 text-amber-700 border border-amber-200;
+  }
+
+  .badge-error {
+    @apply badge bg-red-50 text-red-700 border border-red-200;
+  }
+
+  .badge-info {
+    @apply badge bg-blue-50 text-blue-700 border border-blue-200;
+  }
+
+  .badge-purple {
+    @apply badge bg-purple-50 text-purple-700 border border-purple-200;
+  }
+
+  .badge-neutral {
+    @apply badge bg-slate-100 text-slate-600 border border-slate-200;
+  }
+
+  /* Sidebar nav item */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer;
+  }
+
+  .nav-item-default {
+    @apply nav-item text-slate-400 hover:text-white hover:bg-white/10;
+  }
+
+  .nav-item-active {
+    @apply nav-item text-white bg-white/10 border border-white/20;
+  }
+
+  /* Section header */
+  .section-header {
+    @apply flex items-center justify-between mb-6;
+  }
+
+  .section-title {
+    @apply text-xl font-semibold text-slate-900;
+  }
+
+  .section-desc {
+    @apply text-sm text-slate-500 mt-0.5;
+  }
+
+  /* Stats card */
+  .stat-card {
+    @apply card p-5 flex flex-col gap-3;
+  }
+
+  .stat-value {
+    @apply text-3xl font-bold text-slate-900;
+  }
+
+  .stat-label {
+    @apply text-sm font-medium text-slate-500;
+  }
+
+  .stat-trend-up {
+    @apply text-xs font-medium text-emerald-600 flex items-center gap-1;
+  }
+
+  .stat-trend-down {
+    @apply text-xs font-medium text-red-500 flex items-center gap-1;
+  }
+
+  /* Table */
+  .data-table {
+    @apply w-full text-sm;
+  }
+
+  .data-table th {
+    @apply text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200 bg-slate-50;
+  }
+
+  .data-table td {
+    @apply px-4 py-3 text-slate-700 border-b border-slate-100;
+  }
+
+  .data-table tr:hover td {
+    @apply bg-slate-50/50;
+  }
+
+  /* Form */
+  .form-label {
+    @apply block text-sm font-medium text-slate-700 mb-1.5;
+  }
+
+  .form-input {
+    @apply w-full px-3 py-2.5 text-sm border border-slate-200 rounded-lg bg-white text-slate-900 
+           placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 
+           focus:border-indigo-400 transition-all duration-150;
+  }
+
+  .form-select {
+    @apply form-input cursor-pointer;
+  }
+
+  .form-textarea {
+    @apply form-input resize-none;
+  }
+
+  .form-error {
+    @apply text-xs text-red-500 mt-1;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium 
+           rounded-lg transition-all duration-150 focus:outline-none focus:ring-2 
+           focus:ring-offset-1 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer;
+  }
+
+  .btn-primary {
+    @apply btn bg-indigo-600 text-white hover:bg-indigo-700 focus:ring-indigo-500;
+  }
+
+  .btn-secondary {
+    @apply btn bg-white text-slate-700 border border-slate-200 hover:bg-slate-50 focus:ring-slate-300;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700 focus:ring-red-500;
+  }
+
+  .btn-success {
+    @apply btn bg-emerald-600 text-white hover:bg-emerald-700 focus:ring-emerald-500;
+  }
+
+  .btn-ghost {
+    @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:ring-slate-300;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+
+  /* Module toggle card */
+  .module-card {
+    @apply card p-4 flex items-start gap-4 transition-all duration-200 hover:shadow-md;
+  }
+
+  .module-card-enabled {
+    @apply module-card border-indigo-200 bg-indigo-50/30;
+  }
+
+  /* Alert banners */
+  .alert {
+    @apply flex items-start gap-3 p-4 rounded-lg text-sm border;
+  }
+
+  .alert-info {
+    @apply alert bg-blue-50 border-blue-200 text-blue-800;
+  }
+
+  .alert-warning {
+    @apply alert bg-amber-50 border-amber-200 text-amber-800;
+  }
+
+  .alert-error {
+    @apply alert bg-red-50 border-red-200 text-red-800;
+  }
+
+  .alert-success {
+    @apply alert bg-emerald-50 border-emerald-200 text-emerald-800;
+  }
+
+  /* Skeleton loader */
+  .skeleton {
+    @apply bg-slate-200 animate-pulse rounded;
+  }
+
+  /* Page container */
+  .page-container {
+    @apply p-6 max-w-7xl mx-auto;
+  }
+
+  /* Divider with text */
+  .divider {
+    @apply flex items-center gap-4 my-4;
+  }
+
+  .divider::before,
+  .divider::after {
+    content: '';
+    @apply flex-1 h-px bg-slate-200;
+  }
+
+  /* Code block */
+  .code-block {
+    @apply bg-slate-900 text-slate-100 p-4 rounded-lg font-mono text-xs overflow-x-auto;
+  }
+
+  /* POS Terminal specific */
+  .pos-grid {
+    background: #111827;
+    color: white;
+  }
+
+  .pos-tile {
+    @apply bg-gray-800 hover:bg-gray-700 rounded-xl p-3 cursor-pointer 
+           transition-all duration-150 active:scale-95 flex flex-col items-center 
+           justify-center gap-2 min-h-[80px] text-center border border-gray-700;
+  }
+
+  .pos-tile-active {
+    @apply pos-tile bg-emerald-700 border-emerald-600 hover:bg-emerald-600;
+  }
+
+  .keypad-btn {
+    @apply bg-gray-700 hover:bg-gray-600 active:bg-gray-500 text-white rounded-xl p-4 
+           text-xl font-bold transition-all duration-100 active:scale-95 cursor-pointer
+           flex items-center justify-center min-h-[56px];
+  }
 }
+
+/* ============================================================
+   ANIMATIONS
+   ============================================================ */
 
 @layer utilities {
-  .text-balance {
-    text-wrap: balance;
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out;
   }
+
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  .animate-slide-in-right {
+    animation: slideInRight 0.3s ease-out;
+  }
+
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes slideInRight {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes scaleIn {
+    from { opacity: 0; transform: scale(0.95); }
+    to { opacity: 1; transform: scale(1); }
+  }
+
+  /* Pulse ring for status indicators */
+  .pulse-ring {
+    @apply relative;
+  }
+
+  .pulse-ring::after {
+    content: '';
+    @apply absolute inset-0 rounded-full animate-ping;
+  }
+
+  /* Grid patterns */
+  .bg-grid-pattern {
+    background-image: linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
+                      linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
+    background-size: 32px 32px;
+  }
+
+  /* Glassmorphism */
+  .glass {
+    @apply bg-white/70 backdrop-blur-xl border border-white/20;
+  }
+
+  .glass-dark {
+    @apply bg-slate-900/70 backdrop-blur-xl border border-white/10;
+  }
+
+  /* Gradient backgrounds */
+  .bg-gradient-hero {
+    background: linear-gradient(135deg, #0F172A 0%, #1E3A8A 50%, #0F172A 100%);
+  }
+
+  .bg-gradient-card {
+    background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  }
+
+  /* Shimmer effect */
+  .shimmer {
+    background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -200% 0; }
+    100% { background-position: 200% 0; }
+  }
+}
+
+/* ============================================================
+   RECHARTS OVERRIDES
+   ============================================================ */
+
+.recharts-default-tooltip {
+  @apply !bg-white !border !border-slate-200 !rounded-xl !shadow-lg !text-sm;
+}
+
+.recharts-tooltip-label {
+  @apply !text-slate-700 !font-semibold !mb-1;
+}
+
+/* ============================================================
+   PUBLIC WEBSITE THEME (injected per-tenant)
+   ============================================================ */
+
+.tenant-themed {
+  --primary: var(--tenant-color-primary);
+  --secondary: var(--tenant-color-secondary);
+  --accent: var(--tenant-color-accent);
+  --bg: var(--tenant-color-bg);
+  --text: var(--tenant-color-text);
+  font-family: var(--tenant-font-family);
+}
+
+.tenant-btn-primary {
+  background-color: var(--tenant-color-secondary);
+  color: white;
+  @apply px-6 py-3 rounded-lg font-semibold transition-all duration-200 hover:opacity-90;
+}
+
+.tenant-nav {
+  background-color: var(--tenant-color-primary);
+  color: white;
 }
