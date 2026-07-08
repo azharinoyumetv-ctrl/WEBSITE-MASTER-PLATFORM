@@ -2,8 +2,7 @@
 
 import { PrismaClient, TenantStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
-
-
+import prisma from "@/lib/prisma"
 
 export async function getTenants() {
   try {
@@ -204,7 +203,7 @@ export async function getTenantById(tenantId: string) {
       include: {
         modules: true,
         users: {
-          select: { id: true, email: true, firstName: true, lastName: true, role: true }
+          select: { id: true, email: true, firstName: true, lastName: true, userRoles: true }
         }
       }
     })

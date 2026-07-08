@@ -34,8 +34,7 @@ export async function adjustInventory(tenantId: string, balanceId: string, quant
     const updated = await prisma.tenantInventoryBalance.update({
       where: { id: balanceId },
       data: {
-        quantityOnHand: newQty,
-        status: newStatus
+        quantityOnHand: newQty
       }
     })
 

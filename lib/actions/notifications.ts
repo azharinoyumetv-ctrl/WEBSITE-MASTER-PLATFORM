@@ -40,8 +40,8 @@ export async function getNotificationGateway(tenantId: string, channelType: stri
       where: { tenantId, channelType }
     })
     
-    if (gateway && gateway.providerConfig) {
-      const config = gateway.providerConfig as any
+    if (gateway && gateway.encryptedCredentials) {
+      const config = typeof gateway.encryptedCredentials === 'string' ? JSON.parse(gateway.encryptedCredentials) : gateway.encryptedCredentials
       if (config.password) {
         config.password = decrypt(config.password)
       }
@@ -71,14 +71,14 @@ export async function saveNotificationGateway(tenantId: string, channelType: str
         }
       },
       update: {
-        providerConfig: secureConfig,
+        encryptedCredentials: secureConfig,
         isActive: true
       },
       create: {
         tenantId,
         channelType,
         providerName,
-        providerConfig: secureConfig,
+        encryptedCredentials: secureConfig,
         isActive: true
       }
     })

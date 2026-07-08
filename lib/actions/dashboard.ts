@@ -43,13 +43,23 @@ export async function getDashboardMetrics(tenantId: string) {
     })
 
     // Inventory alerts
-    const criticalItems = await prisma.tenantInventoryBalance.findMany({
+    const criticalBalances = await prisma.tenantInventoryBalance.findMany({
       where: {
         tenantId,
-        status: { in: ['critical', 'low'] }
+        quantityOnHand: { lte: 5 }
+      },
+      include: {
+        catalogItem: { select: { title: true } }
       },
       take: 5
     })
+
+    const criticalItems = criticalBalances.map(b => ({
+      id: b.id,
+      itemTitle: b.catalogItem?.title || 'Unknown Item',
+      quantityOnHand: b.quantityOnHand,
+      status: b.quantityOnHand <= 0 ? 'critical' : 'low'
+    }))
 
     // Enabled modules
     const modules = await prisma.tenantModule.findMany({

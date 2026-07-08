@@ -3,6 +3,7 @@
 import { PrismaClient, OrderStatus, PaymentStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { getCatalogItems } from './catalog'
+import prisma from "@/lib/prisma"
 
 
 

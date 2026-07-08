@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       }
       if (!serverKey) return NextResponse.json({ error: 'Payment provider not configured. Add your API key in Settings or set the platform environment variable.' }, { status: 500 })
 
-      const baseUrl = serverKey.startsWith('SB-Mid-server-') 
+      const baseUrl = (serverKey.startsWith('SB-') || serverKey.toLowerCase().includes('sandbox'))
         ? 'https://app.sandbox.midtrans.com/snap/v1/transactions' 
         : 'https://app.midtrans.com/snap/v1/transactions'
 

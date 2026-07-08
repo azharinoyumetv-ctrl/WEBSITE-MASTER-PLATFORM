@@ -2,6 +2,7 @@
 
 import { PrismaClient, OrderStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
+import prisma from "@/lib/prisma"
 
 
 

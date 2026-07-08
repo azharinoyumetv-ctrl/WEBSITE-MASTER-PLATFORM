@@ -3,6 +3,7 @@
 import { PrismaClient, UserStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
+import prisma from "@/lib/prisma"
 
 
 
