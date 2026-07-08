@@ -42,13 +42,25 @@ export async function POST(request: Request) {
           if (decryptedKey) apiKey = decryptedKey
         }
         if (aiConfig.selectedModelName) {
-          modelName = aiConfig.selectedModelName
+          modelName = aiConfig.selectedModelName.split('|url:')[0]
+          if (aiConfig.selectedModelName.includes('|url:')) {
+            // we'll parse this below if custom
+            (aiConfig as any).customBaseUrl = aiConfig.selectedModelName.split('|url:')[1]
+          }
         }
         if (aiConfig.providerKey && aiConfig.providerKey !== 'platform_managed') {
           provider = aiConfig.providerKey
+          if (provider === 'custom') {
+            (aiConfig as any).customBaseUrl = aiConfig.selectedModelName.split('|url:')[1]
+          }
         }
       }
     }
+
+    // Pass customBaseUrl down to provider checks
+    const customBaseUrl = tenantId !== 'default' && provider === 'custom' 
+      ? (await prisma.tenantAiConfiguration.findUnique({ where: { tenantId } }))?.selectedModelName.split('|url:')[1] 
+      : ''
 
     if (!apiKey) {
       return NextResponse.json(
@@ -59,11 +71,15 @@ export async function POST(request: Request) {
 
     let resultText = ''
 
-    if (provider === 'openai' || provider === 'deepseek' || provider === 'grok' || provider === 'kimi') {
+    if (provider === 'openai' || provider === 'deepseek' || provider === 'grok' || provider === 'kimi' || provider === 'custom') {
       let baseUrl = 'https://api.openai.com/v1/chat/completions'
       if (provider === 'deepseek') baseUrl = 'https://api.deepseek.com/chat/completions'
       if (provider === 'grok') baseUrl = 'https://api.x.ai/v1/chat/completions'
       if (provider === 'kimi') baseUrl = 'https://api.moonshot.cn/v1/chat/completions'
+      if (provider === 'custom') {
+        const cUrl = customBaseUrl || ''
+        baseUrl = cUrl.endsWith('/chat/completions') ? cUrl : cUrl.replace(/\/$/, '') + '/chat/completions'
+      }
 
       const res = await fetch(baseUrl, {
         method: 'POST',

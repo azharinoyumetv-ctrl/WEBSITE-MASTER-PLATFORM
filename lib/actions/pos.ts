@@ -36,9 +36,9 @@ export async function getPosData(tenantId: string) {
 export async function processPosPayment(tenantId: string, terminalId: string, cart: any[], paymentMethod: string, total: number) {
   try {
     // Note: In real system, we'd ensure a POS session is open
-    const isImmediate = paymentMethod === 'cash' || paymentMethod === 'qr'
-    const paymentStatus = isImmediate ? 'succeeded' : 'initiated'
-    const orderStatus = isImmediate ? 'completed' : 'processing'
+    const isCash = paymentMethod === 'cash'
+    const paymentStatus = isCash ? 'succeeded' : 'initiated'
+    const orderStatus = isCash ? 'completed' : 'pending'
 
     const order = await prisma.tenantOrder.create({
       data: {

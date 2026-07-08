@@ -20,5 +20,14 @@ export default async function EcommercePage() {
   const res = await getOrders(tenantId)
   const initialOrders = res.success ? res.orders : []
 
-  return <EcommerceClient initialOrders={initialOrders} tenantId={tenantId} />
+  let baseCurrency = 'USD'
+  try {
+    const prisma = (await import('@/lib/prisma')).default
+    const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })
+    if (website && website.themeConfig && (website.themeConfig as any).baseCurrency) {
+      baseCurrency = (website.themeConfig as any).baseCurrency
+    }
+  } catch(e) {}
+
+  return <EcommerceClient initialOrders={initialOrders} tenantId={tenantId} baseCurrency={baseCurrency} />
 }

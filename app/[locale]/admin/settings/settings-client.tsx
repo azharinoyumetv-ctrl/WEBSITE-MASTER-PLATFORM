@@ -187,13 +187,12 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                     <label className="form-label">Active Payment Gateway</label>
                     <select 
                       className="form-select max-w-sm"
-                      value={websiteData.themeConfig.paymentGateway || 'mock'}
+                      value={websiteData.themeConfig.paymentGateway || 'xendit'}
                       onChange={(e) => setWebsiteData({
                         ...websiteData,
                         themeConfig: { ...websiteData.themeConfig, paymentGateway: e.target.value }
                       })}
                     >
-                      <option value="mock">Development Sandbox</option>
                       <option value="xendit">Xendit</option>
                       <option value="midtrans">Midtrans</option>
                     </select>
@@ -369,9 +368,27 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       <option value="deepseek">DeepSeek</option>
                       <option value="grok">xAI (Grok)</option>
                       <option value="kimi">Moonshot (Kimi)</option>
+                      <option value="custom">Custom (OpenAI Compatible)</option>
                     </select>
                     <p className="text-xs text-slate-400 mt-1">If using your own API key, select the provider above.</p>
                   </div>
+
+                  {aiData.providerKey === 'custom' && (
+                    <div>
+                      <label className="form-label">Custom Base URL</label>
+                      <input 
+                        type="url" 
+                        className="form-input max-w-md" 
+                        placeholder="https://api.example.com/v1"
+                        value={aiData.selectedModelName.split('|url:')[1] || ''}
+                        onChange={(e) => {
+                          const model = aiData.selectedModelName.split('|url:')[0] || ''
+                          setAiData({ ...aiData, selectedModelName: `${model}|url:${e.target.value}` })
+                        }}
+                      />
+                      <p className="text-xs text-slate-400 mt-1">Enter the OpenAI-compatible base URL (omit /chat/completions).</p>
+                    </div>
+                  )}
 
                   {aiData.providerKey !== 'platform_managed' && (
                     <>
@@ -388,50 +405,17 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       </div>
                       <div>
                         <label className="form-label">Language Model</label>
-                        <select 
-                          className="form-select max-w-sm"
-                          value={aiData.selectedModelName}
-                          onChange={(e) => setAiData({ ...aiData, selectedModelName: e.target.value })}
-                        >
-                          {aiData.providerKey === 'openai' && (
-                            <>
-                              <option value="gpt-4o-mini">gpt-4o-mini</option>
-                              <option value="gpt-4o">gpt-4o</option>
-                              <option value="gpt-4-turbo">gpt-4-turbo</option>
-                            </>
-                          )}
-                          {aiData.providerKey === 'anthropic' && (
-                            <>
-                              <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
-                              <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
-                              <option value="claude-3-opus-20240229">Claude 3 Opus</option>
-                            </>
-                          )}
-                          {aiData.providerKey === 'gemini' && (
-                            <>
-                              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
-                              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                            </>
-                          )}
-                          {aiData.providerKey === 'deepseek' && (
-                            <>
-                              <option value="deepseek-chat">DeepSeek Chat</option>
-                              <option value="deepseek-coder">DeepSeek Coder</option>
-                            </>
-                          )}
-                          {aiData.providerKey === 'grok' && (
-                            <>
-                              <option value="grok-beta">grok-beta</option>
-                              <option value="grok-2-latest">grok-2-latest</option>
-                            </>
-                          )}
-                          {aiData.providerKey === 'kimi' && (
-                            <>
-                              <option value="moonshot-v1-8k">moonshot-v1-8k</option>
-                              <option value="moonshot-v1-32k">moonshot-v1-32k</option>
-                            </>
-                          )}
-                        </select>
+                        <input 
+                          type="text"
+                          className="form-input max-w-sm"
+                          placeholder="e.g. gpt-4o, claude-3-5-sonnet-latest"
+                          value={aiData.selectedModelName.split('|url:')[0] || ''}
+                          onChange={(e) => {
+                            const urlPart = aiData.selectedModelName.includes('|url:') ? `|url:${aiData.selectedModelName.split('|url:')[1]}` : ''
+                            setAiData({ ...aiData, selectedModelName: `${e.target.value}${urlPart}` })
+                          }}
+                        />
+                        <p className="text-xs text-slate-400 mt-1">Type the exact model identifier.</p>
                       </div>
                     </>
                   )}

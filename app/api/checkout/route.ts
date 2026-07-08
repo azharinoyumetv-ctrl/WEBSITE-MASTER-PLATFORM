@@ -19,18 +19,51 @@ export async function POST(req: NextRequest) {
     
     // Scaffold for actual provider integration
     if (paymentGateway === 'xendit') {
-      // TODO: Initialize Xendit checkout using xendit-node
-      // const xenditInvoice = await xendit.Invoice.createInvoice({ ... })
-      // return NextResponse.json({ url: xenditInvoice.invoiceUrl })
-      return NextResponse.json({ error: 'Xendit integration is pending configuration' }, { status: 501 })
+      const apiKey = process.env.XENDIT_SECRET_KEY || 'xnd_development_dummy'
+      const res = await fetch('https://api.xendit.co/v2/invoices', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Basic ${Buffer.from(apiKey + ':').toString('base64')}`
+        },
+        body: JSON.stringify({
+          external_id: `txn_${Date.now()}`,
+          amount: body.amount || 10000,
+          payer_email: body.email || 'customer@example.com',
+          description: 'Checkout Order'
+        })
+      })
+      if (!res.ok) {
+        return NextResponse.json({ error: 'Failed to create Xendit invoice' }, { status: 502 })
+      }
+      const data = await res.json()
+      return NextResponse.json({ url: data.invoice_url })
     }
     
     if (paymentGateway === 'midtrans') {
-      // TODO: Initialize Midtrans Snap using midtrans-client
-      // const snap = new midtransClient.Snap({ ... })
-      // const transaction = await snap.createTransaction({ ... })
-      // return NextResponse.json({ url: transaction.redirect_url })
-      return NextResponse.json({ error: 'Midtrans integration is pending configuration' }, { status: 501 })
+      const serverKey = process.env.MIDTRANS_SERVER_KEY || 'SB-Mid-server-dummy'
+      const res = await fetch('https://app.sandbox.midtrans.com/snap/v1/transactions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Basic ${Buffer.from(serverKey + ':').toString('base64')}`
+        },
+        body: JSON.stringify({
+          transaction_details: {
+            order_id: `txn_${Date.now()}`,
+            gross_amount: body.amount || 10000
+          },
+          customer_details: {
+            email: body.email || 'customer@example.com'
+          }
+        })
+      })
+      if (!res.ok) {
+        return NextResponse.json({ error: 'Failed to create Midtrans Snap transaction' }, { status: 502 })
+      }
+      const data = await res.json()
+      return NextResponse.json({ url: data.redirect_url })
     }
 
     // Default Sandbox / Mock behavior

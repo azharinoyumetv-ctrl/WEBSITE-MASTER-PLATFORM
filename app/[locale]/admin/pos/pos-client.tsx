@@ -6,7 +6,7 @@ import { formatCurrency, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { processPosPayment } from '@/lib/actions/pos'
 
-export function PosClient({ initialTerminal, initialCatalogItems, tenantId }: { initialTerminal: any, initialCatalogItems: any[], tenantId: string }) {
+export function PosClient({ initialTerminal, initialCatalogItems, tenantId, baseCurrency = 'USD' }: { initialTerminal: any, initialCatalogItems: any[], tenantId: string, baseCurrency?: string }) {
   const [cart, setCart] = useState<Array<{id: string; title: string; price: number; qty: number}>>([])
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'qr'>('card')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -49,7 +49,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, tenantId }: { 
     setIsProcessing(false)
     
     if (res.success) {
-      toast.success(`Payment of ${formatCurrency(grandTotal)} processed via ${paymentMethod.toUpperCase()}`)
+      toast.success(`Payment of ${formatCurrency(grandTotal, baseCurrency)} processed via ${paymentMethod.toUpperCase()}`)
       setCart([])
     } else {
       toast.error(res.error || 'Failed to process payment')
@@ -115,7 +115,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, tenantId }: { 
                   <ShoppingCart className="w-5 h-5 text-gray-400" />
                 </div>
                 <p className="text-white text-xs font-medium line-clamp-2 text-center leading-tight">{product.title}</p>
-                <p className="text-emerald-400 text-sm font-bold mt-1">{formatCurrency(Number(product.basePrice))}</p>
+                <p className="text-emerald-400 text-sm font-bold mt-1">{formatCurrency(Number(product.basePrice), baseCurrency)}</p>
               </button>
             ))}
             {visibleProducts.length === 0 && (
@@ -172,7 +172,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, tenantId }: { 
                       <Plus className="w-3 h-3 text-white" />
                     </button>
                   </div>
-                  <p className="text-emerald-400 font-bold text-sm">{formatCurrency(item.price * item.qty)}</p>
+                  <p className="text-emerald-400 font-bold text-sm">{formatCurrency(item.price * item.qty, baseCurrency)}</p>
                 </div>
               </div>
             ))
@@ -184,15 +184,15 @@ export function PosClient({ initialTerminal, initialCatalogItems, tenantId }: { 
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between text-gray-400">
               <span>Subtotal</span>
-              <span>{formatCurrency(total)}</span>
+              <span>{formatCurrency(total, baseCurrency)}</span>
             </div>
             <div className="flex justify-between text-gray-400">
               <span>Tax (10%)</span>
-              <span>{formatCurrency(tax)}</span>
+              <span>{formatCurrency(tax, baseCurrency)}</span>
             </div>
             <div className="flex justify-between text-white font-bold text-base pt-1 border-t border-gray-700">
               <span>Total</span>
-              <span>{formatCurrency(grandTotal)}</span>
+              <span>{formatCurrency(grandTotal, baseCurrency)}</span>
             </div>
           </div>
 
@@ -232,7 +232,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, tenantId }: { 
                 Processing...
               </div>
             ) : (
-              <>Charge {formatCurrency(grandTotal)}</>
+              <>Charge {formatCurrency(grandTotal, baseCurrency)}</>
             )}
           </button>
         </div>

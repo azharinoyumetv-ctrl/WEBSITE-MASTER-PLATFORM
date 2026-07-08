@@ -16,7 +16,7 @@ const STATUS_ACTIONS: Record<string, OrderStatus[]> = {
   cancelled: [],
 }
 
-export function EcommerceClient({ initialOrders, tenantId }: { initialOrders: any[], tenantId: string }) {
+export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' }: { initialOrders: any[], tenantId: string, baseCurrency?: string }) {
   const [orders, setOrders] = useState(initialOrders)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
@@ -67,7 +67,7 @@ export function EcommerceClient({ initialOrders, tenantId }: { initialOrders: an
           { label: 'Total Orders', value: stats.total, icon: ShoppingCart, color: 'bg-indigo-600' },
           { label: 'Pending', value: stats.pending, icon: Clock, color: 'bg-amber-500' },
           { label: 'Completed', value: stats.completed, icon: CheckCircle2, color: 'bg-emerald-600' },
-          { label: 'Total Revenue', value: formatCurrency(stats.revenue), icon: DollarSign, color: 'bg-blue-600' },
+          { label: 'Total Revenue', value: formatCurrency(stats.revenue, baseCurrency), icon: DollarSign, color: 'bg-blue-600' },
         ].map(s => (
           <div key={s.label} className="stat-card">
             <div className="flex items-center justify-between">
@@ -123,7 +123,7 @@ export function EcommerceClient({ initialOrders, tenantId }: { initialOrders: an
                     <td><span className="font-mono text-xs font-semibold text-indigo-700">{order.id.slice(0, 8).toUpperCase()}</span></td>
                     <td className="text-sm">{order.guestEmail || 'Registered User'}</td>
                     <td className="text-sm text-slate-500">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</td>
-                    <td className="font-semibold text-sm">{formatCurrency(Number(order.totalAmount))}</td>
+                    <td className="font-semibold text-sm">{formatCurrency(Number(order.totalAmount), baseCurrency)}</td>
                     <td><span className={`badge ${getStatusBadgeClass(order.orderStatus)}`}>{order.orderStatus}</span></td>
                     <td className="text-sm text-slate-400">{formatDate(order.createdAt, 'relative')}</td>
                   </tr>
@@ -162,12 +162,12 @@ export function EcommerceClient({ initialOrders, tenantId }: { initialOrders: an
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-500">Total</span>
-                  <span className="font-bold text-indigo-700">{formatCurrency(Number(selectedOrder.totalAmount))}</span>
+                  <span className="font-bold text-indigo-700">{formatCurrency(Number(selectedOrder.totalAmount), baseCurrency)}</span>
                 </div>
                 {selectedOrder.promoCode && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-500">Discount ({selectedOrder.promoCode})</span>
-                    <span className="text-emerald-600">-{formatCurrency(Number(selectedOrder.discountAmount))}</span>
+                    <span className="text-emerald-600">-{formatCurrency(Number(selectedOrder.discountAmount), baseCurrency)}</span>
                   </div>
                 )}
               </div>
@@ -183,9 +183,9 @@ export function EcommerceClient({ initialOrders, tenantId }: { initialOrders: an
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-xs font-medium text-slate-800 truncate">{item.catalogItem?.title || 'Unknown Item'}</p>
-                        <p className="text-xs text-slate-400">x{item.quantity} @ {formatCurrency(Number(item.unitPrice))}</p>
+                        <p className="text-xs text-slate-400">x{item.quantity} @ {formatCurrency(Number(item.unitPrice), baseCurrency)}</p>
                       </div>
-                      <span className="text-xs font-semibold text-slate-700">{formatCurrency(item.quantity * Number(item.unitPrice))}</span>
+                      <span className="text-xs font-semibold text-slate-700">{formatCurrency(item.quantity * Number(item.unitPrice), baseCurrency)}</span>
                     </div>
                   ))}
                 </div>
