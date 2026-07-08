@@ -364,7 +364,8 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                     >
                       <option value="platform_managed">Platform Managed (Default)</option>
                       <option value="openai">OpenAI</option>
-                      <option value="anthropic">Anthropic (Coming Soon)</option>
+                      <option value="anthropic">Anthropic (Claude)</option>
+                      <option value="gemini">Google (Gemini)</option>
                     </select>
                     <p className="text-xs text-slate-400 mt-1">If using your own API key, select the provider above.</p>
                   </div>
@@ -389,9 +390,26 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                           value={aiData.selectedModelName}
                           onChange={(e) => setAiData({ ...aiData, selectedModelName: e.target.value })}
                         >
-                          <option value="gpt-4o-mini">gpt-4o-mini</option>
-                          <option value="gpt-4o">gpt-4o</option>
-                          <option value="gpt-4-turbo">gpt-4-turbo</option>
+                          {aiData.providerKey === 'openai' && (
+                            <>
+                              <option value="gpt-4o-mini">gpt-4o-mini</option>
+                              <option value="gpt-4o">gpt-4o</option>
+                              <option value="gpt-4-turbo">gpt-4-turbo</option>
+                            </>
+                          )}
+                          {aiData.providerKey === 'anthropic' && (
+                            <>
+                              <option value="claude-3-5-sonnet-20240620">Claude 3.5 Sonnet</option>
+                              <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                              <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                            </>
+                          )}
+                          {aiData.providerKey === 'gemini' && (
+                            <>
+                              <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
+                              <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            </>
+                          )}
                         </select>
                       </div>
                     </>

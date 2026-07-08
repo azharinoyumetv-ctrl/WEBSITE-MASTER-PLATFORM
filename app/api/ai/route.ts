@@ -27,10 +27,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ result: "I've escalated your request to a human support agent. They will get back to you shortly." })
     }
 
-    let apiKey = process.env.OPENAI_API_KEY
+    let apiKey = ''
     let modelName = 'gpt-4o-mini'
+    let provider = 'openai'
 
-    if (tenantId && tenantId !== 'default') {
+    if (tenantId === 'default') {
+      apiKey = process.env.OPENAI_API_KEY || ''
+      provider = 'openai'
+    } else if (tenantId) {
       const aiConfig = await prisma.tenantAiConfiguration.findUnique({ where: { tenantId } })
       if (aiConfig) {
         if (aiConfig.encryptedApiSecret) {
@@ -40,35 +44,80 @@ export async function POST(request: Request) {
         if (aiConfig.selectedModelName) {
           modelName = aiConfig.selectedModelName
         }
+        if (aiConfig.providerKey && aiConfig.providerKey !== 'platform_managed') {
+          provider = aiConfig.providerKey
+        }
       }
     }
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: 'AI features are disabled: Missing OpenAI provider configuration.' },
+        { error: 'AI features are disabled: Missing provider API key. Please configure it in your Settings.' },
         { status: 400 }
       )
     }
 
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: modelName,
-        messages: [{ role: 'user', content: prompt || `Generate a ${tone} ${type} about ${context}` }]
+    let resultText = ''
+
+    if (provider === 'openai') {
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [{ role: 'user', content: prompt || `Generate a ${tone} ${type} about ${context}` }]
+        })
       })
-    })
-    
-    if (!res.ok) {
-      const errorData = await res.json()
-      return NextResponse.json({ error: errorData.error?.message || 'OpenAI API error' }, { status: res.status })
+      if (!res.ok) {
+        const errorData = await res.json()
+        return NextResponse.json({ error: errorData.error?.message || 'OpenAI API error' }, { status: res.status })
+      }
+      const data = await res.json()
+      resultText = data.choices[0].message.content
+    } else if (provider === 'anthropic') {
+      const res = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        },
+        body: JSON.stringify({
+          model: modelName,
+          max_tokens: 1024,
+          messages: [{ role: 'user', content: prompt || `Generate a ${tone} ${type} about ${context}` }]
+        })
+      })
+      if (!res.ok) {
+        const errorData = await res.json()
+        return NextResponse.json({ error: errorData.error?.message || 'Anthropic API error' }, { status: res.status })
+      }
+      const data = await res.json()
+      resultText = data.content[0].text
+    } else if (provider === 'gemini') {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt || `Generate a ${tone} ${type} about ${context}` }] }]
+        })
+      })
+      if (!res.ok) {
+        const errorData = await res.json()
+        return NextResponse.json({ error: errorData.error?.message || 'Gemini API error' }, { status: res.status })
+      }
+      const data = await res.json()
+      resultText = data.candidates[0].content.parts[0].text
+    } else {
+      return NextResponse.json({ error: 'Unsupported AI provider selected.' }, { status: 400 })
     }
 
-    const data = await res.json()
-    return NextResponse.json({ result: data.choices[0].message.content })
+    return NextResponse.json({ result: resultText })
 
   } catch (error: any) {
     console.error('AI generation error:', error)
