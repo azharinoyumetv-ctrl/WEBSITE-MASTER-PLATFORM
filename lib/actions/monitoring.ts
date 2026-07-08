@@ -48,9 +48,7 @@ export async function getMonitoringStatus() {
     monitoring: {
       systemStatus: dbStatus === 'up' ? 'healthy' : 'degraded',
       nodes: [
-        { service: 'api_gateway', status: 'up', latency: '12ms', uptime: '99.98%' },
-        { service: 'postgres_rls', status: dbStatus, connections: dbConnections, uptime: '99.99%', latency: dbLatency },
-        { service: 'nextjs_frontend', status: 'up', latency: nextjsLatency, uptime: '100%' },
+        { service: 'postgres_rls', status: dbStatus, connections: dbConnections, uptime: '99.99%', latency: dbLatency }
       ],
       alertHistory: formattedAlerts
     }

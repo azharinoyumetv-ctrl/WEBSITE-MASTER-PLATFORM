@@ -45,7 +45,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, tenantId, base
     if (cart.length === 0) { toast.error('Cart is empty'); return }
     setIsProcessing(true)
     
-    const res = await processPosPayment(tenantId, initialTerminal.id, cart, paymentMethod, grandTotal)
+    const res = await processPosPayment(tenantId, initialTerminal.id, cart, paymentMethod, grandTotal, baseCurrency)
     setIsProcessing(false)
     
     if (res.success) {

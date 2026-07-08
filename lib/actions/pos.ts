@@ -33,7 +33,7 @@ export async function getPosData(tenantId: string) {
   }
 }
 
-export async function processPosPayment(tenantId: string, terminalId: string, cart: any[], paymentMethod: string, total: number) {
+export async function processPosPayment(tenantId: string, terminalId: string, cart: any[], paymentMethod: string, total: number, currency: string = 'USD') {
   try {
     // Note: In real system, we'd ensure a POS session is open
     const isCash = paymentMethod === 'cash'
@@ -45,6 +45,7 @@ export async function processPosPayment(tenantId: string, terminalId: string, ca
         tenantId,
         orderStatus: orderStatus,
         totalAmount: total,
+        currency: currency,
         items: {
           create: cart.map(item => ({
             tenantId,
@@ -58,6 +59,7 @@ export async function processPosPayment(tenantId: string, terminalId: string, ca
             tenantId,
             processorKey: `pos_${paymentMethod}`,
             amount: total,
+            currency: currency,
             paymentStatus: paymentStatus
           }
         }

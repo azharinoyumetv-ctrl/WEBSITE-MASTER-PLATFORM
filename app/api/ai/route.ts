@@ -19,7 +19,7 @@ export async function POST(request: Request) {
           await sendWhatsAppTemplate({
             to: whatsappPaNumber,
             templateName: whatsappTemplate,
-            parameters: ['AI Chatbot Escalaion', prompt.substring(0, 100)],
+            parameters: ['Support Escalation', prompt.substring(0, 100)],
             credentials: { token: whatsappToken, phoneNumberId: whatsappPhoneId }
           }).catch(console.error)
         }

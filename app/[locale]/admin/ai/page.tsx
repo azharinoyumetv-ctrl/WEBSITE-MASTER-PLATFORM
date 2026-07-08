@@ -11,6 +11,7 @@ export default function AIPage() {
     { role: 'assistant', content: 'Hello! I am your platform AI assistant. I can help you draft product descriptions, analyze sales data, or write marketing copy. What can I help you with today?' }
   ])
   const [isGenerating, setIsGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   // Content Gen state
   const [genType, setGenType] = useState('Product Description')
@@ -32,7 +33,13 @@ export default function AIPage() {
         body: JSON.stringify({ prompt: userPrompt })
       })
       const data = await res.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: data.result || data.error }])
+      if (res.status === 400 && data.error?.includes('API key')) {
+        setAiError(data.error)
+        setMessages(prev => [...prev, { role: 'assistant', content: 'I am unable to assist until an AI provider is configured.' }])
+      } else {
+        setAiError(null)
+        setMessages(prev => [...prev, { role: 'assistant', content: data.result || data.error }])
+      }
     } catch (err) {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error connecting to the AI service.' }])
     } finally {
@@ -51,7 +58,13 @@ export default function AIPage() {
         body: JSON.stringify({ type: genType, context: genContext, tone: genTone })
       })
       const data = await res.json()
-      setGenResult(data.result || data.error)
+      if (res.status === 400 && data.error?.includes('API key')) {
+        setAiError(data.error)
+        setGenResult('AI features are disabled until a provider is configured in Settings.')
+      } else {
+        setAiError(null)
+        setGenResult(data.result || data.error)
+      }
     } catch (err) {
       setGenResult('Error connecting to the AI service.')
     } finally {
@@ -81,6 +94,16 @@ export default function AIPage() {
           </button>
         </div>
       </div>
+
+      {aiError && (
+        <div className="mx-6 mt-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg flex justify-between items-center shadow-sm">
+          <div>
+            <h3 className="font-bold text-sm">AI Not Configured</h3>
+            <p className="text-sm">{aiError}</p>
+          </div>
+          <a href="./settings" className="text-sm font-semibold underline hover:text-red-800">Go to Settings</a>
+        </div>
+      )}
 
       {activeTab === 'chat' && (
         <div className="flex-1 flex flex-col min-h-0 bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
