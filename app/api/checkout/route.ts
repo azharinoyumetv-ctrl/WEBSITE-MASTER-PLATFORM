@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     })
     
     const themeConfig = websiteRes?.themeConfig as any || {}
-    const paymentGateway = themeConfig.paymentGateway || 'mock'
+    const paymentGateway = themeConfig.paymentGateway || 'unset'
     
     if (!body.email) {
       return NextResponse.json({ error: 'Customer email is required for checkout' }, { status: 400 })

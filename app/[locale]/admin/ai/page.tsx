@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, MessageSquare, Image as ImageIcon, Search, ChevronRight, Zap, StopCircle, CornerDownLeft, Bot, User, Loader2 } from 'lucide-react'
+import { Sparkles, MessageSquare, StopCircle, CornerDownLeft, Bot, User, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 export default function AIPage() {

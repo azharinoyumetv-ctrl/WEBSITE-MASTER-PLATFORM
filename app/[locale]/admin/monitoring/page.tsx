@@ -77,21 +77,33 @@ export default async function MonitoringPage() {
             <div className="relative">
               <div className="absolute left-3.5 top-0 bottom-0 w-px bg-slate-100" />
               <div className="space-y-4">
-                {data.alertHistory.map((alert: any) => (
-                  <div key={alert.id} className="relative pl-10">
-                    <div className={cn(
-                      'absolute left-0 w-7 h-7 rounded-full border-2 border-white flex items-center justify-center z-10',
-                      alert.severity === 'WARNING' ? 'bg-amber-100 text-amber-500' : 'bg-blue-100 text-blue-500'
-                    )}>
-                      {alert.severity === 'WARNING' ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                {data.alertHistory.length > 0 ? (
+                  data.alertHistory.map((alert: any) => (
+                    <div key={alert.id} className="relative pl-10">
+                      <div className={cn(
+                        'absolute left-0 w-7 h-7 rounded-full border-2 border-white flex items-center justify-center z-10',
+                        alert.severity === 'WARNING' ? 'bg-amber-100 text-amber-500' : 'bg-blue-100 text-blue-500'
+                      )}>
+                        {alert.severity === 'WARNING' ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      </div>
+                      <div>
+                        <p className="text-xs font-semibold text-slate-800">{alert.message}</p>
+                        <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{alert.service}</p>
+                        <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(alert.timestamp).toLocaleString()}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="pl-10 relative">
+                    <div className="absolute left-0 w-7 h-7 rounded-full border-2 border-white bg-slate-100 text-slate-400 flex items-center justify-center z-10">
+                      <CheckCircle2 className="w-3.5 h-3.5" />
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-slate-800">{alert.message}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5 font-mono">{alert.service}</p>
-                      <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(alert.timestamp).toLocaleString()}</p>
+                      <p className="text-xs font-semibold text-slate-800">No alerts yet</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Your system is running smoothly with no recent incidents.</p>
                     </div>
                   </div>
-                ))}
+                )}
               </div>
             </div>
           </div>
