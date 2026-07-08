@@ -150,6 +150,7 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
     revalidatePath('/site')
     return { success: true, website }
   } catch (error: any) {
+    console.error("saveAdminWebsiteConfig error:", error);
     return { success: false, error: error.message }
   }
 }
@@ -238,6 +239,7 @@ export async function savePaymentConfig(tenantId: string, data: {
     revalidatePath('/admin/settings')
     return { success: true }
   } catch (error: any) {
+    console.error("savePaymentConfig error:", error);
     return { success: false, error: error.message }
   }
 }
