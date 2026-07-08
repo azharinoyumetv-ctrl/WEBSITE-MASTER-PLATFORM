@@ -5,15 +5,20 @@ export async function sendWhatsAppTemplate({
   to,
   templateName,
   parameters = [],
-  languageCode = 'id'
+  languageCode = 'id',
+  credentials
 }: {
   to: string
   templateName: string
   parameters: string[]
   languageCode?: string
+  credentials?: {
+    token: string
+    phoneNumberId: string
+  }
 }) {
-  const token = process.env.WHATSAPP_ACCESS_TOKEN
-  const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+  const token = credentials?.token || process.env.WHATSAPP_ACCESS_TOKEN
+  const phoneNumberId = credentials?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID
 
   if (!token || !phoneNumberId) {
     console.error('WhatsApp API credentials missing in environment variables.')

@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { Resend } from "resend"
+import { sendWhatsAppTemplate } from "@/lib/whatsapp"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -124,6 +125,25 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
           </div>
         `
       }).catch(err => console.error('Resend email failed:', err))
+    }
+
+    // 5. Trigger WhatsApp PA Alert (if configured)
+    const website = await prisma.tenantWebsite.findUnique({
+      where: { tenantId: resolvedTenantId }
+    })
+    const themeConfig = website?.themeConfig as any || {}
+    const { whatsappPaNumber, whatsappPhoneId, whatsappToken, whatsappTemplate } = themeConfig
+
+    if (whatsappPaNumber && whatsappPhoneId && whatsappToken && whatsappTemplate) {
+      await sendWhatsAppTemplate({
+        to: whatsappPaNumber,
+        templateName: whatsappTemplate,
+        parameters: [data.name, data.email],
+        credentials: {
+          token: whatsappToken,
+          phoneNumberId: whatsappPhoneId
+        }
+      })
     }
 
     return { success: true }

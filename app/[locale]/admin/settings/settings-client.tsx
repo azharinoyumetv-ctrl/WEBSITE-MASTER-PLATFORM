@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Settings, Globe, Palette, Shield, CreditCard, Building2, Save, Loader2 } from 'lucide-react'
+import { Settings, Globe, Palette, Shield, CreditCard, Building2, Save, Loader2, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { saveAdminWebsiteConfig, saveTenantLogo } from '@/lib/actions/website'
@@ -185,6 +185,55 @@ export function SettingsClient({ initialWebsite, initialTenant, tenantId }: { in
                       <option value="midtrans">Midtrans</option>
                     </select>
                     <p className="text-xs text-slate-400 mt-1">Select the payment processor for checkout. You must configure API keys for real providers.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <MessageSquare className="w-4 h-4 text-slate-400" /> WhatsApp API Integration (PA Handoff)
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="form-label">PA WhatsApp Number</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="e.g. 628999155182 (Include country code, no +)"
+                      value={websiteData.themeConfig.whatsappPaNumber || ''}
+                      onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, whatsappPaNumber: e.target.value }})}
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Number to receive contact form submissions and AI escalations.</p>
+                  </div>
+                  <div>
+                    <label className="form-label">Phone Number ID</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="e.g. 1234567890"
+                      value={websiteData.themeConfig.whatsappPhoneId || ''}
+                      onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, whatsappPhoneId: e.target.value }})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Access Token</label>
+                    <input 
+                      type="password" 
+                      className="form-input" 
+                      placeholder="EAAL..."
+                      value={websiteData.themeConfig.whatsappToken || ''}
+                      onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, whatsappToken: e.target.value }})}
+                    />
+                  </div>
+                  <div>
+                    <label className="form-label">Template Name</label>
+                    <input 
+                      type="text" 
+                      className="form-input" 
+                      placeholder="e.g. dagangos_peringatan_dukungan"
+                      value={websiteData.themeConfig.whatsappTemplate || ''}
+                      onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, whatsappTemplate: e.target.value }})}
+                    />
                   </div>
                 </div>
               </div>

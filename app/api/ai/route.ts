@@ -1,9 +1,31 @@
 import { NextResponse } from 'next/server'
+import prisma from '@/lib/prisma'
+import { sendWhatsAppTemplate } from '@/lib/whatsapp'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json()
     const { prompt, type, context, tone } = body
+    const tenantId = request.headers.get('x-tenant-id') || 'default'
+
+    // Handoff check
+    if (prompt && /(help|human|support|escalate|agent)/i.test(prompt)) {
+      if (tenantId !== 'default') {
+        const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })
+        const themeConfig = website?.themeConfig as any || {}
+        const { whatsappPaNumber, whatsappPhoneId, whatsappToken, whatsappTemplate } = themeConfig
+        
+        if (whatsappPaNumber && whatsappPhoneId && whatsappToken && whatsappTemplate) {
+          await sendWhatsAppTemplate({
+            to: whatsappPaNumber,
+            templateName: whatsappTemplate,
+            parameters: ['AI Chatbot Escalaion', prompt.substring(0, 100)],
+            credentials: { token: whatsappToken, phoneNumberId: whatsappPhoneId }
+          }).catch(console.error)
+        }
+      }
+      return NextResponse.json({ result: "I've escalated your request to a human support agent. They will get back to you shortly." })
+    }
 
     if (process.env.OPENAI_API_KEY) {
       // Basic OpenAI integration if key is present
