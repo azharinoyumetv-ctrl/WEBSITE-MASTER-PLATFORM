@@ -16,7 +16,8 @@ export function SettingsClient({ initialWebsite, initialTenant, tenantId }: { in
     isActive: initialWebsite?.isActive ?? true,
     themeConfig: initialWebsite?.themeConfig || {
       colors: { primary: '#4f46e5', secondary: '#10b981' },
-      typography: { base_font: 'Inter' }
+      typography: { base_font: 'Inter' },
+      baseCurrency: 'USD'
     },
     globalSeoMetadata: initialWebsite?.globalSeoMetadata || { description: '' }
   })
@@ -143,6 +144,47 @@ export function SettingsClient({ initialWebsite, initialTenant, tenantId }: { in
                   <div>
                     <label className="form-label">Custom Domain</label>
                     <input type="text" className="form-input" defaultValue={initialTenant?.customDomain || ''} placeholder="e.g. www.yourcompany.com" readOnly />
+                  </div>
+                </div>
+              </div>
+
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <CreditCard className="w-4 h-4 text-slate-400" /> Regional & Payment Gateway
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="form-label">Base Currency</label>
+                    <select 
+                      className="form-select max-w-sm"
+                      value={websiteData.themeConfig.baseCurrency || 'USD'}
+                      onChange={(e) => setWebsiteData({
+                        ...websiteData,
+                        themeConfig: { ...websiteData.themeConfig, baseCurrency: e.target.value }
+                      })}
+                    >
+                      <option value="USD">USD ($)</option>
+                      <option value="IDR">IDR (Rp)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="SGD">SGD (S$)</option>
+                    </select>
+                    <p className="text-xs text-slate-400 mt-1">Default currency used across the catalog and checkout.</p>
+                  </div>
+                  <div>
+                    <label className="form-label">Active Payment Gateway</label>
+                    <select 
+                      className="form-select max-w-sm"
+                      value={websiteData.themeConfig.paymentGateway || 'mock'}
+                      onChange={(e) => setWebsiteData({
+                        ...websiteData,
+                        themeConfig: { ...websiteData.themeConfig, paymentGateway: e.target.value }
+                      })}
+                    >
+                      <option value="mock">Sandbox / Mock</option>
+                      <option value="xendit">Xendit</option>
+                      <option value="midtrans">Midtrans</option>
+                    </select>
+                    <p className="text-xs text-slate-400 mt-1">Select the payment processor for checkout. You must configure API keys for real providers.</p>
                   </div>
                 </div>
               </div>

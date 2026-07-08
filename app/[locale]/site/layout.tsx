@@ -77,6 +77,19 @@ export default async function SiteLayout({
       className="min-h-screen flex flex-col tenant-themed"
       style={cssVars as unknown as React.CSSProperties} // Inject dynamic theme tokens
     >
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify({
+            "@context": "https://schema.org",
+            "@type": "Organization",
+            "name": tenant.companyName,
+            "url": `https://${website.domain || tenant.subdomain + '.' + (process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com')}`,
+            "logo": tenant.logoUrl || '',
+            "description": website.globalSeoMetadata?.description || ''
+          })
+        }}
+      />
       <header className="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">

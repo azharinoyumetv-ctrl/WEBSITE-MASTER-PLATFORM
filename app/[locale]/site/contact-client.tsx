@@ -4,11 +4,13 @@ import { useState } from 'react'
 import toast from 'react-hot-toast'
 import { submitContactForm } from '@/lib/actions/site'
 import { useTranslations } from 'next-intl'
+import { Turnstile } from '@marsidev/react-turnstile'
 
 export function ContactClient({ tenantId, primaryColor }: { tenantId: string, primaryColor: string }) {
   const t = useTranslations('Storefront')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -16,9 +18,12 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
     if (!formData.name || !formData.email || !formData.message) {
       return toast.error('Please fill in all required fields.')
     }
+    if (!turnstileToken && process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
+      return toast.error('Please complete the security check.')
+    }
 
     setIsSubmitting(true)
-    const res = await submitContactForm(tenantId, formData)
+    const res = await submitContactForm(tenantId, { ...formData, turnstileToken })
     setIsSubmitting(false)
 
     if (res.success) {
@@ -76,6 +81,16 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
             className="w-full px-4 py-3 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 text-sm resize-none" 
           />
         </div>
+        
+        {process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY && (
+          <div className="py-2">
+            <Turnstile 
+              siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} 
+              onSuccess={(token) => setTurnstileToken(token)}
+            />
+          </div>
+        )}
+
         <button 
           type="submit" 
           disabled={isSubmitting}

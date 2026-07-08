@@ -11,6 +11,7 @@
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
     "@hookform/resolvers": "^5.4.0",
+    "@marsidev/react-turnstile": "^1.5.3",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@radix-ui/react-alert-dialog": "^1.1.18",
@@ -50,6 +51,7 @@
     "react-hot-toast": "^2.6.0",
     "react-markdown": "^10.1.0",
     "recharts": "^3.9.2",
+    "resend": "^6.17.1",
     "tailwind-merge": "^3.6.0",
     "zod": "^4.4.3",
     "zustand": "^5.0.14"

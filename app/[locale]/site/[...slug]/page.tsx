@@ -1,5 +1,5 @@
 import { headers } from 'next/headers'
-import { notFound } from 'next/navigation'
+import { notFound, permanentRedirect } from 'next/navigation'
 import { getPublicWebsiteConfig, getPublicPage } from '@/lib/actions/website'
 import fs from 'fs'
 import path from 'path'
@@ -256,6 +256,11 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
 
   // If there's a DB page, render it
   if (dbPage) {
+    // BR-2: Soft delete + 301 redirect matrix
+    if (dbPage.isDeleted) {
+      permanentRedirect(dbPage.redirectTo || '/home')
+    }
+
     const themeConfig = websiteConfig?.themeConfig as any || {}
     const layoutBlocks = (dbPage.layoutBlocks as any[]) || []
 

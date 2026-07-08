@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Bell, Mail, MessageSquare, Settings2, Plus, Edit2, Trash2, Eye, CheckCircle2, Search, Loader2 } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { updateNotificationTemplate } from '@/lib/actions/notifications'
+import { updateNotificationTemplate, saveNotificationGateway } from '@/lib/actions/notifications'
 
 export function NotificationsClient({ initialTemplates, tenantId }: { initialTemplates: any[], tenantId: string }) {
   const [templates, setTemplates] = useState(initialTemplates)
@@ -15,6 +15,16 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
   const [editSubject, setEditSubject] = useState('')
   const [editBody, setEditBody] = useState('')
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Settings values
+  const [smtpConfig, setSmtpConfig] = useState({
+    host: '',
+    port: '587',
+    encryption: 'TLS',
+    username: '',
+    password: ''
+  })
+  const [isSavingSmtp, setIsSavingSmtp] = useState(false)
 
   const handleSelect = (tmpl: any) => {
     setSelectedTemplate(tmpl)
@@ -37,6 +47,18 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
       setSelectedTemplate(res.template)
     } else {
       toast.error(res.error || 'Failed to save template')
+    }
+  }
+
+  const handleSaveSmtp = async () => {
+    setIsSavingSmtp(true)
+    const res = await saveNotificationGateway(tenantId, 'email', 'custom_smtp', smtpConfig)
+    setIsSavingSmtp(false)
+
+    if (res.success) {
+      toast.success('SMTP Configuration Saved')
+    } else {
+      toast.error(res.error || 'Failed to save configuration')
     }
   }
 
@@ -143,9 +165,7 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
           <table className="data-table">
             <thead><tr><th>Recipient</th><th>Template</th><th>Channel</th><th>Status</th><th>Time</th></tr></thead>
             <tbody>
-              <tr><td>customer@example.com</td><td>Order Confirmation</td><td>Email</td><td><span className="badge badge-success">Delivered</span></td><td className="text-sm text-slate-500">2 mins ago</td></tr>
-              <tr><td>+81 90-1234-5678</td><td>Welcome SMS</td><td>SMS</td><td><span className="badge badge-success">Delivered</span></td><td className="text-sm text-slate-500">1 hour ago</td></tr>
-              <tr><td>admin@company.com</td><td>Low Stock Alert</td><td>Email</td><td><span className="badge badge-warning">Bounced</span></td><td className="text-sm text-slate-500">3 hours ago</td></tr>
+              <tr><td colSpan={5} className="text-center text-slate-500 py-8">No recent notification logs found.</td></tr>
             </tbody>
           </table>
         </div>
@@ -155,16 +175,35 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
         <div className="card p-5 max-w-2xl">
           <h3 className="text-sm font-semibold text-slate-900 mb-4">SMTP Configuration</h3>
           <div className="space-y-4">
-            <div><label className="form-label">SMTP Host</label><input type="text" className="form-input" placeholder="smtp.sendgrid.net" /></div>
+            <div>
+              <label className="form-label">SMTP Host</label>
+              <input type="text" className="form-input" placeholder="smtp.sendgrid.net" value={smtpConfig.host} onChange={e => setSmtpConfig({...smtpConfig, host: e.target.value})} />
+            </div>
             <div className="grid grid-cols-2 gap-4">
-              <div><label className="form-label">Port</label><input type="text" className="form-input" placeholder="587" /></div>
-              <div><label className="form-label">Encryption</label>
-                <select className="form-select"><option>TLS</option><option>SSL</option><option>None</option></select>
+              <div>
+                <label className="form-label">Port</label>
+                <input type="text" className="form-input" placeholder="587" value={smtpConfig.port} onChange={e => setSmtpConfig({...smtpConfig, port: e.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">Encryption</label>
+                <select className="form-select" value={smtpConfig.encryption} onChange={e => setSmtpConfig({...smtpConfig, encryption: e.target.value})}>
+                  <option value="TLS">TLS</option>
+                  <option value="SSL">SSL</option>
+                  <option value="None">None</option>
+                </select>
               </div>
             </div>
-            <div><label className="form-label">Username</label><input type="text" className="form-input" placeholder="apikey" /></div>
-            <div><label className="form-label">Password</label><input type="password" className="form-input" placeholder="••••••••••••••••" /></div>
-            <button className="btn btn-primary" onClick={() => toast.success('Settings Saved')}>Save Configuration</button>
+            <div>
+              <label className="form-label">Username</label>
+              <input type="text" className="form-input" placeholder="apikey" value={smtpConfig.username} onChange={e => setSmtpConfig({...smtpConfig, username: e.target.value})} />
+            </div>
+            <div>
+              <label className="form-label">Password</label>
+              <input type="password" className="form-input" placeholder="••••••••••••••••" value={smtpConfig.password} onChange={e => setSmtpConfig({...smtpConfig, password: e.target.value})} />
+            </div>
+            <button className="btn btn-primary" onClick={handleSaveSmtp} disabled={isSavingSmtp}>
+              {isSavingSmtp ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Save Configuration
+            </button>
           </div>
         </div>
       )}

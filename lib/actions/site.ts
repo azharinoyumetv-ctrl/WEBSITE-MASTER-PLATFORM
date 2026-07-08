@@ -1,9 +1,25 @@
 'use server'
 
 import prisma from "@/lib/prisma"
+import { Resend } from "resend"
 
-export async function submitContactForm(tenantId: string, data: { name: string, email: string, subject: string, message: string }) {
+const resend = new Resend(process.env.RESEND_API_KEY)
+
+export async function submitContactForm(tenantId: string, data: { name: string, email: string, subject: string, message: string, turnstileToken?: string | null }) {
   try {
+    if (process.env.TURNSTILE_SECRET_KEY && data.turnstileToken) {
+      const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: `secret=${process.env.TURNSTILE_SECRET_KEY}&response=${data.turnstileToken}`
+      })
+      const verifyData = await verifyRes.json()
+      if (!verifyData.success) {
+        return { success: false, error: 'Security check failed. Please try again.' }
+      }
+    }
     let resolvedTenantId = tenantId
     if (tenantId === 'default') {
       const defaultTenant = await prisma.systemTenant.findFirst({
@@ -87,6 +103,28 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
         body: JSON.stringify(payload)
       }).catch(err => console.error('Webhook delivery failed:', err))
     })
+
+    // 4. Send Confirmation Email via Resend
+    if (process.env.RESEND_API_KEY) {
+      await resend.emails.send({
+        from: 'contact@dagangos.com',
+        to: [data.email],
+        subject: `Re: ${data.subject || 'Thank you for contacting us'}`,
+        html: `
+          <div>
+            <p>Hi ${firstName || 'there'},</p>
+            <p>Thank you for reaching out! We've received your message and will get back to you shortly.</p>
+            <br/>
+            <p><strong>Your message:</strong></p>
+            <blockquote style="border-left: 3px solid #ccc; padding-left: 10px; color: #555;">
+              ${data.message.replace(/\n/g, '<br/>')}
+            </blockquote>
+            <br/>
+            <p>Best regards,<br/>The Team</p>
+          </div>
+        `
+      }).catch(err => console.error('Resend email failed:', err))
+    }
 
     return { success: true }
   } catch (error: any) {

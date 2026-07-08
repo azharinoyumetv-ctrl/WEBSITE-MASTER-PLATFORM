@@ -12,6 +12,12 @@ export default function AIPage() {
   ])
   const [isGenerating, setIsGenerating] = useState(false)
 
+  // Content Gen state
+  const [genType, setGenType] = useState('Product Description')
+  const [genContext, setGenContext] = useState('')
+  const [genTone, setGenTone] = useState('Professional')
+  const [genResult, setGenResult] = useState('')
+
   const handleSend = async () => {
     if (!prompt.trim()) return
     const userPrompt = prompt
@@ -19,13 +25,38 @@ export default function AIPage() {
     setMessages(prev => [...prev, { role: 'user', content: userPrompt }])
     setIsGenerating(true)
     
-    // Simulate generation
-    await new Promise(r => setTimeout(r, 1500))
-    setMessages(prev => [...prev, { 
-      role: 'assistant', 
-      content: `Here is a drafted response based on your request: "${userPrompt}". \n\nThis is a demonstration of the AI module capabilities. In production, this would stream a response from the LLM provider.`
-    }])
-    setIsGenerating(false)
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt: userPrompt })
+      })
+      const data = await res.json()
+      setMessages(prev => [...prev, { role: 'assistant', content: data.result || data.error }])
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error connecting to the AI service.' }])
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const handleGenerate = async () => {
+    if (!genContext.trim()) return
+    setIsGenerating(true)
+    setGenResult('')
+    try {
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: genType, context: genContext, tone: genTone })
+      })
+      const data = await res.json()
+      setGenResult(data.result || data.error)
+    } catch (err) {
+      setGenResult('Error connecting to the AI service.')
+    } finally {
+      setIsGenerating(false)
+    }
   }
 
   return (
@@ -130,7 +161,7 @@ export default function AIPage() {
             <div className="space-y-4 flex-1">
               <div>
                 <label className="form-label">Content Type</label>
-                <select className="form-select">
+                <select className="form-select" value={genType} onChange={e => setGenType(e.target.value)}>
                   <option>Product Description</option>
                   <option>Blog Post Outline</option>
                   <option>SEO Meta Tags</option>
@@ -139,21 +170,26 @@ export default function AIPage() {
               </div>
               <div>
                 <label className="form-label">Context / Keywords</label>
-                <textarea className="form-textarea" rows={4} placeholder="E.g., lightweight running shoes, carbon fiber, marathon, breathability" />
+                <textarea className="form-textarea" rows={4} placeholder="E.g., lightweight running shoes, carbon fiber, marathon, breathability" value={genContext} onChange={e => setGenContext(e.target.value)} />
               </div>
               <div>
                 <label className="form-label">Tone</label>
-                <select className="form-select">
+                <select className="form-select" value={genTone} onChange={e => setGenTone(e.target.value)}>
                   <option>Professional</option>
                   <option>Enthusiastic</option>
                   <option>Urgent</option>
                   <option>Casual</option>
                 </select>
               </div>
+              {genResult && (
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 whitespace-pre-wrap">
+                  {genResult}
+                </div>
+              )}
             </div>
-            <button className="btn btn-primary w-full mt-4">
-              <Sparkles className="w-4 h-4" />
-              Generate Content
+            <button className="btn btn-primary w-full mt-4" onClick={handleGenerate} disabled={isGenerating || !genContext.trim()}>
+              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+              {isGenerating ? 'Generating...' : 'Generate Content'}
             </button>
           </div>
 
