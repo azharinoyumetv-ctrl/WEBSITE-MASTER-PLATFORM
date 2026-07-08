@@ -59,8 +59,13 @@ export async function POST(request: Request) {
 
     let resultText = ''
 
-    if (provider === 'openai') {
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    if (provider === 'openai' || provider === 'deepseek' || provider === 'grok' || provider === 'kimi') {
+      let baseUrl = 'https://api.openai.com/v1/chat/completions'
+      if (provider === 'deepseek') baseUrl = 'https://api.deepseek.com/chat/completions'
+      if (provider === 'grok') baseUrl = 'https://api.x.ai/v1/chat/completions'
+      if (provider === 'kimi') baseUrl = 'https://api.moonshot.cn/v1/chat/completions'
+
+      const res = await fetch(baseUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -73,7 +78,7 @@ export async function POST(request: Request) {
       })
       if (!res.ok) {
         const errorData = await res.json()
-        return NextResponse.json({ error: errorData.error?.message || 'OpenAI API error' }, { status: res.status })
+        return NextResponse.json({ error: errorData.error?.message || `${provider} API error` }, { status: res.status })
       }
       const data = await res.json()
       resultText = data.choices[0].message.content

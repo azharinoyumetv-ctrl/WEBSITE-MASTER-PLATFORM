@@ -366,6 +366,9 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       <option value="openai">OpenAI</option>
                       <option value="anthropic">Anthropic (Claude)</option>
                       <option value="gemini">Google (Gemini)</option>
+                      <option value="deepseek">DeepSeek</option>
+                      <option value="grok">xAI (Grok)</option>
+                      <option value="kimi">Moonshot (Kimi)</option>
                     </select>
                     <p className="text-xs text-slate-400 mt-1">If using your own API key, select the provider above.</p>
                   </div>
@@ -408,6 +411,24 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                             <>
                               <option value="gemini-1.5-flash">Gemini 1.5 Flash</option>
                               <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                            </>
+                          )}
+                          {aiData.providerKey === 'deepseek' && (
+                            <>
+                              <option value="deepseek-chat">DeepSeek Chat</option>
+                              <option value="deepseek-coder">DeepSeek Coder</option>
+                            </>
+                          )}
+                          {aiData.providerKey === 'grok' && (
+                            <>
+                              <option value="grok-beta">grok-beta</option>
+                              <option value="grok-2-latest">grok-2-latest</option>
+                            </>
+                          )}
+                          {aiData.providerKey === 'kimi' && (
+                            <>
+                              <option value="moonshot-v1-8k">moonshot-v1-8k</option>
+                              <option value="moonshot-v1-32k">moonshot-v1-32k</option>
                             </>
                           )}
                         </select>
