@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Settings, Globe, Palette, Shield, CreditCard, Building2, Save, Loader2, MessageSquare, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -27,6 +27,50 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
     apiSecret: '', // Don't show existing secret, only allow override
     selectedModelName: initialAiConfig?.selectedModelName || 'gpt-4o-mini'
   })
+
+  const [availableModels, setAvailableModels] = useState<string[]>([])
+  const [isFetchingModels, setIsFetchingModels] = useState(false)
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      if (aiData.providerKey === 'platform_managed' || !aiData.apiSecret) {
+        setAvailableModels([])
+        return
+      }
+      setIsFetchingModels(true)
+      try {
+        const customUrlPart = aiData.selectedModelName.includes('|url:') ? aiData.selectedModelName.split('|url:')[1] : ''
+        const res = await fetch('/api/ai/models', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            providerKey: aiData.providerKey,
+            apiSecret: aiData.apiSecret,
+            customBaseUrl: customUrlPart
+          })
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.models && data.models.length > 0) {
+            setAvailableModels(data.models)
+          } else {
+            setAvailableModels([])
+          }
+        } else {
+          setAvailableModels([])
+        }
+      } catch (err) {
+        setAvailableModels([])
+      }
+      setIsFetchingModels(false)
+    }
+
+    const t = setTimeout(() => {
+      fetchModels()
+    }, 800)
+
+    return () => clearTimeout(t)
+  }, [aiData.providerKey, aiData.apiSecret, aiData.selectedModelName.includes('|url:') ? aiData.selectedModelName.split('|url:')[1] : ''])
 
   const [isSaving, setIsSaving] = useState(false)
 
@@ -405,17 +449,41 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       </div>
                       <div>
                         <label className="form-label">Language Model</label>
-                        <input 
-                          type="text"
-                          className="form-input max-w-sm"
-                          placeholder="e.g. gpt-4o, claude-3-5-sonnet-latest"
-                          value={aiData.selectedModelName.split('|url:')[0] || ''}
-                          onChange={(e) => {
-                            const urlPart = aiData.selectedModelName.includes('|url:') ? `|url:${aiData.selectedModelName.split('|url:')[1]}` : ''
-                            setAiData({ ...aiData, selectedModelName: `${e.target.value}${urlPart}` })
-                          }}
-                        />
-                        <p className="text-xs text-slate-400 mt-1">Type the exact model identifier.</p>
+                        {isFetchingModels ? (
+                          <div className="flex items-center gap-2 text-sm text-slate-500 mt-2">
+                            <Loader2 className="w-4 h-4 animate-spin" /> Fetching available models...
+                          </div>
+                        ) : availableModels.length > 0 ? (
+                          <select 
+                            className="form-select max-w-sm"
+                            value={aiData.selectedModelName.split('|url:')[0] || ''}
+                            onChange={(e) => {
+                              const urlPart = aiData.selectedModelName.includes('|url:') ? `|url:${aiData.selectedModelName.split('|url:')[1]}` : ''
+                              setAiData({ ...aiData, selectedModelName: `${e.target.value}${urlPart}` })
+                            }}
+                          >
+                            <option value="">Select a model...</option>
+                            {availableModels.map(m => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                        ) : (
+                          <input 
+                            type="text"
+                            className="form-input max-w-sm"
+                            placeholder="e.g. gpt-4o, claude-3-5-sonnet-latest"
+                            value={aiData.selectedModelName.split('|url:')[0] || ''}
+                            onChange={(e) => {
+                              const urlPart = aiData.selectedModelName.includes('|url:') ? `|url:${aiData.selectedModelName.split('|url:')[1]}` : ''
+                              setAiData({ ...aiData, selectedModelName: `${e.target.value}${urlPart}` })
+                            }}
+                          />
+                        )}
+                        <p className="text-xs text-slate-400 mt-1">
+                          {availableModels.length > 0 
+                            ? "Select an available model from your provider." 
+                            : "Type the exact model identifier."}
+                        </p>
                       </div>
                     </>
                   )}
