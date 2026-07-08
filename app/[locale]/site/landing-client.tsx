@@ -86,7 +86,6 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
               </a>
             </div>
           </div>
-        </div>
       </section>
 
       {/* Interactive Price Estimator */}
