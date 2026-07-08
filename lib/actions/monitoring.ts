@@ -32,16 +32,7 @@ export async function getMonitoringStatus() {
     service: a.targetResource,
     timestamp: a.createdAt.toISOString(),
     resolved: true
-  })) : [
-    { 
-      id: 'alert-001', 
-      severity: 'NOTICE', 
-      message: 'Monitoring initialized', 
-      service: 'system', 
-      timestamp: new Date().toISOString(), 
-      resolved: true 
-    }
-  ]
+  })) : []
 
   return {
     success: true,

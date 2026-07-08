@@ -175,8 +175,8 @@ export default function AIPage() {
       )}
 
       {activeTab === 'generate' && (
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
-          <div className="card p-5 flex flex-col">
+        <div className="flex-1 flex justify-center min-h-0">
+          <div className="card p-5 flex flex-col w-full max-w-2xl">
             <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-indigo-500" />
               Copywriting & SEO
@@ -213,46 +213,6 @@ export default function AIPage() {
             <button className="btn btn-primary w-full mt-4" onClick={handleGenerate} disabled={isGenerating || !genContext.trim()}>
               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
               {isGenerating ? 'Generating...' : 'Generate Content'}
-            </button>
-          </div>
-
-          <div className="card p-5 flex flex-col">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-              <ImageIcon className="w-4 h-4 text-purple-500" />
-              Image Generation
-            </h3>
-            <div className="space-y-4 flex-1">
-              <div>
-                <label className="form-label">Image Prompt</label>
-                <textarea className="form-textarea" rows={4} placeholder="Describe the image you want to generate..." />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="form-label">Aspect Ratio</label>
-                  <select className="form-select">
-                    <option>1:1 (Square)</option>
-                    <option>16:9 (Landscape)</option>
-                    <option>9:16 (Portrait)</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="form-label">Style</label>
-                  <select className="form-select">
-                    <option>Photorealistic</option>
-                    <option>Illustration</option>
-                    <option>3D Render</option>
-                  </select>
-                </div>
-              </div>
-              <div className="p-4 bg-slate-50 border border-slate-100 border-dashed rounded-xl flex-1 flex flex-col items-center justify-center text-center">
-                <ImageIcon className="w-8 h-8 text-slate-300 mb-2" />
-                <p className="text-sm text-slate-500 font-medium">Preview Area</p>
-                <p className="text-xs text-slate-400 mt-1">Generated images will appear here</p>
-              </div>
-            </div>
-            <button className="btn bg-purple-600 hover:bg-purple-700 text-white w-full mt-4">
-              <Sparkles className="w-4 h-4" />
-              Generate Image
             </button>
           </div>
         </div>
