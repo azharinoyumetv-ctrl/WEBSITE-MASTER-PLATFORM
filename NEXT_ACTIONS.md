@@ -39,13 +39,10 @@ This task list outlines the steps required to transition the **Website Master Pl
     pm2 startup
     ```
 
-- `[ ]` **4. Nginx Reverse Proxy & Multi-Tenant Routing**
-  - `[ ]` Configure Nginx server block to proxy port `3000` (Next.js server)
-  - `[ ]` Enable wildcard subdomain routing (`*.yourdomain.com`) in Nginx configuration to support dynamic multi-tenancy
-  - `[ ]` Install Certbot and generate Let's Encrypt SSL certificates:
-    ```bash
-    sudo certbot --nginx -d yourdomain.com -d *.yourdomain.com
-    ```
+- `[x]` **4. HTTPS & Multi-Tenant Routing**
+  - `[x]` Cloudflare Tunnel is configured to route `store.dagangos.com` to `localhost:4000`
+  - `[x]` SSL/TLS is handled via Cloudflare; no Nginx reverse proxy needed
+  - `[x]` Wildcard/tenant routing handled by application middleware and `NEXT_PUBLIC_BASE_DOMAIN`
 
 - `[ ]` **5. Production Sanity Check**
   - `[ ]` Verify homepage renders in both English (`/en`) and Indonesian (`/id`)
