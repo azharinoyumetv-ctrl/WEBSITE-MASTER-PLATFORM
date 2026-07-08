@@ -98,7 +98,14 @@ export async function createTenant(data: { companyName: string, subdomain: strin
           typography: {
             headings: 'Geist',
             base_font: 'Inter'
-          }
+          },
+          paymentGateway: 'unset',
+          xenditEnabled: false,
+          midtransEnabled: false,
+          whatsappPaNumber: '',
+          whatsappPhoneId: '',
+          whatsappToken: '',
+          whatsappTemplate: 'order_confirmation'
         }
       }
     })
