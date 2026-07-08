@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { decrypt } from '@/lib/crypto'
 
 export async function POST(req: NextRequest) {
   try {
@@ -28,8 +29,11 @@ export async function POST(req: NextRequest) {
     const currency = body.currency || themeConfig.baseCurrency || 'USD'
 
     if (paymentGateway === 'xendit') {
-      const apiKey = process.env.XENDIT_SECRET_KEY
-      if (!apiKey) return NextResponse.json({ error: 'Payment Gateway not configured (Xendit)' }, { status: 500 })
+      let apiKey = process.env.XENDIT_SECRET_KEY
+      if (websiteRes?.xenditEncryptedSecret && websiteRes.xenditEncryptedSecretIv) {
+        apiKey = decrypt(`${websiteRes.xenditEncryptedSecretIv}:${websiteRes.xenditEncryptedSecret}`) || apiKey
+      }
+      if (!apiKey) return NextResponse.json({ error: 'Payment provider not configured. Add your API key in Settings or set the platform environment variable.' }, { status: 500 })
 
       const res = await fetch('https://api.xendit.co/v2/invoices', {
         method: 'POST',
@@ -53,10 +57,17 @@ export async function POST(req: NextRequest) {
     }
     
     if (paymentGateway === 'midtrans') {
-      const serverKey = process.env.MIDTRANS_SERVER_KEY
-      if (!serverKey) return NextResponse.json({ error: 'Payment Gateway not configured (Midtrans)' }, { status: 500 })
+      let serverKey = process.env.MIDTRANS_SERVER_KEY
+      if (websiteRes?.midtransEncryptedServerKey && websiteRes.midtransEncryptedServerKeyIv) {
+        serverKey = decrypt(`${websiteRes.midtransEncryptedServerKeyIv}:${websiteRes.midtransEncryptedServerKey}`) || serverKey
+      }
+      if (!serverKey) return NextResponse.json({ error: 'Payment provider not configured. Add your API key in Settings or set the platform environment variable.' }, { status: 500 })
 
-      const res = await fetch('https://app.sandbox.midtrans.com/snap/v1/transactions', {
+      const baseUrl = serverKey.startsWith('SB-Mid-server-') 
+        ? 'https://app.sandbox.midtrans.com/snap/v1/transactions' 
+        : 'https://app.midtrans.com/snap/v1/transactions'
+
+      const res = await fetch(baseUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

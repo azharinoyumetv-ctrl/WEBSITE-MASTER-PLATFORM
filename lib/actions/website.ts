@@ -105,6 +105,22 @@ export async function getAdminWebsiteConfig(tenantId: string) {
     const website = await prisma.tenantWebsite.findUnique({
       where: { tenantId }
     })
+    
+    if (website) {
+      // Don't leak the actual encrypted keys to the client, but return a placeholder if they exist
+      if (website.xenditEncryptedSecret) (website as any).xenditSecretPlaceholder = 'sk_live_****'
+      if (website.xenditEncryptedWebhookToken) (website as any).xenditWebhookPlaceholder = 'xtok_****'
+      if (website.midtransEncryptedServerKey) (website as any).midtransServerKeyPlaceholder = 'Mid-server-****'
+      
+      // We explicitly clear these so they don't get sent to the client
+      website.xenditEncryptedSecret = null
+      website.xenditEncryptedSecretIv = null
+      website.xenditEncryptedWebhookToken = null
+      website.xenditEncryptedWebhookTokenIv = null
+      website.midtransEncryptedServerKey = null
+      website.midtransEncryptedServerKeyIv = null
+    }
+
     return { success: true, website }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -173,6 +189,52 @@ export async function saveAiConfig(tenantId: string, data: { providerKey: string
       },
       update: updateData
     })
+    revalidatePath('/admin/settings')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function savePaymentConfig(tenantId: string, data: { 
+  xenditEnabled: boolean, 
+  xenditSecret: string, 
+  xenditWebhookToken: string, 
+  midtransEnabled: boolean, 
+  midtransServerKey: string 
+}) {
+  try {
+    const updateData: any = {
+      xenditEnabled: data.xenditEnabled,
+      midtransEnabled: data.midtransEnabled
+    }
+
+    if (data.xenditSecret && data.xenditSecret !== 'sk_live_****') {
+      const encryptedStr = encrypt(data.xenditSecret)
+      const [iv, ciphertext] = encryptedStr.split(':')
+      updateData.xenditEncryptedSecret = ciphertext
+      updateData.xenditEncryptedSecretIv = iv
+    }
+
+    if (data.xenditWebhookToken && data.xenditWebhookToken !== 'xtok_****') {
+      const encryptedStr = encrypt(data.xenditWebhookToken)
+      const [iv, ciphertext] = encryptedStr.split(':')
+      updateData.xenditEncryptedWebhookToken = ciphertext
+      updateData.xenditEncryptedWebhookTokenIv = iv
+    }
+
+    if (data.midtransServerKey && data.midtransServerKey !== 'Mid-server-****') {
+      const encryptedStr = encrypt(data.midtransServerKey)
+      const [iv, ciphertext] = encryptedStr.split(':')
+      updateData.midtransEncryptedServerKey = ciphertext
+      updateData.midtransEncryptedServerKeyIv = iv
+    }
+
+    await prisma.tenantWebsite.update({
+      where: { tenantId },
+      data: updateData
+    })
+    
     revalidatePath('/admin/settings')
     return { success: true }
   } catch (error: any) {

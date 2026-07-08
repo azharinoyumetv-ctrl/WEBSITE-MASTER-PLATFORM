@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Settings, Globe, Palette, Shield, CreditCard, Building2, Save, Loader2, MessageSquare, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig } from '@/lib/actions/website'
+import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig } from '@/lib/actions/website'
 
 export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig, tenantId }: { initialWebsite: any, initialTenant: any, initialAiConfig?: any, tenantId: string }) {
   const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing' | 'ai'>('general')
@@ -20,6 +20,14 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
       baseCurrency: 'USD'
     },
     globalSeoMetadata: initialWebsite?.globalSeoMetadata || { description: '' }
+  })
+
+  const [paymentConfig, setPaymentConfig] = useState({
+    xenditEnabled: initialWebsite?.xenditEnabled || false,
+    xenditSecret: initialWebsite?.xenditSecretPlaceholder || '',
+    xenditWebhookToken: initialWebsite?.xenditWebhookPlaceholder || '',
+    midtransEnabled: initialWebsite?.midtransEnabled || false,
+    midtransServerKey: initialWebsite?.midtransServerKeyPlaceholder || ''
   })
 
   const [aiData, setAiData] = useState({
@@ -83,12 +91,17 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
       aiRes = await saveAiConfig(tenantId, aiData)
     }
 
+    let paymentRes = { success: true, error: '' }
+    if (activeTab === 'general') {
+      paymentRes = await savePaymentConfig(tenantId, paymentConfig)
+    }
+
     setIsSaving(false)
 
-    if (res.success && aiRes.success) {
+    if (res.success && aiRes.success && paymentRes.success) {
       toast.success('Settings saved successfully')
     } else {
-      toast.error(res.error || aiRes.error || 'Failed to save settings')
+      toast.error(res.error || aiRes.error || paymentRes.error || 'Failed to save settings')
     }
   }
 
@@ -241,6 +254,82 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       <option value="midtrans">Midtrans</option>
                     </select>
                     <p className="text-xs text-slate-400 mt-1">Select the payment processor for checkout. You must configure API keys for real providers.</p>
+                  </div>
+
+                  <div className="mt-6 border-t border-slate-100 pt-6">
+                    <h4 className="text-sm font-semibold text-slate-900 mb-4">Provider Configurations</h4>
+                    
+                    <div className="space-y-4">
+                      {/* Xendit Config */}
+                      <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
+                        <div className="flex items-center justify-between mb-4">
+                          <h5 className="text-sm font-semibold text-slate-800">Xendit</h5>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={paymentConfig.xenditEnabled} 
+                              onChange={(e) => setPaymentConfig({...paymentConfig, xenditEnabled: e.target.checked})} 
+                              className="form-checkbox text-indigo-600 rounded" 
+                            />
+                            <span className="text-sm text-slate-600">Enable</span>
+                          </label>
+                        </div>
+                        {paymentConfig.xenditEnabled && (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="form-label text-xs">Secret Key</label>
+                              <input 
+                                type="password" 
+                                className="form-input text-sm" 
+                                placeholder="xnd_..."
+                                value={paymentConfig.xenditSecret}
+                                onChange={(e) => setPaymentConfig({...paymentConfig, xenditSecret: e.target.value})}
+                              />
+                            </div>
+                            <div>
+                              <label className="form-label text-xs">Webhook Verification Token</label>
+                              <input 
+                                type="password" 
+                                className="form-input text-sm" 
+                                placeholder="Token from Xendit Dashboard"
+                                value={paymentConfig.xenditWebhookToken}
+                                onChange={(e) => setPaymentConfig({...paymentConfig, xenditWebhookToken: e.target.value})}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Midtrans Config */}
+                      <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
+                        <div className="flex items-center justify-between mb-4">
+                          <h5 className="text-sm font-semibold text-slate-800">Midtrans</h5>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={paymentConfig.midtransEnabled} 
+                              onChange={(e) => setPaymentConfig({...paymentConfig, midtransEnabled: e.target.checked})} 
+                              className="form-checkbox text-indigo-600 rounded" 
+                            />
+                            <span className="text-sm text-slate-600">Enable</span>
+                          </label>
+                        </div>
+                        {paymentConfig.midtransEnabled && (
+                          <div className="space-y-4">
+                            <div>
+                              <label className="form-label text-xs">Server Key</label>
+                              <input 
+                                type="password" 
+                                className="form-input text-sm" 
+                                placeholder="SB-Mid-server-... or Mid-server-..."
+                                value={paymentConfig.midtransServerKey}
+                                onChange={(e) => setPaymentConfig({...paymentConfig, midtransServerKey: e.target.value})}
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>

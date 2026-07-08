@@ -263,9 +263,17 @@ model TenantWebsite {
   siteTitle         String   @map("site_title") @db.VarChar(255)
   faviconUrl        String?  @map("favicon_url") @db.Text
   themeConfig       Json     @default("{}") @map("theme_config")
-  globalSeoMetadata Json     @default("{\"keywords\":[],\"description\":\"\"}") @map("global_seo_metadata")
-  isActive          Boolean  @default(true) @map("is_active")
-  createdAt         DateTime @default(now()) @map("created_at") @db.Timestamptz
+  globalSeoMetadata             Json     @default("{\"keywords\":[],\"description\":\"\"}") @map("global_seo_metadata")
+  isActive                      Boolean  @default(true) @map("is_active")
+  xenditEncryptedSecret         String?  @map("xendit_encrypted_secret") @db.Text
+  xenditEncryptedSecretIv       String?  @map("xendit_encrypted_secret_iv") @db.VarChar(64)
+  xenditEncryptedWebhookToken   String?  @map("xendit_encrypted_webhook_token") @db.Text
+  xenditEncryptedWebhookTokenIv String?  @map("xendit_encrypted_webhook_token_iv") @db.VarChar(64)
+  xenditEnabled                 Boolean  @default(false) @map("xendit_enabled")
+  midtransEncryptedServerKey    String?  @map("midtrans_encrypted_server_key") @db.Text
+  midtransEncryptedServerKeyIv  String?  @map("midtrans_encrypted_server_key_iv") @db.VarChar(64)
+  midtransEnabled               Boolean  @default(false) @map("midtrans_enabled")
+  createdAt                     DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
