@@ -36,11 +36,14 @@ export async function getPosData(tenantId: string) {
 export async function processPosPayment(tenantId: string, terminalId: string, cart: any[], paymentMethod: string, total: number) {
   try {
     // Note: In real system, we'd ensure a POS session is open
-    // Create an order
+    const isImmediate = paymentMethod === 'cash' || paymentMethod === 'qr'
+    const paymentStatus = isImmediate ? 'succeeded' : 'initiated'
+    const orderStatus = isImmediate ? 'completed' : 'processing'
+
     const order = await prisma.tenantOrder.create({
       data: {
         tenantId,
-        orderStatus: 'completed',
+        orderStatus: orderStatus,
         totalAmount: total,
         items: {
           create: cart.map(item => ({
@@ -55,7 +58,7 @@ export async function processPosPayment(tenantId: string, terminalId: string, ca
             tenantId,
             processorKey: `pos_${paymentMethod}`,
             amount: total,
-            paymentStatus: 'succeeded'
+            paymentStatus: paymentStatus
           }
         }
       }
