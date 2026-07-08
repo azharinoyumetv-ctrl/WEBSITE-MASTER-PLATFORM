@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma"
 import { Resend } from "resend"
 import { sendWhatsAppTemplate } from "@/lib/whatsapp"
+import crypto from 'crypto'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -97,11 +98,20 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
       }
     }
 
+    const payloadString = JSON.stringify(payload)
+    const webhookSecret = process.env.WEBHOOK_API_KEY
+    
     webhooksToTrigger.forEach(w => {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (webhookSecret) {
+        const signature = crypto.createHmac('sha256', webhookSecret).update(payloadString).digest('hex')
+        headers['X-Webhook-Signature'] = signature
+      }
+
       fetch(w.targetUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        headers,
+        body: payloadString
       }).catch(err => console.error('Webhook delivery failed:', err))
     })
 

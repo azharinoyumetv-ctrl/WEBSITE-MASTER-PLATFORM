@@ -21,7 +21,7 @@ export default async function ModulesPage() {
   const res = await getTenantModules(tenantId)
   const dbModules = res.success ? res.modules : []
 
-  // Merge DB state with Mock catalog
+  // Merge dynamic DB state with the platform's static capability registry
   const modules = PLATFORM_MODULES.map(mockMod => {
     const dbMod = dbModules.find(m => m.moduleKey === mockMod.key)
     return {

@@ -183,14 +183,6 @@ export default function LoginPage() {
               </div>
             )}
             
-            {/* Demo Hint (only visible in development/test environments) */}
-            {process.env.NODE_ENV !== 'production' && (
-              <div className="text-xs text-slate-500 bg-white/5 p-3 rounded-lg border border-white/5">
-                <p>{t('demo_hint')}</p>
-                <p>{t('demo_email')} <span className="font-mono text-slate-300">admin@dagangos.com</span></p>
-                <p>{t('demo_password')} <span className="font-mono text-slate-300">password123</span></p>
-              </div>
-            )}
 
 
             {/* Submit */}

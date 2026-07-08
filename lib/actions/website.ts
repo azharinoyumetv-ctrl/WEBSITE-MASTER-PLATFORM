@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
+import { encrypt } from '@/lib/crypto'
 
 
 
@@ -145,6 +146,34 @@ export async function saveTenantLogo(tenantId: string, logoUrl: string) {
     })
     revalidatePath('/admin/settings')
     revalidatePath('/site')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function saveAiConfig(tenantId: string, data: { providerKey: string, apiSecret?: string, selectedModelName: string }) {
+  try {
+    const encryptedSecret = data.apiSecret ? encrypt(data.apiSecret) : undefined
+    const updateData: any = {
+      providerKey: data.providerKey,
+      selectedModelName: data.selectedModelName
+    }
+    if (encryptedSecret) {
+      updateData.encryptedApiSecret = encryptedSecret
+    }
+
+    await prisma.tenantAiConfiguration.upsert({
+      where: { tenantId },
+      create: {
+        tenantId,
+        providerKey: data.providerKey,
+        encryptedApiSecret: encryptedSecret,
+        selectedModelName: data.selectedModelName
+      },
+      update: updateData
+    })
+    revalidatePath('/admin/settings')
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }

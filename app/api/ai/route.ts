@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { sendWhatsAppTemplate } from '@/lib/whatsapp'
-
+import { decrypt } from '@/lib/crypto'
 export async function POST(request: Request) {
   try {
     const body = await request.json()
@@ -27,34 +27,48 @@ export async function POST(request: Request) {
       return NextResponse.json({ result: "I've escalated your request to a human support agent. They will get back to you shortly." })
     }
 
-    if (process.env.OPENAI_API_KEY) {
-      // Basic OpenAI integration if key is present
-      const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [{ role: 'user', content: prompt || `Generate a ${tone} ${type} about ${context}` }]
-        })
+    let apiKey = process.env.OPENAI_API_KEY
+    let modelName = 'gpt-4o-mini'
+
+    if (tenantId && tenantId !== 'default') {
+      const aiConfig = await prisma.tenantAiConfiguration.findUnique({ where: { tenantId } })
+      if (aiConfig) {
+        if (aiConfig.encryptedApiSecret) {
+          const decryptedKey = decrypt(aiConfig.encryptedApiSecret)
+          if (decryptedKey) apiKey = decryptedKey
+        }
+        if (aiConfig.selectedModelName) {
+          modelName = aiConfig.selectedModelName
+        }
+      }
+    }
+
+    if (!apiKey) {
+      return NextResponse.json(
+        { error: 'AI features are disabled: Missing OpenAI provider configuration.' },
+        { status: 400 }
+      )
+    }
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages: [{ role: 'user', content: prompt || `Generate a ${tone} ${type} about ${context}` }]
       })
-      const data = await res.json()
-      return NextResponse.json({ result: data.choices[0].message.content })
-    }
-
-    // Dummy response if no key is found
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    })
     
-    let dummyResponse = ''
-    if (type) {
-      dummyResponse = `Here is your ${tone} ${type} about ${context}:\n\nThis is a highly optimized, conversion-focused piece of content tailored for your audience. Enjoy!\n\n(Note: Set OPENAI_API_KEY in your .env to enable real AI generation.)`
-    } else {
-      dummyResponse = `Here is a drafted response based on your request: "${prompt}".\n\n(Note: Set OPENAI_API_KEY in your .env to enable real AI generation.)`
+    if (!res.ok) {
+      const errorData = await res.json()
+      return NextResponse.json({ error: errorData.error?.message || 'OpenAI API error' }, { status: res.status })
     }
 
-    return NextResponse.json({ result: dummyResponse })
+    const data = await res.json()
+    return NextResponse.json({ result: data.choices[0].message.content })
 
   } catch (error: any) {
     console.error('AI generation error:', error)

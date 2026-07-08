@@ -56,9 +56,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
           className="absolute inset-0 opacity-15"
           style={{ background: `radial-gradient(circle at 30% 30%, ${primaryColor}, transparent 60%)` }}
         />
-        <div className="max-w-7xl mx-auto px-6 md:px-8 relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-12 items-center">
-          
-          <div className="lg:col-span-7 text-left space-y-6">
+        <div className="max-w-5xl mx-auto px-6 md:px-8 relative z-10 flex flex-col items-center text-center justify-center space-y-6">
             <span 
               className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/5 border text-slate-200"
               style={{ borderColor: `${primaryColor}40` }}
@@ -86,77 +84,6 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
               <a href="/contact" className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all text-sm">
                 {t('contact_sales')}
               </a>
-            </div>
-          </div>
-
-          {/* Interactive Block Selector Customizer */}
-          <div className="lg:col-span-5 bg-slate-900 border border-white/10 p-6 rounded-2xl shadow-2xl relative overflow-hidden animate-fade-in">
-            <div className="flex items-center justify-between border-b border-white/10 pb-4 mb-6">
-              <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-red-500" />
-                <span className="w-3 h-3 rounded-full bg-yellow-500" />
-                <span className="w-3 h-3 rounded-full bg-green-500" />
-              </div>
-              <span className="text-xs text-slate-500 font-mono">live_preview.exe</span>
-            </div>
-
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{t('modular_layout_templates')}</p>
-            <div className="grid grid-cols-3 gap-2 mb-6">
-              {['landing_page', 'ecommerce', 'restaurant'].map(mode => (
-                <button
-                  key={mode}
-                  onClick={() => setPreviewMode(mode)}
-                  style={previewMode === mode ? { backgroundColor: primaryColor, borderColor: primaryColor, color: '#ffffff' } : {}}
-                  className={`py-2 px-3 text-xs font-medium rounded-lg border transition-all duration-200 ${
-                    previewMode === mode 
-                      ? '' 
-                      : 'bg-white/5 border-white/10 text-slate-400 hover:bg-white/10'
-                  }`}
-                >
-                  {packages[mode]?.name.split(' ')[0]}
-                </button>
-              ))}
-            </div>
-
-            {/* Mock website view */}
-            <div className="bg-white text-slate-900 rounded-xl p-4 min-h-[160px] border border-white/5 flex flex-col justify-between transition-all duration-300">
-              {previewMode === 'landing_page' && (
-                <div className="space-y-3">
-                  <div className="h-6 w-32 rounded animate-pulse" style={{ backgroundColor: primaryColor }} />
-                  <div className="h-3 w-full bg-slate-200 rounded" />
-                  <div className="h-3 w-4/5 bg-slate-200 rounded" />
-                  <div className="h-8 w-24 bg-slate-900 rounded-full mt-2" />
-                </div>
-              )}
-              {previewMode === 'ecommerce' && (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
-                    <div className="h-4 w-20 bg-slate-900 rounded" />
-                    <div className="h-4 w-4 rounded-full" style={{ backgroundColor: primaryColor }} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2 mt-2">
-                    <div className="bg-slate-100 p-2 rounded text-center">
-                      <div className="h-10 bg-slate-200 rounded mb-1" />
-                      <div className="h-2 w-12 bg-slate-900 rounded mx-auto" />
-                    </div>
-                    <div className="bg-slate-100 p-2 rounded text-center">
-                      <div className="h-10 bg-slate-200 rounded mb-1" />
-                      <div className="h-2 w-12 bg-slate-900 rounded mx-auto" />
-                    </div>
-                  </div>
-                </div>
-              )}
-              {previewMode === 'restaurant' && (
-                <div className="space-y-3">
-                  <div className="h-5 w-24 bg-red-500 rounded" />
-                  <p className="text-[10px] text-slate-500">{t('select_booking_slot')}</p>
-                  <div className="grid grid-cols-3 gap-1">
-                    <div className="h-5 bg-slate-100 rounded flex items-center justify-center text-[8px] font-bold text-slate-700">12:00 PM</div>
-                    <div className="h-5 text-white rounded flex items-center justify-center text-[8px] font-bold" style={{ backgroundColor: primaryColor }}>01:00 PM</div>
-                    <div className="h-5 bg-slate-100 rounded flex items-center justify-center text-[8px] font-bold text-slate-700">02:00 PM</div>
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         </div>

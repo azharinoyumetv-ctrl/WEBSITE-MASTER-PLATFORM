@@ -92,7 +92,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, tenantId }: { 
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
               type="text"
-              placeholder="Search products or scan barcode..."
+              placeholder="Search products..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               id="pos-search"

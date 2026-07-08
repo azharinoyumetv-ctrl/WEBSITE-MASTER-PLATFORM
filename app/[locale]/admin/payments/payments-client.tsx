@@ -97,25 +97,6 @@ export function PaymentsClient({ initialPayments }: { initialPayments: any[] }) 
           <p className="text-xs text-slate-400">Showing {filtered.length} of {payments.length} transactions</p>
         </div>
       </div>
-
-      {/* Webhook Log */}
-      <div className="mt-6 card p-5">
-        <h3 className="text-sm font-semibold text-slate-900 mb-4">Webhook Events</h3>
-        <div className="space-y-2">
-          {[
-            { event: 'payment.succeeded', payload: 'pi_3OxK8j2e...', time: '2m ago', status: 'delivered' },
-            { event: 'payment.succeeded', payload: 'pi_3OxL9k3f...', time: '1h ago', status: 'delivered' },
-            { event: 'payment.initiated', payload: 'paypal_003', time: '2h ago', status: 'pending' },
-          ].map((wh, i) => (
-            <div key={i} className="flex items-center gap-3 p-2.5 bg-slate-50 rounded-lg">
-              <div className={cn('w-2 h-2 rounded-full flex-shrink-0', wh.status === 'delivered' ? 'bg-emerald-500' : 'bg-amber-500')} />
-              <code className="text-xs text-slate-700 flex-1">{wh.event}</code>
-              <code className="text-xs text-slate-400">{wh.payload}</code>
-              <span className="text-xs text-slate-400">{wh.time}</span>
-            </div>
-          ))}
-        </div>
-      </div>
     </div>
   )
 }

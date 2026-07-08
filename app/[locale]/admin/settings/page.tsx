@@ -27,10 +27,15 @@ export default async function SettingsPage() {
   const res = await getAdminWebsiteConfig(tenantId)
   const initialWebsite = res.success ? res.website : null
 
+  const aiConfig = await prisma.tenantAiConfiguration.findUnique({
+    where: { tenantId }
+  })
+
   return (
     <SettingsClient 
       initialWebsite={initialWebsite} 
       initialTenant={tenant} 
+      initialAiConfig={aiConfig}
       tenantId={tenantId} 
     />
   )

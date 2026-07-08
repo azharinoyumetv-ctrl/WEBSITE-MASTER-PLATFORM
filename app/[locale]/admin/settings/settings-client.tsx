@@ -1,13 +1,13 @@
 'use client'
 
 import { useState } from 'react'
-import { Settings, Globe, Palette, Shield, CreditCard, Building2, Save, Loader2, MessageSquare } from 'lucide-react'
+import { Settings, Globe, Palette, Shield, CreditCard, Building2, Save, Loader2, MessageSquare, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { saveAdminWebsiteConfig, saveTenantLogo } from '@/lib/actions/website'
+import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig } from '@/lib/actions/website'
 
-export function SettingsClient({ initialWebsite, initialTenant, tenantId }: { initialWebsite: any, initialTenant: any, tenantId: string }) {
-  const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing'>('general')
+export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig, tenantId }: { initialWebsite: any, initialTenant: any, initialAiConfig?: any, tenantId: string }) {
+  const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing' | 'ai'>('general')
   const [logoPreview, setLogoPreview] = useState<string | null>(initialTenant?.logoUrl || null)
   const [isUploading, setIsUploading] = useState(false)
   
@@ -21,18 +21,30 @@ export function SettingsClient({ initialWebsite, initialTenant, tenantId }: { in
     },
     globalSeoMetadata: initialWebsite?.globalSeoMetadata || { description: '' }
   })
-  
+
+  const [aiData, setAiData] = useState({
+    providerKey: initialAiConfig?.providerKey || 'platform_managed',
+    apiSecret: '', // Don't show existing secret, only allow override
+    selectedModelName: initialAiConfig?.selectedModelName || 'gpt-4o-mini'
+  })
+
   const [isSaving, setIsSaving] = useState(false)
 
   const handleSave = async () => {
     setIsSaving(true)
     const res = await saveAdminWebsiteConfig(tenantId, websiteData)
+    
+    let aiRes = { success: true, error: '' }
+    if (activeTab === 'ai') {
+      aiRes = await saveAiConfig(tenantId, aiData)
+    }
+
     setIsSaving(false)
 
-    if (res.success) {
+    if (res.success && aiRes.success) {
       toast.success('Settings saved successfully')
     } else {
-      toast.error(res.error || 'Failed to save settings')
+      toast.error(res.error || aiRes.error || 'Failed to save settings')
     }
   }
 
@@ -94,6 +106,7 @@ export function SettingsClient({ initialWebsite, initialTenant, tenantId }: { in
           {[
             { id: 'general', label: 'General', icon: Building2 },
             { id: 'theme', label: 'Brand & Theme', icon: Palette },
+            { id: 'ai', label: 'AI & Automations', icon: Bot },
             { id: 'billing', label: 'Billing & Plan', icon: CreditCard },
           ].map(tab => (
             <button
@@ -180,7 +193,7 @@ export function SettingsClient({ initialWebsite, initialTenant, tenantId }: { in
                         themeConfig: { ...websiteData.themeConfig, paymentGateway: e.target.value }
                       })}
                     >
-                      <option value="mock">Sandbox / Mock</option>
+                      <option value="mock">Development Sandbox</option>
                       <option value="xendit">Xendit</option>
                       <option value="midtrans">Midtrans</option>
                     </select>
@@ -330,6 +343,59 @@ export function SettingsClient({ initialWebsite, initialTenant, tenantId }: { in
                       onChange={(e) => setWebsiteData({ ...websiteData, globalSeoMetadata: { ...websiteData.globalSeoMetadata, description: e.target.value } })}
                     />
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'ai' && (
+            <div className="space-y-6">
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Bot className="w-4 h-4 text-slate-400" /> AI Provider Configuration
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="form-label">Provider</label>
+                    <select 
+                      className="form-select max-w-sm"
+                      value={aiData.providerKey}
+                      onChange={(e) => setAiData({ ...aiData, providerKey: e.target.value })}
+                    >
+                      <option value="platform_managed">Platform Managed (Default)</option>
+                      <option value="openai">OpenAI</option>
+                      <option value="anthropic">Anthropic (Coming Soon)</option>
+                    </select>
+                    <p className="text-xs text-slate-400 mt-1">If using your own API key, select the provider above.</p>
+                  </div>
+
+                  {aiData.providerKey !== 'platform_managed' && (
+                    <>
+                      <div>
+                        <label className="form-label">API Secret Key</label>
+                        <input 
+                          type="password" 
+                          className="form-input max-w-md" 
+                          placeholder="sk-..."
+                          value={aiData.apiSecret}
+                          onChange={(e) => setAiData({ ...aiData, apiSecret: e.target.value })}
+                        />
+                        <p className="text-xs text-slate-400 mt-1">Leave blank to keep existing key. Keys are securely encrypted at rest (AES-256).</p>
+                      </div>
+                      <div>
+                        <label className="form-label">Language Model</label>
+                        <select 
+                          className="form-select max-w-sm"
+                          value={aiData.selectedModelName}
+                          onChange={(e) => setAiData({ ...aiData, selectedModelName: e.target.value })}
+                        >
+                          <option value="gpt-4o-mini">gpt-4o-mini</option>
+                          <option value="gpt-4o">gpt-4o</option>
+                          <option value="gpt-4-turbo">gpt-4-turbo</option>
+                        </select>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             </div>
