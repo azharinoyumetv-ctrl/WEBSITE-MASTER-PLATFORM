@@ -55,9 +55,10 @@ export default async function middleware(request: NextRequest) {
       // Determine locale to redirect to
       const localeMatch = pathname.match(/^\/(en|id)(\/|$)/)
       const locale = localeMatch ? localeMatch[1] : getLocale(request)
-      const url = new URL(`/${locale}/auth/login`, request.url)
-      url.searchParams.set('callbackUrl', request.url)
-      return applySecurityHeaders(NextResponse.redirect(url))
+      const redirectUrl = request.nextUrl.clone()
+      redirectUrl.pathname = `/${locale}/auth/login`
+      redirectUrl.searchParams.set('callbackUrl', request.nextUrl.href)
+      return applySecurityHeaders(NextResponse.redirect(redirectUrl))
     }
   }
 
@@ -107,7 +108,8 @@ function handleRouting(request: NextRequest) {
   // Redirect to localized URL if missing
   if (!localeInUrl) {
     const locale = getLocale(request)
-    const redirectUrl = new URL(`/${locale}${pathname}${url.search}`, request.url)
+    const redirectUrl = request.nextUrl.clone()
+    redirectUrl.pathname = `/${locale}${pathname}`
     return NextResponse.redirect(redirectUrl)
   }
 
@@ -122,7 +124,8 @@ function handleRouting(request: NextRequest) {
     }
     // Rewrite to /en/site or /en/site/about
     const targetPath = pathWithoutLocale === '/' ? '' : pathWithoutLocale
-    const finalUrl = new URL(`/${localeInUrl}/site${targetPath}`, request.url)
+    const finalUrl = request.nextUrl.clone()
+    finalUrl.pathname = `/${localeInUrl}/site${targetPath}`
     return NextResponse.rewrite(finalUrl, {
       request: { headers: requestHeaders },
     })
