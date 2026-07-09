@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Globe, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, Building2, User } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { registerTenantAdmin } from '@/lib/actions/auth'
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -30,11 +31,20 @@ export default function RegisterPage() {
 
     setIsLoading(true)
 
-    // Simulate API registration request for Phase 2 UI
-    await new Promise(resolve => setTimeout(resolve, 1500))
-    toast.success('Registration requested! We will contact you shortly.')
-    router.push('/auth/login')
-    setIsLoading(false)
+    try {
+      const result = await registerTenantAdmin(formData)
+      if (result.success) {
+        toast.success('Registration successful! Please sign in.')
+        router.push('/auth/login')
+      } else {
+        setError(result.error || 'An error occurred during registration.')
+      }
+    } catch (err) {
+      console.error(err)
+      setError('An unexpected error occurred.')
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
