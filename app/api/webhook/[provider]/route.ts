@@ -4,34 +4,50 @@ import crypto from 'crypto'
 import { decrypt } from '@/lib/crypto'
 import { sendWhatsAppTemplate } from '@/lib/whatsapp'
 
-// Simple in-memory rate limiter per IP/provider to prevent spam/attacks
-const rateLimitCache: Record<string, { count: number, resetTime: number }> = {}
 const RATE_LIMIT_WINDOW = 60000 // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 50 // 50 requests per minute per IP
 
-function checkRateLimit(req: NextRequest, provider: string) {
-  const ip = req.headers.get('x-forwarded-for') || 'unknown'
-  const key = `${provider}:${ip}`
-  const now = Date.now()
+async function checkRateLimit(req: NextRequest, provider: string) {
+  // Use Cloudflare true client IP if available, fallback to x-forwarded-for
+  const ip = req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || 'unknown'
+  const now = new Date()
   
-  if (!rateLimitCache[key]) {
-    rateLimitCache[key] = { count: 1, resetTime: now + RATE_LIMIT_WINDOW }
+  try {
+    const record = await prisma.systemApiRateLimit.findUnique({
+      where: {
+        provider_ipAddress: {
+          provider,
+          ipAddress: ip
+        }
+      }
+    })
+
+    if (!record || now > record.resetTime) {
+      // Create new record or reset window
+      await prisma.systemApiRateLimit.upsert({
+        where: { provider_ipAddress: { provider, ipAddress: ip } },
+        update: { count: 1, resetTime: new Date(now.getTime() + RATE_LIMIT_WINDOW) },
+        create: { provider, ipAddress: ip, count: 1, resetTime: new Date(now.getTime() + RATE_LIMIT_WINDOW) }
+      })
+      return true
+    }
+
+    if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+      return false
+    }
+
+    // Increment count
+    await prisma.systemApiRateLimit.update({
+      where: { provider_ipAddress: { provider, ipAddress: ip } },
+      data: { count: { increment: 1 } }
+    })
+    
+    return true
+  } catch (error) {
+    // Fail open if database is down or table missing (e.g. before migration)
+    console.error('Rate limit error:', error)
     return true
   }
-  
-  const record = rateLimitCache[key]
-  if (now > record.resetTime) {
-    record.count = 1
-    record.resetTime = now + RATE_LIMIT_WINDOW
-    return true
-  }
-  
-  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
-    return false
-  }
-  
-  record.count++
-  return true
 }
 
 // Simple in-memory cache to prevent repeatedly scanning & decrypting the entire tenant DB on every webhook
@@ -40,7 +56,8 @@ const tenantTokenCache: Record<string, { timestamp: number, data: { tenantId: st
 const CACHE_TTL = 1000 * 60 * 15 // 15 minutes
 
 export async function POST(req: NextRequest, { params }: { params: { provider: string } }) {
-  if (!checkRateLimit(req, params.provider)) {
+  const allowed = await checkRateLimit(req, params.provider)
+  if (!allowed) {
     return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 })
   }
 

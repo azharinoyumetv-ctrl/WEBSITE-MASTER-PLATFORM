@@ -892,3 +892,16 @@ model SystemBackupLedger {
 
   @@map("system_backup_ledger")
 }
+
+model SystemApiRateLimit {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  provider  String   @db.VarChar(64)
+  ipAddress String   @map("ip_address") @db.VarChar(45)
+  count     Int      @default(1)
+  resetTime DateTime @map("reset_time") @db.Timestamptz
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  @@unique([provider, ipAddress])
+  @@map("system_api_rate_limit")
+}
