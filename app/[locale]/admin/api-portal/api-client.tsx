@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Code2, Key, Link2, Copy, Trash2, Eye, EyeOff, CheckCircle2, ShieldAlert, Plus, Zap, Loader2 } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { createApiKey, createWebhook, deleteApiKey, deleteWebhook } from '@/lib/actions/api'
+import { createApiKey, createWebhook, deleteApiKey, deleteWebhook, testWebhookDispatch } from '@/lib/actions/api'
 
 export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { initialKeys: any[], initialWebhooks: any[], tenantId: string }) {
   const [keys, setKeys] = useState(initialKeys)
@@ -12,6 +12,7 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
   const [showKey, setShowKey] = useState<string | null>(null)
   const [isCreatingKey, setIsCreatingKey] = useState(false)
   const [isCreatingWebhook, setIsCreatingWebhook] = useState(false)
+  const [testingWebhooks, setTestingWebhooks] = useState<Record<string, boolean>>({})
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -68,6 +69,18 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
       toast.success('Webhook deleted')
     } else {
       toast.error('Failed to delete webhook')
+    }
+  }
+
+  const handleTestWebhook = async (id: string) => {
+    setTestingWebhooks(prev => ({ ...prev, [id]: true }))
+    const res = await testWebhookDispatch(tenantId, id)
+    setTestingWebhooks(prev => ({ ...prev, [id]: false }))
+
+    if (res.success) {
+      toast.success(res.message || 'Test payload sent')
+    } else {
+      toast.error('Test failed: ' + res.error)
     }
   }
 
@@ -179,7 +192,14 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
                 </div>
 
                 <div className="mt-4 flex items-center gap-2">
-                  <button onClick={() => toast.success('Test payload sent')} className="btn btn-ghost btn-sm text-xs"><Zap className="w-3 h-3" /> Send Test</button>
+                  <button 
+                    onClick={() => handleTestWebhook(w.id)} 
+                    disabled={testingWebhooks[w.id]}
+                    className="btn btn-ghost btn-sm text-xs"
+                  >
+                    {testingWebhooks[w.id] ? <Loader2 className="w-3 h-3 animate-spin" /> : <Zap className="w-3 h-3" />} 
+                    {testingWebhooks[w.id] ? 'Sending...' : 'Send Test'}
+                  </button>
                   <button onClick={() => handleDeleteWebhook(w.id)} className="btn btn-ghost btn-sm text-xs text-red-500"><Trash2 className="w-3 h-3" /> Delete</button>
                 </div>
               </div>

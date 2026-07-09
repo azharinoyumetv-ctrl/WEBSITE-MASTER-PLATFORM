@@ -18,6 +18,7 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState(initialRoles.length > 0 ? initialRoles[0].id : '')
   const [isInviting, setIsInviting] = useState(false)
+  const [selectedProfile, setSelectedProfile] = useState<any | null>(null)
 
   const filtered = users.filter(u => {
     const matchesSearch =
@@ -191,7 +192,7 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
                   <td>
                     <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
-                        onClick={() => toast.success(`Viewing ${nameStr}'s profile`)}
+                        onClick={() => setSelectedProfile(user)}
                         className="btn btn-ghost btn-sm"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -260,6 +261,70 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
                 {isInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 {isInviting ? 'Sending...' : 'Send Invitation'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedProfile && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-modal w-full max-w-md animate-scale-in overflow-hidden">
+            <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center gap-4">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0 text-white text-2xl font-bold shadow-sm"
+                style={{ backgroundColor: stringToColor(selectedProfile.email) }}
+              >
+                {getInitials(selectedProfile.firstName || selectedProfile.lastName ? `${selectedProfile.firstName || ''} ${selectedProfile.lastName || ''}`.trim() : selectedProfile.email)}
+              </div>
+              <div>
+                <h3 className="text-xl font-bold text-slate-900">
+                  {selectedProfile.firstName || selectedProfile.lastName ? `${selectedProfile.firstName || ''} ${selectedProfile.lastName || ''}`.trim() : 'Unknown Name'}
+                </h3>
+                <p className="text-sm text-slate-500">{selectedProfile.email}</p>
+              </div>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="p-3 bg-slate-50 rounded-xl">
+                  <p className="text-xs text-slate-400 mb-1">Status</p>
+                  <span className={`badge ${getStatusBadgeClass(selectedProfile.status)}`}>
+                    {selectedProfile.status.replace('_', ' ')}
+                  </span>
+                </div>
+                <div className="p-3 bg-slate-50 rounded-xl">
+                  <p className="text-xs text-slate-400 mb-1">Joined</p>
+                  <p className="text-sm font-medium text-slate-900">{formatDate(selectedProfile.createdAt)}</p>
+                </div>
+              </div>
+              
+              <div>
+                <p className="text-xs text-slate-400 mb-2">Assigned Roles</p>
+                <div className="flex flex-wrap gap-2">
+                  {selectedProfile.roles && selectedProfile.roles.length > 0 ? (
+                    selectedProfile.roles.map((roleName: string) => (
+                      <span key={roleName} className="text-sm text-slate-700 bg-slate-100 px-3 py-1 rounded-full flex items-center gap-1.5">
+                        {roleName.toLowerCase().includes('admin') && <Crown className="w-3.5 h-3.5 text-amber-500" />}
+                        {roleName}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-sm text-slate-500 italic">No roles assigned</span>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="text-xs text-slate-400 mb-1">Last Login</p>
+                <p className="text-sm font-medium text-slate-900 flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-slate-400" />
+                  {selectedProfile.lastLoginAt ? formatDate(selectedProfile.lastLoginAt, 'long') : 'Never logged in'}
+                </p>
+              </div>
+            </div>
+            
+            <div className="p-6 border-t border-slate-100 flex justify-end">
+              <button onClick={() => setSelectedProfile(null)} className="btn btn-secondary w-full sm:w-auto">Close</button>
             </div>
           </div>
         </div>

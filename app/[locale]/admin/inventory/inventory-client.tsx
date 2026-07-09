@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Warehouse, AlertTriangle, CheckCircle2, TrendingDown, MapPin, Package, RefreshCw, ArrowUpDown, Search, Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { adjustInventory } from '@/lib/actions/inventory'
+import { adjustInventory, transferStock } from '@/lib/actions/inventory'
 
 const STATUS_CONFIG = {
   optimal: { label: 'Optimal', color: 'badge-success', icon: CheckCircle2 },
@@ -19,6 +19,17 @@ export function InventoryClient({ initialLocations, initialBalances, tenantId }:
   const [adjustModal, setAdjustModal] = useState<any | null>(null)
   const [adjustQty, setAdjustQty] = useState('')
   const [isAdjusting, setIsAdjusting] = useState(false)
+
+  // Transfer State
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
+  const [transferSourceBalanceId, setTransferSourceBalanceId] = useState('')
+  const [transferTargetLocationId, setTransferTargetLocationId] = useState('')
+  const [transferQty, setTransferQty] = useState('')
+  const [isTransferring, setIsTransferring] = useState(false)
+
+  // Sync state if initial balances change via revalidatePath
+  // (Next.js passes new props after server action invalidates cache)
+  useEffect(() => { setBalances(initialBalances) }, [initialBalances])
 
   const filteredBalances = balances.filter(b => {
     const matchSearch = b.catalogItem?.title?.toLowerCase().includes(search.toLowerCase()) || false
@@ -49,6 +60,30 @@ export function InventoryClient({ initialLocations, initialBalances, tenantId }:
     }
   }
 
+  const handleTransfer = async () => {
+    const qty = parseInt(transferQty)
+    if (!transferSourceBalanceId || !transferTargetLocationId || isNaN(qty) || qty <= 0) {
+      toast.error('Please fill out all fields correctly')
+      return
+    }
+    const sourceBal = balances.find(b => b.id === transferSourceBalanceId)
+    if (!sourceBal) return
+
+    setIsTransferring(true)
+    const res = await transferStock(tenantId, sourceBal.locationId, transferTargetLocationId, sourceBal.catalogItemId, qty)
+    setIsTransferring(false)
+
+    if (res.success) {
+      toast.success('Stock transferred successfully')
+      setIsTransferModalOpen(false)
+      setTransferSourceBalanceId('')
+      setTransferTargetLocationId('')
+      setTransferQty('')
+    } else {
+      toast.error((res as any).error || 'Transfer failed')
+    }
+  }
+
   return (
     <div className="page-container animate-slide-up">
       <div className="section-header">
@@ -56,7 +91,7 @@ export function InventoryClient({ initialLocations, initialBalances, tenantId }:
           <h2 className="section-title">Inventory Management</h2>
           <p className="section-desc">Multi-location stock tracking and low-stock alerts</p>
         </div>
-        <button onClick={() => toast.success('Opening stock transfer')} className="btn btn-secondary">
+        <button onClick={() => setIsTransferModalOpen(true)} className="btn btn-secondary">
           <ArrowUpDown className="w-4 h-4" />
           Transfer Stock
         </button>
@@ -206,6 +241,60 @@ export function InventoryClient({ initialLocations, initialBalances, tenantId }:
               <button onClick={doAdjust} disabled={isAdjusting} className="btn btn-primary" id="confirm-adjust-btn">
                 {isAdjusting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {isAdjusting ? 'Adjusting...' : 'Confirm'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Transfer Modal */}
+      {isTransferModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-modal w-full max-w-md animate-scale-in">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-semibold">Transfer Stock</h3>
+              <p className="text-sm text-slate-500">Move inventory between locations</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="form-label">Source Item & Location</label>
+                <select className="form-select" value={transferSourceBalanceId} onChange={e => setTransferSourceBalanceId(e.target.value)}>
+                  <option value="">Select source...</option>
+                  {balances.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.catalogItem?.title} ({b.location?.locationName}) - {b.quantityOnHand} available
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Target Location</label>
+                <select className="form-select" value={transferTargetLocationId} onChange={e => setTransferTargetLocationId(e.target.value)}>
+                  <option value="">Select destination...</option>
+                  {initialLocations.map(loc => {
+                    const sourceBal = balances.find(b => b.id === transferSourceBalanceId)
+                    if (sourceBal && sourceBal.locationId === loc.id) return null // Hide source location
+                    return <option key={loc.id} value={loc.id}>{loc.locationName}</option>
+                  })}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Quantity to Transfer</label>
+                <input
+                  type="number"
+                  value={transferQty}
+                  onChange={(e) => setTransferQty(e.target.value)}
+                  placeholder="Enter quantity"
+                  className="form-input"
+                  min="1"
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+              <button onClick={() => setIsTransferModalOpen(false)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleTransfer} disabled={isTransferring} className="btn btn-primary">
+                {isTransferring ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {isTransferring ? 'Transferring...' : 'Complete Transfer'}
               </button>
             </div>
           </div>

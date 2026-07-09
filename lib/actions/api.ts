@@ -98,3 +98,36 @@ export async function deleteWebhook(tenantId: string, id: string) {
     return { success: false, error: error.message }
   }
 }
+
+export async function testWebhookDispatch(tenantId: string, webhookId: string) {
+  try {
+    const webhook = await prisma.tenantApiWebhook.findUnique({
+      where: { id: webhookId, tenantId }
+    })
+    
+    if (!webhook) return { success: false, error: 'Webhook not found' }
+    
+    const payload = {
+      event: 'ping',
+      timestamp: new Date().toISOString(),
+      message: 'This is a test event from the API Portal.'
+    }
+    
+    const res = await fetch(webhook.targetUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-webhook-signature': crypto.createHmac('sha256', webhook.secretSigningToken).update(JSON.stringify(payload)).digest('hex')
+      },
+      body: JSON.stringify(payload)
+    })
+    
+    if (res.ok) {
+      return { success: true, message: `Test payload sent successfully. Remote responded with HTTP ${res.status}.` }
+    } else {
+      return { success: false, error: `Remote returned HTTP ${res.status}` }
+    }
+  } catch (error: any) {
+    return { success: false, error: error.message || 'Network error while dispatching test webhook.' }
+  }
+}

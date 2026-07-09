@@ -3,10 +3,13 @@
 import { useState } from 'react'
 import { CreditCard, DollarSign, TrendingUp, RefreshCw, AlertTriangle, CheckCircle2, Clock, Search } from 'lucide-react'
 import { formatCurrency, formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
+import { refundPayment, capturePayment } from '@/lib/actions/payments'
+import toast from 'react-hot-toast'
 
-export function PaymentsClient({ initialPayments }: { initialPayments: any[] }) {
+export function PaymentsClient({ initialPayments, tenantId }: { initialPayments: any[], tenantId: string }) {
   const [payments, setPayments] = useState(initialPayments)
   const [search, setSearch] = useState('')
+  const [isProcessing, setIsProcessing] = useState<Record<string, boolean>>({})
 
   const filtered = payments.filter(p =>
     p.id.includes(search.toLowerCase()) || (p.externalTransactionId?.includes(search) ?? false)
@@ -17,6 +20,19 @@ export function PaymentsClient({ initialPayments }: { initialPayments: any[] }) 
     succeeded: payments.filter(p => p.paymentStatus === 'succeeded').length,
     failed: payments.filter(p => p.paymentStatus === 'failed').length,
     initiated: payments.filter(p => p.paymentStatus === 'initiated').length,
+  }
+
+  const handleAction = async (actionFn: any, paymentId: string, actionName: string) => {
+    setIsProcessing(prev => ({ ...prev, [paymentId]: true }))
+    const res = await actionFn(tenantId, paymentId)
+    setIsProcessing(prev => ({ ...prev, [paymentId]: false }))
+    
+    if (res.success) {
+      toast.success(`Payment ${actionName} successfully`)
+      setPayments(prev => prev.map(p => p.id === paymentId ? { ...p, ...res.payment } : p))
+    } else {
+      toast.error(`Failed to ${actionName}: ` + res.error)
+    }
   }
 
   return (
@@ -64,6 +80,7 @@ export function PaymentsClient({ initialPayments }: { initialPayments: any[] }) 
               <th>Amount</th>
               <th>Status</th>
               <th>Date</th>
+              <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -84,11 +101,33 @@ export function PaymentsClient({ initialPayments }: { initialPayments: any[] }) 
                 <td className="font-semibold">{formatCurrency(Number(p.amount))} <span className="text-xs text-slate-400">{p.currency}</span></td>
                 <td><span className={`badge ${getStatusBadgeClass(p.paymentStatus)}`}>{p.paymentStatus}</span></td>
                 <td className="text-sm text-slate-400">{formatDate(p.createdAt, 'relative')}</td>
+                <td className="text-right">
+                  <div className="flex items-center justify-end gap-2">
+                    {p.paymentStatus === 'initiated' && (
+                      <button 
+                        onClick={() => handleAction(capturePayment, p.id, 'captured')} 
+                        disabled={isProcessing[p.id]}
+                        className="btn btn-ghost btn-sm text-emerald-600"
+                      >
+                        {isProcessing[p.id] ? 'Processing...' : 'Capture'}
+                      </button>
+                    )}
+                    {p.paymentStatus === 'succeeded' && (
+                      <button 
+                        onClick={() => handleAction(refundPayment, p.id, 'refunded')} 
+                        disabled={isProcessing[p.id]}
+                        className="btn btn-ghost btn-sm text-red-500"
+                      >
+                        {isProcessing[p.id] ? 'Processing...' : 'Refund'}
+                      </button>
+                    )}
+                  </div>
+                </td>
               </tr>
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={6} className="text-center py-8 text-slate-500">No payments found.</td>
+                <td colSpan={7} className="text-center py-8 text-slate-500">No payments found.</td>
               </tr>
             )}
           </tbody>

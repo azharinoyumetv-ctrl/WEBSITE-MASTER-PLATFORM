@@ -37,5 +37,5 @@ export default async function PaymentsPage() {
 
   const initialPayments = res.payments!
 
-  return <PaymentsClient initialPayments={initialPayments} />
+  return <PaymentsClient initialPayments={initialPayments} tenantId={tenantId} />
 }
