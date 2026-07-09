@@ -25,6 +25,15 @@ function getLocale(request: NextRequest) {
   return defaultLocale
 }
 
+function getBaseUrl(request: NextRequest) {
+  const host = request.headers.get('host')
+  const proto = request.headers.get('x-forwarded-proto') || 'https'
+  if (host) {
+    return `${proto}://${host}`
+  }
+  return process.env.NEXTAUTH_URL || request.nextUrl.origin
+}
+
 function applySecurityHeaders(res: NextResponse) {
   const csp = [
     "default-src 'self'",
@@ -55,9 +64,10 @@ export default async function middleware(request: NextRequest) {
       // Determine locale to redirect to
       const localeMatch = pathname.match(/^\/(en|id)(\/|$)/)
       const locale = localeMatch ? localeMatch[1] : getLocale(request)
-      const redirectUrl = request.nextUrl.clone()
-      redirectUrl.pathname = `/${locale}/auth/login`
-      redirectUrl.searchParams.set('callbackUrl', request.nextUrl.href)
+      const origin = getBaseUrl(request)
+      const redirectUrl = new URL(`/${locale}/auth/login`, origin)
+      const callback = new URL(request.nextUrl.pathname + request.nextUrl.search, origin).href
+      redirectUrl.searchParams.set('callbackUrl', callback)
       return applySecurityHeaders(NextResponse.redirect(redirectUrl))
     }
   }
@@ -108,8 +118,8 @@ function handleRouting(request: NextRequest) {
   // Redirect to localized URL if missing
   if (!localeInUrl) {
     const locale = getLocale(request)
-    const redirectUrl = request.nextUrl.clone()
-    redirectUrl.pathname = `/${locale}${pathname}`
+    const origin = getBaseUrl(request)
+    const redirectUrl = new URL(`/${locale}${pathname}${request.nextUrl.search}`, origin)
     return NextResponse.redirect(redirectUrl)
   }
 
@@ -124,8 +134,8 @@ function handleRouting(request: NextRequest) {
     }
     // Rewrite to /en/site or /en/site/about
     const targetPath = pathWithoutLocale === '/' ? '' : pathWithoutLocale
-    const finalUrl = request.nextUrl.clone()
-    finalUrl.pathname = `/${localeInUrl}/site${targetPath}`
+    const origin = getBaseUrl(request)
+    const finalUrl = new URL(`/${localeInUrl}/site${targetPath}`, origin)
     return NextResponse.rewrite(finalUrl, {
       request: { headers: requestHeaders },
     })
