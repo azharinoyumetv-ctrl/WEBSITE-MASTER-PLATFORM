@@ -43,11 +43,15 @@ export function AnalyticsTracker({ tenantId }: AnalyticsTrackerProps) {
     fetch('/api/analytics/event', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-      // keepalive allows the request to complete even if the page is unloading
-      keepalive: true
-    }).catch(() => {
-      // Silently ignore errors — analytics should never break the user experience
+      body: JSON.stringify(payload)
+    })
+    .then(res => {
+      if (!res.ok) {
+        console.warn('[AnalyticsTracker] Failed to record pageview:', res.status)
+      }
+    })
+    .catch(err => {
+      console.warn('[AnalyticsTracker] Network error recording pageview:', err)
     })
   }, [pathname, tenantId])
 

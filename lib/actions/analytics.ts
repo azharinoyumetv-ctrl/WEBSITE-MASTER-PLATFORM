@@ -1,6 +1,7 @@
 'use server'
 
 import prisma from "@/lib/prisma"
+import { revalidatePath } from 'next/cache'
 
 export async function getAnalytics(tenantId: string, rangeDays: number = 7) {
   try {
@@ -253,6 +254,9 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
       })
       upserted++
     }
+
+    revalidatePath('/admin/analytics')
+    revalidatePath('/admin/dashboard')
 
     return { success: true, upserted }
   } catch (error: any) {

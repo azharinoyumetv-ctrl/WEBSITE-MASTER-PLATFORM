@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 import { BarChart3, TrendingUp, Users, Eye, ShoppingCart, DollarSign, Globe, Smartphone, Monitor, Tablet, RefreshCw, Database } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis,
@@ -13,11 +14,11 @@ const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4'
 
 export function AnalyticsClient({ initialData, tenantId }: { initialData: any; tenantId?: string }) {
   const [dateRange, setDateRange] = useState('7d')
-  const [data, setData] = useState(initialData)
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const router = useRouter()
 
-  const deviceData = data.deviceBreakdown.map((d: any) => ({
+  const deviceData = initialData.deviceBreakdown.map((d: any) => ({
     name: d.device, value: d.sessions, percentage: d.percentage,
   }))
 
@@ -26,7 +27,8 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
     startTransition(async () => {
       const res = await backfillAnalyticsSummaries(tenantId, 7)
       if (res.success) {
-        setBackfillMsg(`Seeded ${res.upserted} summary entries. Refresh the page to see updated charts.`)
+        setBackfillMsg(`Seeded ${res.upserted} summary entries. Charts have been updated.`)
+        router.refresh()
       } else {
         setBackfillMsg(`Backfill failed: ${(res as any).error}`)
       }
@@ -73,10 +75,10 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
-          { label: 'Page Views', value: data.pageViews.toLocaleString(), icon: Eye, color: 'bg-indigo-600', trend: '+12.7%' },
-          { label: 'Unique Visitors', value: data.uniqueVisitors.toLocaleString(), icon: Users, color: 'bg-emerald-600', trend: '+8.3%' },
-          { label: 'Conversions', value: data.conversions, icon: ShoppingCart, color: 'bg-amber-500', trend: '+5.1%' },
-          { label: 'Revenue', value: formatCurrency(data.revenue), icon: DollarSign, color: 'bg-purple-600', trend: '+18.4%' },
+          { label: 'Page Views', value: initialData.pageViews.toLocaleString(), icon: Eye, color: 'bg-indigo-600', trend: '+12.7%' },
+          { label: 'Unique Visitors', value: initialData.uniqueVisitors.toLocaleString(), icon: Users, color: 'bg-emerald-600', trend: '+8.3%' },
+          { label: 'Conversions', value: initialData.conversions, icon: ShoppingCart, color: 'bg-amber-500', trend: '+5.1%' },
+          { label: 'Revenue', value: formatCurrency(initialData.revenue), icon: DollarSign, color: 'bg-purple-600', trend: '+18.4%' },
         ].map(s => (
           <div key={s.label} className="stat-card">
             <div className="flex items-center justify-between">
@@ -97,7 +99,7 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
           <h3 className="text-sm font-semibold text-slate-900">Traffic & Revenue Trend</h3>
         </div>
         <ResponsiveContainer width="100%" height={260}>
-          <AreaChart data={data.dailyData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+          <AreaChart data={initialData.dailyData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
             <defs>
               <linearGradient id="pvGrad" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor="#4F46E5" stopOpacity={0.15} />
@@ -124,7 +126,7 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
         <div className="lg:col-span-2 card p-5">
           <h3 className="text-sm font-semibold text-slate-900 mb-4">Orders Per Day</h3>
           <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={data.dailyData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
+            <BarChart data={initialData.dailyData} margin={{ top: 5, right: 5, left: -15, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={v => new Date(v).toLocaleDateString('en', { month: 'short', day: 'numeric' })} />
               <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} />
@@ -146,7 +148,7 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
             </PieChart>
           </ResponsiveContainer>
           <div className="space-y-2 mt-3">
-            {data.deviceBreakdown.map((d, i) => {
+            {initialData.deviceBreakdown.map((d: any, i: number) => {
               const Icon = d.device === 'Mobile' ? Smartphone : d.device === 'Tablet' ? Tablet : Monitor
               return (
                 <div key={d.device} className="flex items-center gap-2.5">
@@ -165,7 +167,7 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
       <div className="card p-5">
         <h3 className="text-sm font-semibold text-slate-900 mb-4">Top Pages</h3>
         <div className="space-y-3">
-          {data.topPages.map((page, i) => (
+          {initialData.topPages.map((page: any, i: number) => (
             <div key={page.page} className="flex items-center gap-3">
               <span className="w-5 h-5 rounded bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-500">{i + 1}</span>
               <div className="flex-1 min-w-0">
@@ -176,7 +178,7 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
                 <div className="w-full bg-slate-100 rounded-full h-1.5">
                   <div
                     className="bg-indigo-500 h-1.5 rounded-full transition-all duration-500"
-                    style={{ width: `${(page.views / data.topPages[0].views) * 100}%` }}
+                    style={{ width: `${(page.views / initialData.topPages[0].views) * 100}%` }}
                   />
                 </div>
               </div>
