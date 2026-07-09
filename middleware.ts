@@ -59,7 +59,12 @@ export default async function middleware(request: NextRequest) {
   const isProtected = (pathname.match(/^\/(en|id)\/admin/) || pathname.startsWith('/admin')) && !pathname.includes('/auth/login')
 
   if (isProtected) {
-    const token = await getToken({ req: request })
+    const isSecure = process.env.NEXTAUTH_URL?.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https'
+    const token = await getToken({ 
+      req: request,
+      secret: process.env.NEXTAUTH_SECRET,
+      secureCookie: isSecure
+    })
     if (!token) {
       // Determine locale to redirect to
       const localeMatch = pathname.match(/^\/(en|id)(\/|$)/)
