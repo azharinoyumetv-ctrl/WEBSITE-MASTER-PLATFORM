@@ -47,7 +47,7 @@ export default async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // 1. Auth check for protected admin routes
-  const isProtected = pathname.match(/^\/(en|id)\/admin/) || pathname.startsWith('/admin')
+  const isProtected = (pathname.match(/^\/(en|id)\/admin/) || pathname.startsWith('/admin')) && !pathname.includes('/auth/login')
 
   if (isProtected) {
     const token = await getToken({ req: request })
@@ -56,7 +56,7 @@ export default async function middleware(request: NextRequest) {
       const localeMatch = pathname.match(/^\/(en|id)(\/|$)/)
       const locale = localeMatch ? localeMatch[1] : getLocale(request)
       const url = new URL(`/${locale}/auth/login`, request.url)
-      url.searchParams.set('callbackUrl', encodeURI(request.url))
+      url.searchParams.set('callbackUrl', request.url)
       return applySecurityHeaders(NextResponse.redirect(url))
     }
   }

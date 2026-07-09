@@ -1,7 +1,7 @@
 'use server'
 
 import prisma from "@/lib/prisma"
-import { revalidatePath } from 'next/cache'
+
 
 export async function getAnalytics(tenantId: string, rangeDays: number = 7) {
   try {
@@ -256,6 +256,7 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
     }
 
     try {
+      const { revalidatePath } = require('next/cache')
       revalidatePath('/admin/analytics')
       revalidatePath('/admin/dashboard')
     } catch (e) {
