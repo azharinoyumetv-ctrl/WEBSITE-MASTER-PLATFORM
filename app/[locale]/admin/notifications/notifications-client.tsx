@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Bell, Mail, MessageSquare, Settings2, Plus, Edit2, Trash2, Eye, CheckCircle2, Search, Loader2 } from 'lucide-react'
+import { Bell, Mail, MessageSquare, Settings2, Plus, Edit2, Trash2, Eye, CheckCircle2, Search, Loader2, X } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { updateNotificationTemplate, saveNotificationGateway } from '@/lib/actions/notifications'
+import { updateNotificationTemplate, saveNotificationGateway, createNotificationTemplate, dispatchTestNotification } from '@/lib/actions/notifications'
 
 export function NotificationsClient({ initialTemplates, tenantId }: { initialTemplates: any[], tenantId: string }) {
   const [templates, setTemplates] = useState(initialTemplates)
@@ -26,6 +26,42 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
   })
   const [isSavingSmtp, setIsSavingSmtp] = useState(false)
 
+  // New Template State
+  const [isNewTemplateModalOpen, setIsNewTemplateModalOpen] = useState(false)
+  const [isCreatingTemplate, setIsCreatingTemplate] = useState(false)
+  const [newTemplate, setNewTemplate] = useState({ templateKey: '', channelType: 'email' })
+
+  const handleCreateTemplate = async () => {
+    if (!newTemplate.templateKey) return
+    setIsCreatingTemplate(true)
+    const res = await createNotificationTemplate(tenantId, {
+      ...newTemplate,
+      subjectLine: newTemplate.channelType === 'email' ? 'New Notification' : undefined,
+      htmlBodyMarkup: 'Hello {{customer_name}},'
+    })
+    setIsCreatingTemplate(false)
+    if (res.success && res.template) {
+      toast.success('Template created')
+      setTemplates([...templates, res.template])
+      setIsNewTemplateModalOpen(false)
+      setNewTemplate({ templateKey: '', channelType: 'email' })
+      handleSelect(res.template)
+    } else {
+      toast.error(res.error || 'Failed to create template')
+    }
+  }
+
+  const handleTestSend = async () => {
+    if (!selectedTemplate) return
+    const toastId = toast.loading('Dispatching test notification...')
+    const res = await dispatchTestNotification(tenantId, selectedTemplate.id)
+    if (res.success) {
+      toast.success(res.message || 'Success', { id: toastId })
+    } else {
+      toast.error(res.error || 'Failed to dispatch test', { id: toastId })
+    }
+  }
+
   const handleSelect = (tmpl: any) => {
     setSelectedTemplate(tmpl)
     setEditSubject(tmpl.subjectLine || '')
@@ -41,7 +77,7 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
     })
     setIsSaving(false)
 
-    if (res.success) {
+    if (res.success && res.template) {
       toast.success('Template Saved')
       setTemplates(prev => prev.map(t => t.id === res.template.id ? res.template : t))
       setSelectedTemplate(res.template)
@@ -88,7 +124,7 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
             <div className="card p-4">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-sm font-semibold text-slate-900">Templates</h3>
-                <button onClick={() => toast.success('New template')} className="p-1 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100">
+                <button onClick={() => setIsNewTemplateModalOpen(true)} className="p-1 rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100">
                   <Plus className="w-4 h-4" />
                 </button>
               </div>
@@ -119,7 +155,7 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold text-slate-900 capitalize">Edit: {selectedTemplate.templateKey.replace(/_/g, ' ')}</h3>
                   <div className="flex gap-2">
-                    <button onClick={() => toast.success('Preview sent')} className="btn btn-secondary btn-sm"><Eye className="w-4 h-4" /> Test Send</button>
+                    <button onClick={handleTestSend} className="btn btn-secondary btn-sm"><Eye className="w-4 h-4" /> Test Send</button>
                     <button onClick={handleSave} disabled={isSaving} className="btn btn-primary btn-sm">
                       {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save
                     </button>
@@ -204,6 +240,38 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
             <button className="btn btn-primary" onClick={handleSaveSmtp} disabled={isSavingSmtp}>
               {isSavingSmtp ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Save Configuration
             </button>
+          </div>
+        </div>
+      )}
+
+      {isNewTemplateModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-semibold text-slate-900">New Template</h3>
+              <button onClick={() => setIsNewTemplateModalOpen(false)} className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/50">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="form-label">Template Key</label>
+                <input type="text" className="form-input" placeholder="e.g. order_confirmation" value={newTemplate.templateKey} onChange={e => setNewTemplate({...newTemplate, templateKey: e.target.value.toLowerCase().replace(/\s+/g, '_')})} />
+              </div>
+              <div>
+                <label className="form-label">Channel Type</label>
+                <select className="form-select" value={newTemplate.channelType} onChange={e => setNewTemplate({...newTemplate, channelType: e.target.value})}>
+                  <option value="email">Email</option>
+                  <option value="sms">SMS</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+              <button onClick={() => setIsNewTemplateModalOpen(false)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleCreateTemplate} disabled={isCreatingTemplate || !newTemplate.templateKey} className="btn btn-primary">
+                {isCreatingTemplate ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Create
+              </button>
+            </div>
           </div>
         </div>
       )}

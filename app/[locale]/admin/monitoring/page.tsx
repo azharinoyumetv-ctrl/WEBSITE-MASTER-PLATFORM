@@ -1,6 +1,7 @@
 import { Activity, Server, Database, Globe, AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getMonitoringStatus } from '@/lib/actions/monitoring'
+import { MetricsButton } from './metrics-button'
 
 export default async function MonitoringPage() {
   const res = await getMonitoringStatus()
@@ -61,8 +62,8 @@ export default async function MonitoringPage() {
                       {'connections' in node && <span>Connections: <strong className="text-slate-700">{node.connections}</strong></span>}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <button className="text-xs text-indigo-600 hover:text-indigo-800 font-medium">Metrics &rarr;</button>
+                  <div className="text-right flex items-center justify-end">
+                    <MetricsButton serviceName={node.service} />
                   </div>
                 </div>
               ))}

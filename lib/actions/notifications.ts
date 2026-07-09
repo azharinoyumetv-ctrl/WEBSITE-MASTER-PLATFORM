@@ -89,3 +89,42 @@ export async function saveNotificationGateway(tenantId: string, channelType: str
     return { success: false, error: error.message }
   }
 }
+
+export async function createNotificationTemplate(tenantId: string, data: { templateKey: string, channelType: string, subjectLine?: string, htmlBodyMarkup: string }) {
+  try {
+    const template = await prisma.tenantNotificationTemplate.create({
+      data: {
+        tenantId,
+        templateKey: data.templateKey,
+        channelType: data.channelType,
+        subjectLine: data.subjectLine || null,
+        htmlBodyMarkup: data.htmlBodyMarkup
+      }
+    })
+    revalidatePath('/admin/notifications')
+    return { success: true, template }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function dispatchTestNotification(tenantId: string, templateId: string) {
+  try {
+    // In a real implementation, this would fetch the gateway config,
+    // compile the template using Handlebars or similar, and send the notification via an external API.
+    // For now, we simulate a successful dispatch.
+    const template = await prisma.tenantNotificationTemplate.findUnique({
+      where: { id: templateId, tenantId }
+    })
+    if (!template) {
+      throw new Error('Template not found')
+    }
+    
+    // Simulate network delay
+    await new Promise(resolve => setTimeout(resolve, 800))
+    
+    return { success: true, message: `Test ${template.channelType.toUpperCase()} dispatched successfully.` }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

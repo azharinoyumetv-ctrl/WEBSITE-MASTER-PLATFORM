@@ -1,14 +1,39 @@
 'use client'
 
 import { useState } from 'react'
-import { Users2, Search, Mail, Phone, Tag, Plus, ChevronRight, Clock, ShoppingCart, MessageSquare, TrendingUp } from 'lucide-react'
+import { Users2, Search, Mail, Phone, Tag, Plus, ChevronRight, Clock, ShoppingCart, MessageSquare, TrendingUp, X, Loader2 } from 'lucide-react'
 import { formatCurrency, formatDate, getInitials, stringToColor, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
+import { createCrmContact } from '@/lib/actions/crm'
 
-export function CrmClient({ initialContacts, initialTimeline }: { initialContacts: any[], initialTimeline: any[] }) {
+export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tenantId: string, initialContacts: any[], initialTimeline: any[] }) {
   const [contacts, setContacts] = useState(initialContacts)
   const [selected, setSelected] = useState<any | null>(initialContacts[0] || null)
   const [search, setSearch] = useState('')
+  
+  // New Contact Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [newContact, setNewContact] = useState({ firstName: '', lastName: '', email: '', phoneNumber: '' })
+
+  const handleCreate = async () => {
+    if (!newContact.firstName || !newContact.email) {
+      toast.error('First Name and Email are required')
+      return
+    }
+    setIsCreating(true)
+    const res = await createCrmContact(tenantId, newContact)
+    setIsCreating(false)
+    if (res.success) {
+      toast.success('Contact created successfully')
+      setContacts([res.contact, ...contacts])
+      setIsModalOpen(false)
+      setNewContact({ firstName: '', lastName: '', email: '', phoneNumber: '' })
+      if (!selected) setSelected(res.contact)
+    } else {
+      toast.error(res.error || 'Failed to create contact')
+    }
+  }
 
   const filtered = contacts.filter(c =>
     `${c.firstName} ${c.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
@@ -30,7 +55,7 @@ export function CrmClient({ initialContacts, initialTimeline }: { initialContact
           <h2 className="section-title">CRM — Customer Relationships</h2>
           <p className="section-desc">Contact directory and interaction timeline</p>
         </div>
-        <button onClick={() => toast.success('Opening new contact form')} className="btn btn-primary">
+        <button onClick={() => setIsModalOpen(true)} className="btn btn-primary">
           <Plus className="w-4 h-4" />
           Add Contact
         </button>
@@ -167,6 +192,45 @@ export function CrmClient({ initialContacts, initialTimeline }: { initialContact
           )}
         </div>
       </div>
+
+      {isModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-semibold text-slate-900">New Contact</h3>
+              <button onClick={() => setIsModalOpen(false)} className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/50">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">First Name *</label>
+                  <input type="text" className="form-input" value={newContact.firstName} onChange={e => setNewContact({...newContact, firstName: e.target.value})} />
+                </div>
+                <div>
+                  <label className="form-label">Last Name</label>
+                  <input type="text" className="form-input" value={newContact.lastName} onChange={e => setNewContact({...newContact, lastName: e.target.value})} />
+                </div>
+              </div>
+              <div>
+                <label className="form-label">Email *</label>
+                <input type="email" className="form-input" value={newContact.email} onChange={e => setNewContact({...newContact, email: e.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">Phone Number</label>
+                <input type="tel" className="form-input" value={newContact.phoneNumber} onChange={e => setNewContact({...newContact, phoneNumber: e.target.value})} />
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+              <button onClick={() => setIsModalOpen(false)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleCreate} disabled={isCreating} className="btn btn-primary">
+                {isCreating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Create Contact
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
