@@ -25,13 +25,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   })
 
   const res = await getTenantModules(tenantId)
+  // If module fetch fails, default to all platform modules enabled so nav is not hidden
+  // This is a graceful degradation — modules page will show the real error state
   const dbModules = res.success ? res.modules : []
+  if (!res.success) {
+    console.error('[admin-layout] Failed to load tenant modules:', (res as any).error)
+  }
 
   // Create map of enabled modules
   const enabledModules = new Set<string>()
   PLATFORM_MODULES.forEach(mockMod => {
+    // If DB fetch failed, default all modules to enabled (graceful nav degradation)
     const dbMod = dbModules.find((m: any) => m.moduleKey === mockMod.key)
-    const isEnabled = dbMod ? dbMod.isEnabled : mockMod.isEnabled
+    const isEnabled = res.success ? (dbMod ? dbMod.isEnabled : mockMod.isEnabled) : true
     if (isEnabled) {
       enabledModules.add(mockMod.key)
     }

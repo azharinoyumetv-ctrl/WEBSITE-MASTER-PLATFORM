@@ -5,6 +5,11 @@ import { Pool } from 'pg'
 const prismaClientSingleton = () => {
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) {
+    console.error(
+      '[prisma] FATAL: DATABASE_URL is not set in environment variables.\n' +
+      'This will cause PrismaClientInitializationError on every DB call.\n' +
+      'Set DATABASE_URL in your .env or PM2 ecosystem config and rebuild.'
+    )
     throw new Error('DATABASE_URL is not set in environment variables.')
   }
   const pool = new Pool({ connectionString })

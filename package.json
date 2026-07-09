@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 4000",
+    "prebuild": "node -e \"if (!process.env.DATABASE_URL) { console.error('\\n[prebuild] ERROR: DATABASE_URL is not set. Build aborted to prevent runtime PrismaClientInitializationError.\\nSet DATABASE_URL in your .env file or PM2 ecosystem config before building.\\n'); process.exit(1); } else { console.log('[prebuild] DATABASE_URL is set. Proceeding with build.'); }\"",
     "build": "next build",
     "start": "next start -p 4000",
     "lint": "next lint"

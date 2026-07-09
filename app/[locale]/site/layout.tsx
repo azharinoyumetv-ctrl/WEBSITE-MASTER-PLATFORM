@@ -6,6 +6,7 @@ import { getPublicWebsiteConfig } from '@/lib/actions/website'
 import { getTranslations } from 'next-intl/server'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { WhatsAppWidget } from './whatsapp-widget'
+import { AnalyticsTracker } from '@/components/AnalyticsTracker'
 
 export default async function SiteLayout({
   children,
@@ -180,6 +181,7 @@ export default async function SiteLayout({
         </div>
       </footer>
       {tenantDomain === 'default' && <WhatsAppWidget />}
+      <AnalyticsTracker tenantId={tenant.id} />
     </div>
   )
 }

@@ -1,22 +1,37 @@
 'use client'
 
-import { useState } from 'react'
-import { BarChart3, TrendingUp, Users, Eye, ShoppingCart, DollarSign, Globe, Smartphone, Monitor, Tablet } from 'lucide-react'
+import { useState, useTransition } from 'react'
+import { BarChart3, TrendingUp, Users, Eye, ShoppingCart, DollarSign, Globe, Smartphone, Monitor, Tablet, RefreshCw, Database } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { formatCurrency, cn } from '@/lib/utils'
+import { backfillAnalyticsSummaries } from '@/lib/actions/analytics'
 
 const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4']
 
-export function AnalyticsClient({ initialData }: { initialData: any }) {
+export function AnalyticsClient({ initialData, tenantId }: { initialData: any; tenantId?: string }) {
   const [dateRange, setDateRange] = useState('7d')
-  const data = initialData
+  const [data, setData] = useState(initialData)
+  const [backfillMsg, setBackfillMsg] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
 
-  const deviceData = data.deviceBreakdown.map(d => ({
+  const deviceData = data.deviceBreakdown.map((d: any) => ({
     name: d.device, value: d.sessions, percentage: d.percentage,
   }))
+
+  const handleBackfill = () => {
+    if (!tenantId) return
+    startTransition(async () => {
+      const res = await backfillAnalyticsSummaries(tenantId, 7)
+      if (res.success) {
+        setBackfillMsg(`Seeded ${res.upserted} summary entries. Refresh the page to see updated charts.`)
+      } else {
+        setBackfillMsg(`Backfill failed: ${(res as any).error}`)
+      }
+    })
+  }
 
   return (
     <div className="page-container animate-slide-up">
@@ -35,8 +50,25 @@ export function AnalyticsClient({ initialData }: { initialData: any }) {
               {r}
             </button>
           ))}
+          {tenantId && (
+            <button
+              onClick={handleBackfill}
+              disabled={isPending}
+              title="Seed 7 days of test analytics summaries based on real order + pageview data"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50"
+            >
+              <Database className="w-3.5 h-3.5" />
+              {isPending ? 'Seeding...' : 'Seed Test Data'}
+            </button>
+          )}
         </div>
       </div>
+
+      {backfillMsg && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-xs text-amber-700">
+          {backfillMsg}
+        </div>
+      )}
 
       {/* KPIs */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

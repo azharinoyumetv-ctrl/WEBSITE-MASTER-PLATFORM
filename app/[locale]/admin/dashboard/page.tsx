@@ -247,13 +247,16 @@ export default async function AdminDashboard() {
     getAnalytics(tenantId),
     getMonitoringStatus()
   ])
+
+  const metricsError = !metricsRes.success ? (metricsRes as any).error : null
+  const analyticsError = !analyticsRes.success ? (analyticsRes as any).error : null
   
   const m = metricsRes.success && metricsRes.metrics ? metricsRes.metrics : {
     totalOrders: 0, revenue: 0, recentLogs: [], recentOrders: [], criticalItems: [], modules: []
   }
 
   const a = analyticsRes.success && analyticsRes.analytics ? analyticsRes.analytics : {
-    pageViews: 0, dailyData: []
+    pageViews: 0, conversions: 0, dailyData: []
   }
 
   const monitoringData = monitoringRes.success && monitoringRes.monitoring ? monitoringRes.monitoring : {
@@ -292,6 +295,27 @@ export default async function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Error banners for failed server actions */}
+      {metricsError && (
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-700">Error loading dashboard metrics</p>
+            <p className="text-xs text-red-500 mt-0.5 font-mono">{metricsError}</p>
+            <p className="text-xs text-red-600 mt-1">The figures below may be incomplete. Check server logs and ensure the production build is up to date.</p>
+          </div>
+        </div>
+      )}
+      {analyticsError && (
+        <div className="mb-4 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4">
+          <AlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-amber-700">Error loading analytics data</p>
+            <p className="text-xs text-amber-500 mt-0.5 font-mono">{analyticsError}</p>
+          </div>
+        </div>
+      )}
 
       {/* KPI Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">

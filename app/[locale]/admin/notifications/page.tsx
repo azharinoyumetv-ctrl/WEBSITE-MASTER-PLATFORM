@@ -3,6 +3,7 @@ import { NotificationsClient } from './notifications-client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
+import { AlertTriangle } from 'lucide-react'
 
 export default async function NotificationsPage() {
   const session = await getServerSession(authOptions)
@@ -18,7 +19,23 @@ export default async function NotificationsPage() {
   }
 
   const res = await getNotificationTemplates(tenantId)
-  const initialTemplates = res.success ? res.templates : []
+
+  if (!res.success) {
+    const errorMsg = (res as any).error || 'Unknown error'
+    return (
+      <div className="page-container animate-slide-up">
+        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-5">
+          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-red-700">Failed to load notification templates</p>
+            <p className="text-xs text-red-500 mt-1 font-mono">{errorMsg}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  const initialTemplates = res.templates!
 
   return <NotificationsClient initialTemplates={initialTemplates} tenantId={tenantId} />
 }
