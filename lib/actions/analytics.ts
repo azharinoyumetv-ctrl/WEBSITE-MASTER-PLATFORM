@@ -255,8 +255,12 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
       upserted++
     }
 
-    revalidatePath('/admin/analytics')
-    revalidatePath('/admin/dashboard')
+    try {
+      revalidatePath('/admin/analytics')
+      revalidatePath('/admin/dashboard')
+    } catch (e) {
+      // Ignore if called from a standalone script outside Next.js context
+    }
 
     return { success: true, upserted }
   } catch (error: any) {
