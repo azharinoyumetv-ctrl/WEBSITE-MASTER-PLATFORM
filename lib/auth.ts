@@ -40,17 +40,17 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Account suspended")
         }
 
-        // Try user.passwordHash first (primary path), then authCredential.passwordHash (secondary)
-        const hashToCheck = user.passwordHash || user.authCredential?.passwordHash
+        let isValidPassword = false;
 
-        if (!hashToCheck) {
-          throw new Error("Invalid credentials")
+        // In a dual-table schema, check the dedicated auth credential table first
+        if (user.authCredential?.passwordHash) {
+          isValidPassword = await bcrypt.compare(credentials.password, user.authCredential.passwordHash);
         }
 
-        const isValidPassword = await bcrypt.compare(
-          credentials.password,
-          hashToCheck
-        )
+        // Fallback to the legacy user.passwordHash if the primary failed or didn't exist
+        if (!isValidPassword && user.passwordHash) {
+          isValidPassword = await bcrypt.compare(credentials.password, user.passwordHash);
+        }
 
         if (!isValidPassword) {
           throw new Error("Invalid credentials")
