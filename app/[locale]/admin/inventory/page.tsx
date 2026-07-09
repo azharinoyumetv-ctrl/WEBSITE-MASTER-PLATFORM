@@ -37,6 +37,7 @@ export default async function InventoryPage() {
 
   const initialLocations = res.locations!
   const initialBalances = res.balances!
+  const catalogItems = res.catalogItems || []
 
-  return <InventoryClient initialLocations={initialLocations} initialBalances={initialBalances} tenantId={tenantId} />
+  return <InventoryClient initialLocations={initialLocations} initialBalances={initialBalances} catalogItems={catalogItems} tenantId={tenantId} />
 }

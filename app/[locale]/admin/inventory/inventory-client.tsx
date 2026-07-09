@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Warehouse, AlertTriangle, CheckCircle2, TrendingDown, MapPin, Package, RefreshCw, ArrowUpDown, Search, Loader2 } from 'lucide-react'
+import { Warehouse, AlertTriangle, CheckCircle2, TrendingDown, MapPin, Package, RefreshCw, ArrowUpDown, Search, Loader2, Plus, Edit2, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { adjustInventory, transferStock } from '@/lib/actions/inventory'
+import { adjustInventory, transferStock, addInventoryBalance, updateInventoryBalance, deleteInventoryBalance } from '@/lib/actions/inventory'
 
 const STATUS_CONFIG = {
   optimal: { label: 'Optimal', color: 'badge-success', icon: CheckCircle2 },
@@ -12,13 +12,28 @@ const STATUS_CONFIG = {
   critical: { label: 'Critical', color: 'badge-error', icon: TrendingDown },
 }
 
-export function InventoryClient({ initialLocations, initialBalances, tenantId }: { initialLocations: any[], initialBalances: any[], tenantId: string }) {
+export function InventoryClient({ initialLocations, initialBalances, catalogItems, tenantId }: { initialLocations: any[], initialBalances: any[], catalogItems: any[], tenantId: string }) {
   const [balances, setBalances] = useState(initialBalances)
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [adjustModal, setAdjustModal] = useState<any | null>(null)
   const [adjustQty, setAdjustQty] = useState('')
   const [isAdjusting, setIsAdjusting] = useState(false)
+
+  // Add State
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [addLocationId, setAddLocationId] = useState('')
+  const [addCatalogItemId, setAddCatalogItemId] = useState('')
+  const [addQty, setAddQty] = useState('')
+  const [addThreshold, setAddThreshold] = useState('5')
+  const [isAdding, setIsAdding] = useState(false)
+
+  // Edit State
+  const [editModal, setEditModal] = useState<any | null>(null)
+  const [editQty, setEditQty] = useState('')
+  const [editReserved, setEditReserved] = useState('')
+  const [editThreshold, setEditThreshold] = useState('')
+  const [isEditing, setIsEditing] = useState(false)
 
   // Transfer State
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
@@ -84,6 +99,61 @@ export function InventoryClient({ initialLocations, initialBalances, tenantId }:
     }
   }
 
+  const handleAdd = async () => {
+    const qty = parseInt(addQty)
+    const threshold = parseInt(addThreshold)
+    if (!addLocationId || !addCatalogItemId || isNaN(qty) || isNaN(threshold)) {
+      toast.error('Please fill out all fields correctly')
+      return
+    }
+    setIsAdding(true)
+    const res = await addInventoryBalance(tenantId, addLocationId, addCatalogItemId, qty, threshold)
+    setIsAdding(false)
+    if (res.success) {
+      toast.success('Inventory added successfully')
+      setBalances(prev => [...prev, res.balance])
+      setIsAddModalOpen(false)
+      setAddLocationId('')
+      setAddCatalogItemId('')
+      setAddQty('')
+      setAddThreshold('5')
+    } else {
+      toast.error(res.error || 'Failed to add inventory')
+    }
+  }
+
+  const handleEdit = async () => {
+    if (!editModal) return
+    const qty = parseInt(editQty)
+    const reserved = parseInt(editReserved)
+    const threshold = parseInt(editThreshold)
+    if (isNaN(qty) || isNaN(reserved) || isNaN(threshold)) {
+      toast.error('Invalid numbers')
+      return
+    }
+    setIsEditing(true)
+    const res = await updateInventoryBalance(tenantId, editModal.id, { quantityOnHand: qty, quantityReserved: reserved, lowStockThreshold: threshold })
+    setIsEditing(false)
+    if (res.success) {
+      toast.success('Inventory updated')
+      setBalances(prev => prev.map(b => b.id === editModal.id ? { ...b, ...res.balance, catalogItem: b.catalogItem } : b))
+      setEditModal(null)
+    } else {
+      toast.error(res.error || 'Failed to update inventory')
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this inventory record?')) return
+    const res = await deleteInventoryBalance(tenantId, id)
+    if (res.success) {
+      toast.success('Inventory deleted')
+      setBalances(prev => prev.filter(b => b.id !== id))
+    } else {
+      toast.error(res.error || 'Failed to delete inventory')
+    }
+  }
+
   return (
     <div className="page-container animate-slide-up">
       <div className="section-header">
@@ -91,10 +161,16 @@ export function InventoryClient({ initialLocations, initialBalances, tenantId }:
           <h2 className="section-title">Inventory Management</h2>
           <p className="section-desc">Multi-location stock tracking and low-stock alerts</p>
         </div>
-        <button onClick={() => setIsTransferModalOpen(true)} className="btn btn-secondary">
-          <ArrowUpDown className="w-4 h-4" />
-          Transfer Stock
-        </button>
+        <div className="flex items-center gap-3">
+          <button onClick={() => setIsTransferModalOpen(true)} className="btn btn-secondary">
+            <ArrowUpDown className="w-4 h-4" />
+            Transfer Stock
+          </button>
+          <button onClick={() => setIsAddModalOpen(true)} className="btn btn-primary">
+            <Plus className="w-4 h-4" />
+            Add Stock
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -186,13 +262,34 @@ export function InventoryClient({ initialLocations, initialBalances, tenantId }:
                       <td className="text-slate-400">{bal.lowStockThreshold}</td>
                       <td><span className={`badge ${statusConf.color}`}>{statusConf.label}</span></td>
                       <td>
-                        <button
-                          onClick={() => { setAdjustModal(bal); setAdjustQty('') }}
-                          className="btn btn-secondary btn-sm"
-                          id={`adjust-${bal.id}`}
-                        >
-                          Adjust
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => { setAdjustModal(bal); setAdjustQty('') }}
+                            className="btn btn-secondary btn-sm"
+                            title="Adjust Quantity"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => {
+                              setEditModal(bal)
+                              setEditQty(bal.quantityOnHand.toString())
+                              setEditReserved(bal.quantityReserved.toString())
+                              setEditThreshold(bal.lowStockThreshold.toString())
+                            }}
+                            className="btn btn-secondary btn-sm"
+                            title="Edit Record"
+                          >
+                            <Edit2 className="w-4 h-4 text-slate-500" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(bal.id)}
+                            className="btn btn-secondary btn-sm hover:bg-red-50 hover:border-red-200"
+                            title="Delete Record"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -295,6 +392,88 @@ export function InventoryClient({ initialLocations, initialBalances, tenantId }:
               <button onClick={handleTransfer} disabled={isTransferring} className="btn btn-primary">
                 {isTransferring ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 {isTransferring ? 'Transferring...' : 'Complete Transfer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add Modal */}
+      {isAddModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-modal w-full max-w-md animate-scale-in">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-semibold">Add Stock</h3>
+              <p className="text-sm text-slate-500">Add a new inventory balance record</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="form-label">Location</label>
+                <select className="form-select" value={addLocationId} onChange={e => setAddLocationId(e.target.value)}>
+                  <option value="">Select location...</option>
+                  {initialLocations.map(loc => (
+                    <option key={loc.id} value={loc.id}>{loc.locationName}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Catalog Item</label>
+                <select className="form-select" value={addCatalogItemId} onChange={e => setAddCatalogItemId(e.target.value)}>
+                  <option value="">Select item...</option>
+                  {catalogItems.map(item => (
+                    <option key={item.id} value={item.id}>{item.title}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Quantity On Hand</label>
+                  <input type="number" value={addQty} onChange={(e) => setAddQty(e.target.value)} className="form-input" min="0" />
+                </div>
+                <div>
+                  <label className="form-label">Low Stock Threshold</label>
+                  <input type="number" value={addThreshold} onChange={(e) => setAddThreshold(e.target.value)} className="form-input" min="0" />
+                </div>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+              <button onClick={() => setIsAddModalOpen(false)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleAdd} disabled={isAdding} className="btn btn-primary">
+                {isAdding ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {isAdding ? 'Adding...' : 'Add Stock'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Modal */}
+      {editModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-modal w-full max-w-sm animate-scale-in">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-semibold">Edit Stock Record</h3>
+              <p className="text-sm text-slate-500">{editModal.catalogItem?.title}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="form-label">Quantity On Hand</label>
+                <input type="number" value={editQty} onChange={(e) => setEditQty(e.target.value)} className="form-input" min="0" />
+              </div>
+              <div>
+                <label className="form-label">Quantity Reserved</label>
+                <input type="number" value={editReserved} onChange={(e) => setEditReserved(e.target.value)} className="form-input" min="0" />
+              </div>
+              <div>
+                <label className="form-label">Low Stock Threshold</label>
+                <input type="number" value={editThreshold} onChange={(e) => setEditThreshold(e.target.value)} className="form-input" min="0" />
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+              <button onClick={() => setEditModal(null)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleEdit} disabled={isEditing} className="btn btn-primary">
+                {isEditing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {isEditing ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
           </div>

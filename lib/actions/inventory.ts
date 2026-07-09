@@ -14,7 +14,11 @@ export async function getInventory(tenantId: string) {
       include: { catalogItem: true, location: true }
     })
 
-    return { success: true, locations, balances }
+    const catalogItems = await prisma.tenantCatalogItem.findMany({
+      where: { tenantId }
+    })
+
+    return { success: true, locations, balances, catalogItems }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -98,5 +102,66 @@ export async function transferStock(tenantId: string, sourceLocationId: string, 
     return { success: false, error: error.message }
   } finally {
     revalidatePath('/admin/inventory')
+  }
+}
+
+export async function addInventoryBalance(tenantId: string, locationId: string, catalogItemId: string, quantity: number, lowStockThreshold: number = 5) {
+  try {
+    const existing = await prisma.tenantInventoryBalance.findUnique({
+      where: { locationId_catalogItemId: { locationId, catalogItemId } }
+    })
+
+    if (existing) {
+      return { success: false, error: 'Inventory balance already exists for this item at this location. Use Edit instead.' }
+    }
+
+    const created = await prisma.tenantInventoryBalance.create({
+      data: {
+        tenantId,
+        locationId,
+        catalogItemId,
+        quantityOnHand: quantity,
+        lowStockThreshold
+      },
+      include: { catalogItem: true, location: true }
+    })
+
+    revalidatePath('/admin/inventory')
+    return { success: true, balance: created }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateInventoryBalance(tenantId: string, balanceId: string, data: { quantityOnHand?: number, lowStockThreshold?: number, quantityReserved?: number }) {
+  try {
+    const balance = await prisma.tenantInventoryBalance.findUnique({
+      where: { id: balanceId, tenantId }
+    })
+
+    if (!balance) return { success: false, error: 'Balance not found' }
+
+    const updated = await prisma.tenantInventoryBalance.update({
+      where: { id: balanceId },
+      data,
+      include: { catalogItem: true, location: true }
+    })
+
+    revalidatePath('/admin/inventory')
+    return { success: true, balance: updated }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function deleteInventoryBalance(tenantId: string, balanceId: string) {
+  try {
+    await prisma.tenantInventoryBalance.deleteMany({
+      where: { id: balanceId, tenantId }
+    })
+    revalidatePath('/admin/inventory')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
   }
 }
