@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Users2, Search, Mail, Phone, Tag, Plus, ChevronRight, Clock, ShoppingCart, MessageSquare, TrendingUp, X, Loader2 } from 'lucide-react'
+import { Users2, Search, Mail, Phone, Tag, Plus, ChevronRight, Clock, ShoppingCart, MessageSquare, TrendingUp, X, Loader2, Upload, Trash2, CheckSquare } from 'lucide-react'
 import { formatCurrency, formatDate, getInitials, stringToColor, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { createCrmContact, updateCrmContact, deleteCrmContact, addTimelineEvent, sendTimelineWhatsApp } from '@/lib/actions/crm'
+import { createCrmContact, updateCrmContact, deleteCrmContact, addTimelineEvent, sendTimelineWhatsApp, bulkDeleteCrmContacts, importCrmContacts } from '@/lib/actions/crm'
+import { useRef } from 'react'
 
 export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tenantId: string, initialContacts: any[], initialTimeline: any[] }) {
   const [contacts, setContacts] = useState(initialContacts)
@@ -24,6 +25,11 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
   const [composerType, setComposerType] = useState<'note'|'call'|'whatsapp'>('note')
   const [composerText, setComposerText] = useState('')
   const [isSendingEvent, setIsSendingEvent] = useState(false)
+
+  // Bulk / Import State
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [isImporting, setIsImporting] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
 
   const handleCreate = async () => {
@@ -116,10 +122,67 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
     } else toast.error(res.error)
   }
 
-  const filtered = contacts.filter(c =>
-    `${c.firstName} ${c.lastName}`.toLowerCase().includes(search.toLowerCase()) ||
-    c.email.toLowerCase().includes(search.toLowerCase())
+  const filtered = contacts.filter(c => 
+    c.firstName.toLowerCase().includes(search.toLowerCase()) || 
+    c.lastName?.toLowerCase().includes(search.toLowerCase()) || 
+    c.email.toLowerCase().includes(search.toLowerCase()) ||
+    c.tags?.some((t: string) => t.toLowerCase().includes(search.toLowerCase()))
   )
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filtered.length) setSelectedIds([])
+    else setSelectedIds(filtered.map(c => c.id))
+  }
+
+  const handleBulkDelete = async () => {
+    if (!confirm(`Are you sure you want to delete ${selectedIds.length} contacts?`)) return
+    const res = await bulkDeleteCrmContacts(tenantId, selectedIds)
+    if (res.success) {
+      toast.success(`Deleted ${res.count} contacts`)
+      setContacts(contacts.filter(c => !selectedIds.includes(c.id)))
+      setSelectedIds([])
+      if (selected && selectedIds.includes(selected.id)) setSelected(null)
+    } else toast.error(res.error)
+  }
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsImporting(true)
+    try {
+      const text = await file.text()
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+      
+      const parsedContacts = lines.slice(1).map(line => {
+        const values = line.split(',').map(v => v.trim())
+        const obj: any = {}
+        headers.forEach((h, i) => obj[h] = values[i] || '')
+        return {
+          firstName: obj.firstname || obj['first name'] || '',
+          lastName: obj.lastname || obj['last name'] || '',
+          email: obj.email || '',
+          phoneNumber: obj.phone || obj.phonenumber || '',
+          tags: obj.tags ? obj.tags.split(';') : []
+        }
+      })
+
+      const res = await importCrmContacts(tenantId, parsedContacts)
+      if (res.success) {
+        toast.success(`Imported ${res.count} contacts`)
+        setTimeout(() => window.location.reload(), 1500)
+      } else {
+        toast.error('Import failed: ' + res.error)
+      }
+    } catch (err: any) {
+      toast.error('Failed to parse CSV')
+    }
+    setIsImporting(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   const contactTimeline = selected ? initialTimeline.filter(t => t.contactId === selected.id) : []
 
@@ -136,50 +199,76 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
           <h2 className="section-title">CRM — Customer Relationships</h2>
           <p className="section-desc">Contact directory and interaction timeline</p>
         </div>
-        <button onClick={() => setIsModalOpen(true)} className="btn btn-primary">
-          <Plus className="w-4 h-4" />
-          Add Contact
-        </button>
+        <div className="flex gap-2">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input type="text" placeholder="Search contacts or tags..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" />
+            </div>
+            {selectedIds.length > 0 && (
+              <button onClick={handleBulkDelete} className="btn btn-secondary text-red-500 border-red-200 hover:bg-red-50">
+                <Trash2 className="w-4 h-4 mr-1" /> Delete ({selectedIds.length})
+              </button>
+            )}
+            <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
+            <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="btn btn-secondary">
+              {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
+              Import CSV
+            </button>
+            <button onClick={() => setIsModalOpen(true)} className="btn btn-primary flex items-center gap-2">
+              <Plus className="w-4 h-4" /> New Contact
+            </button>
+          </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Contact list */}
         <div className="lg:col-span-1">
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" placeholder="Search contacts..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" id="crm-search" />
-          </div>
           <div className="card divide-y divide-slate-100 overflow-hidden">
-            {filtered.map(contact => {
-              const initials = getInitials(`${contact.firstName} ${contact.lastName}`)
-              const color = stringToColor(contact.email)
-              return (
-                <button
-                  key={contact.id}
-                  onClick={() => setSelected(contact)}
-                  className={cn('w-full text-left px-4 py-3.5 flex items-center gap-3 transition-colors', selected?.id === contact.id ? 'bg-indigo-50' : 'hover:bg-slate-50')}
-                >
-                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: color }}>
-                    <span className="text-white text-xs font-bold">{initials}</span>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">{contact.firstName} {contact.lastName}</p>
-                    <p className="text-xs text-slate-400 truncate">{contact.email}</p>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xs font-semibold text-emerald-600">{formatCurrency(Number(contact.totalSpend) || 0)}</p>
-                    <div className="flex flex-wrap gap-1 justify-end mt-0.5">
-                      {(contact.tags as string[] || []).slice(0, 1).map(tag => (
-                        <span key={tag} className="badge badge-info text-[9px]">{tag}</span>
-                      ))}
+            {/* Bulk select header */}
+            {filtered.length > 0 && (
+              <div className="px-4 py-2 bg-slate-50 flex items-center justify-between border-b border-slate-100">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" onChange={toggleSelectAll} checked={filtered.length > 0 && selectedIds.length === filtered.length} />
+                  <span className="text-xs text-slate-500 font-medium">Select All</span>
+                </label>
+              </div>
+            )}
+            <div className="max-h-[600px] overflow-y-auto">
+              {filtered.map(contact => {
+                const initials = getInitials(`${contact.firstName} ${contact.lastName}`)
+                const color = stringToColor(contact.email)
+                const isSelected = selectedIds.includes(contact.id)
+                return (
+                  <div
+                    key={contact.id}
+                    onClick={() => setSelected(contact)}
+                    className={cn('w-full text-left px-4 py-3.5 flex items-center gap-3 transition-colors cursor-pointer', selected?.id === contact.id ? 'bg-indigo-50' : 'hover:bg-slate-50')}
+                  >
+                    <div onClick={(e) => e.stopPropagation()} className="pt-1">
+                      <input type="checkbox" checked={isSelected} onChange={() => toggleSelect(contact.id)} />
+                    </div>
+                    <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0" style={{ backgroundColor: color }}>
+                      <span className="text-white text-xs font-bold">{initials}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-900">{contact.firstName} {contact.lastName}</p>
+                      <p className="text-xs text-slate-400 truncate">{contact.email}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xs font-semibold text-emerald-600">{formatCurrency(Number(contact.totalSpend) || 0)}</p>
+                      <div className="flex flex-wrap gap-1 justify-end mt-0.5">
+                        {(contact.tags as string[] || []).slice(0, 1).map(tag => (
+                          <span key={tag} className="badge badge-info text-[9px]">{tag}</span>
+                        ))}
+                      </div>
                     </div>
                   </div>
-                </button>
-              )
-            })}
-            {filtered.length === 0 && (
-              <div className="p-8 text-center text-slate-500">No contacts found.</div>
-            )}
+                )
+              })}
+              {filtered.length === 0 && (
+                <div className="p-8 text-center text-slate-500">No contacts found.</div>
+              )}
+            </div>
           </div>
         </div>
 

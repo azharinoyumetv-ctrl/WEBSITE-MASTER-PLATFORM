@@ -89,9 +89,25 @@ export async function refundPayment(tenantId: string, paymentId: string) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'Refund failed via gateway');
 
-    const updated = await prisma.tenantPayment.update({
-      where: { id: paymentId },
-      data: { paymentStatus: 'refunded' }
+    const updated = await prisma.$transaction(async (tx) => {
+      const p = await tx.tenantPayment.update({
+        where: { id: paymentId },
+        data: { paymentStatus: 'refunded' }
+      })
+      await tx.tenantPaymentLedger.create({
+        data: {
+          tenantId,
+          paymentId,
+          orderId: p.orderId,
+          type: 'refund',
+          amount: Number(p.amount), // negative amount usually for refunds, or just absolute? Let's use negative
+          currency: p.currency,
+          gateway: p.paymentGateway,
+          gatewayTxId: p.externalTransactionId,
+          status: 'success'
+        }
+      })
+      return p
     })
     
     revalidatePath('/admin/payments')
@@ -127,9 +143,64 @@ export async function capturePayment(tenantId: string, paymentId: string) {
     const data = await res.json();
     if (!res.ok) throw new Error(data.message || 'Capture failed via gateway');
 
-    const updated = await prisma.tenantPayment.update({
-      where: { id: paymentId },
-      data: { paymentStatus: 'succeeded' }
+    const updated = await prisma.$transaction(async (tx) => {
+      const p = await tx.tenantPayment.update({
+        where: { id: paymentId },
+        data: { paymentStatus: 'succeeded' }
+      })
+      await tx.tenantPaymentLedger.create({
+        data: {
+          tenantId,
+          paymentId,
+          orderId: p.orderId,
+          type: 'capture',
+          amount: Number(p.amount),
+          currency: p.currency,
+          gateway: p.paymentGateway,
+          gatewayTxId: p.externalTransactionId,
+          status: 'success'
+        }
+      })
+      return p
+    })
+    
+    revalidatePath('/admin/payments')
+    return { success: true, payment: updated }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function manualAdjustPayment(tenantId: string, paymentId: string, adjustAmount: number, reason: string) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) throw new Error('Unauthorized')
+    await requirePermission((session.user as any).id, tenantId, 'payments', 'write')
+
+    const payment = await prisma.tenantPayment.findUnique({ where: { id: paymentId, tenantId } })
+    if (!payment) return { success: false, error: 'Payment not found' }
+
+    const updated = await prisma.$transaction(async (tx) => {
+      const newAmount = Number(payment.amount) + adjustAmount
+      const p = await tx.tenantPayment.update({
+        where: { id: paymentId },
+        data: { amount: newAmount }
+      })
+      await tx.tenantPaymentLedger.create({
+        data: {
+          tenantId,
+          paymentId,
+          orderId: p.orderId,
+          type: 'manual_adjustment',
+          amount: adjustAmount,
+          currency: p.currency,
+          gateway: p.paymentGateway,
+          gatewayTxId: p.externalTransactionId,
+          status: 'success'
+        }
+      })
+      // optional log of reason
+      return p
     })
     
     revalidatePath('/admin/payments')

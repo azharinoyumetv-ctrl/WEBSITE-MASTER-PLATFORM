@@ -44,8 +44,11 @@ export async function getPublicPage(tenantId: string, slug: string) {
       }
     })
 
-    if (!page || !page.isPublished || page.isDeleted) {
+    if (!page || page.isDeleted) {
       return { success: false, error: 'Page not found' }
+    }
+    if (!page.isPublished) {
+      return { success: false, error: 'Page is draft', isDraft: true }
     }
 
     return { success: true, page }

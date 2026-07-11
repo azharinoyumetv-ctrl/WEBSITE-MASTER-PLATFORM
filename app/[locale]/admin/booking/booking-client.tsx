@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CalendarCheck, Clock, User, CheckCircle2, XCircle, AlertCircle, Plus, ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { CalendarCheck, Clock, User, CheckCircle2, XCircle, AlertCircle, Plus, ChevronLeft, ChevronRight, Loader2, Download } from 'lucide-react'
 import { formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { createBooking, updateBookingStatus } from '@/lib/actions/booking'
@@ -88,17 +88,48 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
     }
   }
 
+  const exportToICal = () => {
+    let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//Website Master Platform//Booking//EN\n"
+    bookings.forEach(b => {
+      const start = new Date(b.startTime).toISOString().replace(/-|:|\.\d+/g, '')
+      const end = new Date(b.endTime).toISOString().replace(/-|:|\.\d+/g, '')
+      icsContent += "BEGIN:VEVENT\n"
+      icsContent += `UID:${b.id}\n`
+      icsContent += `DTSTAMP:${new Date().toISOString().replace(/-|:|\.\d+/g, '')}\n`
+      icsContent += `DTSTART:${start}\n`
+      icsContent += `DTEND:${end}\n`
+      icsContent += `SUMMARY:${b.customerName} - ${b.resourceName}\n`
+      if (b.notes) icsContent += `DESCRIPTION:${b.notes.replace(/\n/g, '\\n')}\n`
+      icsContent += "END:VEVENT\n"
+    })
+    icsContent += "END:VCALENDAR"
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `bookings-export-${new Date().toISOString().split('T')[0]}.ics`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
   return (
     <div className="page-container animate-slide-up">
-      <div className="section-header">
+      <div className="section-header flex items-center justify-between">
         <div>
           <h2 className="section-title">Booking & Scheduling</h2>
           <p className="section-desc">Manage appointments, resources, and availability</p>
         </div>
-        <button onClick={() => setShowNewModal(true)} className="btn btn-primary" id="new-booking-btn">
-          <Plus className="w-4 h-4" />
-          New Booking
-        </button>
+        <div className="flex gap-2">
+          <button onClick={exportToICal} className="btn btn-secondary flex items-center gap-2">
+            <Download className="w-4 h-4" /> iCal
+          </button>
+          <button onClick={() => setShowNewModal(true)} className="btn btn-primary" id="new-booking-btn">
+            <Plus className="w-4 h-4" />
+            New Booking
+          </button>
+        </div>
       </div>
 
       {/* Stats */}

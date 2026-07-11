@@ -2,13 +2,14 @@
 
 import { useState, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { BarChart3, TrendingUp, Users, Eye, ShoppingCart, DollarSign, Globe, Smartphone, Monitor, Tablet, RefreshCw, Database } from 'lucide-react'
+import { BarChart3, TrendingUp, Users, Eye, ShoppingCart, DollarSign, Globe, Smartphone, Monitor, Tablet, RefreshCw, Database, Mail, X } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { formatCurrency, cn } from '@/lib/utils'
-import { backfillAnalyticsSummaries } from '@/lib/actions/analytics'
+import { backfillAnalyticsSummaries, saveAnalyticsSchedule } from '@/lib/actions/analytics'
+import toast from 'react-hot-toast'
 
 const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4']
 
@@ -19,6 +20,11 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
   const dateRange = currentDays + 'd'
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+
+  // Email Schedule State
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [scheduleConfig, setScheduleConfig] = useState({ frequency: 'weekly', email: '' })
+  const [isSavingSchedule, setIsSavingSchedule] = useState(false)
 
   const deviceData = initialData.deviceBreakdown.map((d: any) => ({
     name: d.device, value: d.sessions, percentage: d.percentage,
@@ -35,6 +41,44 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
         setBackfillMsg(`Backfill failed: ${(res as any).error}`)
       }
     })
+  }
+
+  const handleExportCSV = () => {
+    if (!initialData.dailyData || initialData.dailyData.length === 0) {
+      toast.error('No data to export')
+      return
+    }
+    const headers = ['Date', 'Page Views', 'Unique Visitors', 'Orders', 'Revenue', 'Bounce Rate']
+    let csvContent = headers.join(',') + '\n'
+    
+    initialData.dailyData.forEach((d: any) => {
+      csvContent += `${d.date},${d.pageViews},${d.uniqueVisitors || 0},${d.orders},${d.revenue},${d.bounceRate}\n`
+    })
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `analytics-export-${dateRange}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const handleSaveSchedule = async () => {
+    if (!scheduleConfig.email) {
+      toast.error('Email is required')
+      return
+    }
+    setIsSavingSchedule(true)
+    const res = await saveAnalyticsSchedule(tenantId || '', scheduleConfig)
+    setIsSavingSchedule(false)
+    if (res.success) {
+      toast.success('Report schedule saved')
+      setShowScheduleModal(false)
+    } else {
+      toast.error(res.error || 'Failed to save schedule')
+    }
   }
 
   return (
@@ -62,9 +106,15 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50"
             >
               <Database className="w-3.5 h-3.5" />
-              {isPending ? 'Seeding...' : 'Seed Test Data'}
+              {isPending ? 'Seeding...' : 'Seed Test'}
             </button>
           )}
+          <button onClick={() => setShowScheduleModal(true)} className="btn btn-secondary px-3 py-1.5 text-sm">
+            <Mail className="w-4 h-4 mr-1.5 inline" /> Schedule
+          </button>
+          <button onClick={handleExportCSV} className="btn btn-primary px-3 py-1.5 text-sm">
+            Export CSV
+          </button>
         </div>
       </div>
 
@@ -188,6 +238,49 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
           ))}
         </div>
       </div>
+
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-scale-in">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-semibold text-slate-900">Schedule Email Report</h3>
+              <button onClick={() => setShowScheduleModal(false)} className="p-1 hover:bg-slate-100 rounded-lg transition-colors">
+                <X className="w-5 h-5 text-slate-400" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div>
+                <label className="form-label">Recipient Email</label>
+                <input 
+                  type="email" 
+                  className="form-input" 
+                  placeholder="admin@example.com"
+                  value={scheduleConfig.email}
+                  onChange={e => setScheduleConfig({ ...scheduleConfig, email: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="form-label">Frequency</label>
+                <select 
+                  className="form-input"
+                  value={scheduleConfig.frequency}
+                  onChange={e => setScheduleConfig({ ...scheduleConfig, frequency: e.target.value })}
+                >
+                  <option value="daily">Daily</option>
+                  <option value="weekly">Weekly</option>
+                  <option value="monthly">Monthly</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+              <button onClick={() => setShowScheduleModal(false)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleSaveSchedule} disabled={isSavingSchedule} className="btn btn-primary">
+                {isSavingSchedule ? 'Saving...' : 'Save Schedule'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

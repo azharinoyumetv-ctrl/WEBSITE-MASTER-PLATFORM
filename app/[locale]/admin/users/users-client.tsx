@@ -9,6 +9,7 @@ import {
 import { formatDate, getStatusBadgeClass, getInitials, stringToColor, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { inviteUser, toggleUserStatus } from '@/lib/actions/user'
+import Link from 'next/link'
 
 export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser }: { initialUsers: any[], initialRoles: any[], tenantId: string, currentUser: any }) {
   const [users, setUsers] = useState(initialUsers)
@@ -143,7 +144,16 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
             </tr>
           </thead>
           <tbody>
-            {filtered.map((user) => {
+            {filtered.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="py-8 text-center text-slate-500 text-sm">
+                  <div className="flex flex-col items-center justify-center">
+                    <Users className="w-8 h-8 text-slate-300 mb-2" />
+                    <p>No users found matching your criteria.</p>
+                  </div>
+                </td>
+              </tr>
+            ) : filtered.map((user) => {
               const nameStr = user.firstName || user.lastName ? `${user.firstName || ''} ${user.lastName || ''}`.trim() : user.email
               const initials = getInitials(nameStr)
               const avatarColor = stringToColor(user.email)
@@ -190,13 +200,13 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
                   </td>
                   <td className="text-sm text-slate-500">{formatDate(user.createdAt)}</td>
                   <td>
-                    <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => setSelectedProfile(user)}
-                        className="btn btn-ghost btn-sm"
-                      >
-                        <Eye className="w-3.5 h-3.5" />
+                    <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button onClick={() => setSelectedProfile(user)} className="btn btn-ghost btn-sm text-xs" title="Quick View">
+                        <Eye className="w-4 h-4" />
                       </button>
+                      <Link href={`/admin/users/${user.id}`} className="btn btn-ghost btn-sm text-xs">
+                        Full Profile
+                      </Link>
                       <button
                         onClick={() => handleToggleStatus(user)}
                         className={cn('btn btn-sm', user.status === 'active' ? 'btn-ghost' : 'btn-success')}

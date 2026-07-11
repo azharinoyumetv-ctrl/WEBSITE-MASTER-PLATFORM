@@ -1,10 +1,11 @@
 'use client'
 
 import { useState } from 'react'
-import { Sparkles, MessageSquare, StopCircle, CornerDownLeft, Bot, User, Loader2 } from 'lucide-react'
+import { Sparkles, MessageSquare, StopCircle, CornerDownLeft, Bot, User, Loader2, Settings2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
-export function AIClient({ tenantId }: { tenantId: string }) {
+export function AIClient({ tenantId, isAiConfigured = true }: { tenantId: string, isAiConfigured?: boolean }) {
   const [activeTab, setActiveTab] = useState<'chat' | 'generate'>('chat')
   const [prompt, setPrompt] = useState('')
   const [messages, setMessages] = useState<Array<{role: 'user' | 'assistant', content: string}>>([
@@ -12,6 +13,8 @@ export function AIClient({ tenantId }: { tenantId: string }) {
   ])
   const [isGenerating, setIsGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
+  const [lastLatency, setLastLatency] = useState<number | null>(null)
+  const [lastProvider, setLastProvider] = useState<string | null>(null)
 
   // Content Gen state
   const [genType, setGenType] = useState('Product Description')
@@ -25,14 +28,20 @@ export function AIClient({ tenantId }: { tenantId: string }) {
     setPrompt('')
     setMessages(prev => [...prev, { role: 'user', content: userPrompt }])
     setIsGenerating(true)
+    setLastLatency(null)
+    setLastProvider(null)
     
+    const start = Date.now()
     try {
-      const res = await fetch('/api/ai', {
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
         body: JSON.stringify({ prompt: userPrompt })
       })
       const data = await res.json()
+      setLastLatency(Date.now() - start)
+      setLastProvider(data.provider || 'default')
+
       if (res.status === 400 && data.error?.includes('API key')) {
         setAiError(data.error)
         setMessages(prev => [...prev, { role: 'assistant', content: 'I am unable to assist until an AI provider is configured.' }])
@@ -41,6 +50,7 @@ export function AIClient({ tenantId }: { tenantId: string }) {
         setMessages(prev => [...prev, { role: 'assistant', content: data.result || data.error }])
       }
     } catch (err) {
+      setLastLatency(Date.now() - start)
       setMessages(prev => [...prev, { role: 'assistant', content: 'Sorry, I encountered an error connecting to the AI service.' }])
     } finally {
       setIsGenerating(false)
@@ -51,13 +61,20 @@ export function AIClient({ tenantId }: { tenantId: string }) {
     if (!genContext.trim()) return
     setIsGenerating(true)
     setGenResult('')
+    setLastLatency(null)
+    setLastProvider(null)
+
+    const start = Date.now()
     try {
-      const res = await fetch('/api/ai', {
+      const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-tenant-id': tenantId },
         body: JSON.stringify({ type: genType, context: genContext, tone: genTone })
       })
       const data = await res.json()
+      setLastLatency(Date.now() - start)
+      setLastProvider(data.provider || 'default')
+
       if (res.status === 400 && data.error?.includes('API key')) {
         setAiError(data.error)
         setGenResult('AI features are disabled until a provider is configured in Settings.')
@@ -66,10 +83,30 @@ export function AIClient({ tenantId }: { tenantId: string }) {
         setGenResult(data.result || data.error)
       }
     } catch (err) {
+      setLastLatency(Date.now() - start)
       setGenResult('Error connecting to the AI service.')
     } finally {
       setIsGenerating(false)
     }
+  }
+
+  if (!isAiConfigured) {
+    return (
+      <div className="page-container h-[calc(100vh-4rem)] flex flex-col animate-slide-up items-center justify-center bg-slate-50">
+        <div className="bg-white p-10 rounded-2xl shadow-sm border border-slate-200 text-center max-w-md">
+          <div className="w-16 h-16 bg-indigo-50 text-indigo-500 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <Sparkles className="w-8 h-8" />
+          </div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">AI Provider Unconfigured</h2>
+          <p className="text-slate-500 mb-8">
+            Connect an AI provider like OpenAI or Anthropic to unlock intelligent assistants, content generation, and smart data analysis.
+          </p>
+          <Link href="/admin/settings?tab=ai" className="btn btn-primary w-full justify-center">
+            <Settings2 className="w-4 h-4" /> Configure AI
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -94,6 +131,13 @@ export function AIClient({ tenantId }: { tenantId: string }) {
           </button>
         </div>
       </div>
+
+      {lastLatency !== null && (
+        <div className="mx-6 mt-4 p-2 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-between text-[11px] text-slate-500 font-mono">
+          <span>Provider: <span className="font-semibold text-slate-700">{lastProvider}</span></span>
+          <span>Latency: <span className={cn("font-semibold", lastLatency > 3000 ? "text-amber-500" : "text-emerald-500")}>{lastLatency}ms</span></span>
+        </div>
+      )}
 
       {aiError && (
         <div className="mx-6 mt-4 p-4 bg-red-50 border-l-4 border-red-500 text-red-700 rounded-r-lg flex justify-between items-center shadow-sm">

@@ -280,3 +280,36 @@ export async function getNotificationLogs(tenantId: string) {
     return { success: false, error: error.message }
   }
 }
+
+export async function deleteNotificationTemplate(tenantId: string, templateId: string) {
+  try {
+    await prisma.tenantNotificationTemplate.delete({
+      where: { id: templateId, tenantId }
+    })
+    revalidatePath('/admin/notifications')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function retryNotificationLog(tenantId: string, logId: string) {
+  try {
+    const log = await prisma.tenantNotificationLog.findUnique({
+      where: { id: logId, tenantId }
+    })
+    if (!log) throw new Error("Log not found")
+    
+    // Simplistic retry mark for processNotificationQueue to pick up later
+    await prisma.tenantNotificationLog.update({
+      where: { id: logId },
+      data: { status: 'pending', deliveryError: null, retryCount: log.retryCount + 1 }
+    })
+    
+    // We could immediately call processNotificationQueue(tenantId) here, but marking it pending is enough
+    revalidatePath('/admin/notifications')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

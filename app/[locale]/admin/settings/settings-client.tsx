@@ -1,7 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Settings, Globe, Palette, Shield, CreditCard, Building2, Save, Loader2, MessageSquare, Bot } from 'lucide-react'
+import { 
+  Building2, Palette, Save, Bot, Loader2, CreditCard, 
+  MessageSquare, Globe, Lock, Shield 
+} from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig, getWebsiteConfigSnapshots, restoreWebsiteConfigSnapshot } from '@/lib/actions/website'
@@ -267,8 +270,8 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                 </h3>
                 <div className="space-y-4">
                   <div>
-                    <label className="form-label">Company Name</label>
-                    <input type="text" className="form-input" defaultValue={initialTenant?.companyName || ''} readOnly />
+                    <label className="form-label flex items-center gap-1">Company Name <Lock className="w-3 h-3 text-slate-400" /></label>
+                    <input type="text" className="form-input bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed" defaultValue={initialTenant?.companyName || ''} readOnly />
                     <p className="text-xs text-slate-400 mt-1">Managed via global admin.</p>
                   </div>
                 </div>
@@ -289,8 +292,9 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                   </div>
                   <div className="divider text-xs text-slate-400">OR</div>
                   <div>
-                    <label className="form-label">Custom Domain</label>
-                    <input type="text" className="form-input" defaultValue={initialTenant?.customDomain || ''} placeholder="e.g. www.yourcompany.com" readOnly />
+                    <label className="form-label flex items-center gap-1">Custom Domain <Lock className="w-3 h-3 text-slate-400" /></label>
+                    <input type="text" className="form-input bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed" defaultValue={initialTenant?.customDomain || ''} placeholder="e.g. www.yourcompany.com" readOnly />
+                    <p className="text-xs text-slate-400 mt-1">Managed via global admin. Contact support to update.</p>
                   </div>
                 </div>
               </div>
@@ -554,6 +558,113 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                   </div>
                 </div>
               </div>
+
+              {/* Typography & Layout */}
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Palette className="w-4 h-4 text-slate-400" /> Typography & Layout
+                </h3>
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="form-label">Font Family</label>
+                      <select 
+                        className="form-select"
+                        value={websiteData.themeConfig.fontFamily || 'inter'}
+                        onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, fontFamily: e.target.value }})}
+                      >
+                        <option value="inter">Inter (Default)</option>
+                        <option value="roboto">Roboto</option>
+                        <option value="outfit">Outfit</option>
+                        <option value="poppins">Poppins</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="form-label">Base Font Size</label>
+                      <select 
+                        className="form-select"
+                        value={websiteData.themeConfig.fontSize || '16px'}
+                        onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, fontSize: e.target.value }})}
+                      >
+                        <option value="14px">Small (14px)</option>
+                        <option value="16px">Medium (16px)</option>
+                        <option value="18px">Large (18px)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="form-label">Layout Density</label>
+                    <select 
+                      className="form-select max-w-sm"
+                      value={websiteData.themeConfig.layoutDensity || 'comfortable'}
+                      onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, layoutDensity: e.target.value }})}
+                    >
+                      <option value="compact">Compact (High Information Density)</option>
+                      <option value="cozy">Cozy (Balanced)</option>
+                      <option value="comfortable">Comfortable (Lots of Whitespace)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="flex items-center gap-2 cursor-pointer mt-4">
+                      <input 
+                        type="checkbox" 
+                        className="form-checkbox text-indigo-600 rounded"
+                        checked={websiteData.themeConfig.allowPageOverrides || false}
+                        onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, allowPageOverrides: e.target.checked }})}
+                      />
+                      <span className="text-sm font-medium text-slate-700">Allow Per-Page Theme Overrides</span>
+                    </label>
+                    <p className="text-xs text-slate-400 mt-1 ml-6">If enabled, individual pages can override the global theme colors and layout.</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Navigation & Footer Schema */}
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-slate-400" /> Navigation & Footer Schema
+                </h3>
+                <div className="space-y-4">
+                  <div>
+                    <label className="form-label">Navigation Schema (JSON)</label>
+                    <textarea 
+                      className="form-textarea font-mono text-xs" 
+                      rows={5}
+                      placeholder='[{"label": "Home", "href": "/"}, {"label": "Shop", "href": "/shop"}]'
+                      value={typeof websiteData.themeConfig.navigationSchema === 'string' ? websiteData.themeConfig.navigationSchema : JSON.stringify(websiteData.themeConfig.navigationSchema || [], null, 2)}
+                      onChange={(e) => {
+                        let parsed = e.target.value;
+                        try {
+                          parsed = JSON.parse(e.target.value);
+                        } catch (e) {
+                          // allow invalid json string while typing
+                        }
+                        setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, navigationSchema: parsed }})
+                      }}
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Define header navigation links in JSON format.</p>
+                  </div>
+                  <div>
+                    <label className="form-label">Footer Configuration (JSON)</label>
+                    <textarea 
+                      className="form-textarea font-mono text-xs" 
+                      rows={5}
+                      placeholder='{"columns": [{"title": "Company", "links": []}], "copyright": "© 2024"}'
+                      value={typeof websiteData.themeConfig.footerConfig === 'string' ? websiteData.themeConfig.footerConfig : JSON.stringify(websiteData.themeConfig.footerConfig || {}, null, 2)}
+                      onChange={(e) => {
+                        let parsed = e.target.value;
+                        try {
+                          parsed = JSON.parse(e.target.value);
+                        } catch (e) {
+                          // allow invalid json string while typing
+                        }
+                        setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, footerConfig: parsed }})
+                      }}
+                    />
+                    <p className="text-xs text-slate-400 mt-1">Define footer columns, links, and copyright text.</p>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -755,19 +866,25 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
               <button onClick={() => setDiffSnapshot(null)} className="text-slate-400 hover:text-slate-600">×</button>
             </div>
             <div className="p-4 flex-1 overflow-y-auto bg-slate-50">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <h4 className="text-sm font-semibold mb-2 text-red-600">Current State</h4>
-                  <pre className="text-xs p-4 bg-white border border-slate-200 rounded-lg overflow-x-auto">
-                    {JSON.stringify(websiteData, null, 2)}
-                  </pre>
-                </div>
-                <div>
-                  <h4 className="text-sm font-semibold mb-2 text-emerald-600">Snapshot to Restore</h4>
-                  <pre className="text-xs p-4 bg-white border border-slate-200 rounded-lg overflow-x-auto">
-                    {JSON.stringify(diffSnapshot.configData, null, 2)}
-                  </pre>
-                </div>
+              <div className="mb-2 grid grid-cols-2 gap-4 px-2">
+                <div className="text-sm font-semibold text-red-600 text-center">Current State (to be replaced)</div>
+                <div className="text-sm font-semibold text-emerald-600 text-center">Snapshot State (to restore)</div>
+              </div>
+              <div className="space-y-3">
+                {Array.from(new Set([...Object.keys(websiteData || {}), ...Object.keys(diffSnapshot.snapshot || {})])).map(key => {
+                  const currVal = JSON.stringify((websiteData as any)?.[key], null, 2)
+                  const snapVal = JSON.stringify(diffSnapshot.snapshot?.[key], null, 2)
+                  if (currVal === snapVal) return null
+                  return (
+                    <div key={key} className="p-3 border border-slate-200 rounded-lg bg-white shadow-sm">
+                      <div className="font-bold text-slate-700 mb-2 font-mono text-sm">{key}</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <pre className="text-xs text-red-600 bg-red-50 p-2 rounded overflow-x-auto border border-red-100">{currVal || 'undefined'}</pre>
+                        <pre className="text-xs text-emerald-600 bg-emerald-50 p-2 rounded overflow-x-auto border border-emerald-100">{snapVal || 'undefined'}</pre>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
             <div className="p-4 border-t border-slate-100 flex justify-end gap-3">

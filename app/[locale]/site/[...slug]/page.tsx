@@ -243,6 +243,11 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
 
       // Try to get specific DB page
       const pageRes = await getPublicPage(websiteRes.tenantId!, slug)
+      
+      if (pageRes.isDraft) {
+        notFound()
+      }
+
       if (pageRes.success && pageRes.page) {
         dbPage = pageRes.page
       }

@@ -62,6 +62,14 @@ export async function POST(request: Request) {
       ? (await prisma.tenantAiConfiguration.findUnique({ where: { tenantId } }))?.selectedModelName.split('|url:')[1] 
       : ''
 
+    let systemPrompt = 'You are a helpful AI assistant.'
+    if (tenantId !== 'default') {
+      const config = await prisma.tenantAiConfiguration.findUnique({ where: { tenantId } })
+      if (config && (config as any).systemPrompt) {
+        systemPrompt = (config as any).systemPrompt
+      }
+    }
+
     if (!apiKey) {
       return NextResponse.json(
         { error: 'AI features are disabled: Missing provider API key. Please configure it in your Settings.' },
@@ -89,7 +97,10 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           model: modelName,
-          messages: [{ role: 'user', content: prompt || `Generate a ${tone} ${type} about ${context}` }]
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: prompt || `Generate a ${tone} ${type} about ${context}` }
+          ]
         })
       })
       if (!res.ok) {
@@ -98,6 +109,7 @@ export async function POST(request: Request) {
       }
       const data = await res.json()
       resultText = data.choices[0].message.content
+      return NextResponse.json({ result: resultText, provider })
     } else if (provider === 'anthropic') {
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
@@ -108,8 +120,9 @@ export async function POST(request: Request) {
         },
         body: JSON.stringify({
           model: modelName,
-          max_tokens: 1024,
-          messages: [{ role: 'user', content: prompt || `Generate a ${tone} ${type} about ${context}` }]
+          system: systemPrompt,
+          messages: [{ role: 'user', content: prompt || `Generate a ${tone} ${type} about ${context}` }],
+          max_tokens: 1000
         })
       })
       if (!res.ok) {
@@ -118,6 +131,7 @@ export async function POST(request: Request) {
       }
       const data = await res.json()
       resultText = data.content[0].text
+      return NextResponse.json({ result: resultText, provider })
     } else if (provider === 'gemini') {
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`, {
         method: 'POST',
@@ -125,6 +139,9 @@ export async function POST(request: Request) {
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
+          system_instruction: {
+            parts: [{ text: systemPrompt }]
+          },
           contents: [{ parts: [{ text: prompt || `Generate a ${tone} ${type} about ${context}` }] }]
         })
       })
@@ -134,11 +151,10 @@ export async function POST(request: Request) {
       }
       const data = await res.json()
       resultText = data.candidates[0].content.parts[0].text
+      return NextResponse.json({ result: resultText, provider })
     } else {
       return NextResponse.json({ error: 'Unsupported AI provider selected.' }, { status: 400 })
     }
-
-    return NextResponse.json({ result: resultText })
 
   } catch (error: any) {
     console.error('AI generation error:', error)

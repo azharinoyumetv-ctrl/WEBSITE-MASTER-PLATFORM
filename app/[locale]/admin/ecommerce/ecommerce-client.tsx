@@ -1,10 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { ShoppingCart, Search, Filter, Package, Eye, TrendingUp, DollarSign, AlertCircle, CheckCircle2, Clock, XCircle, Truck, Loader2 } from 'lucide-react'
+import { ShoppingCart, Search, Filter, Package, Eye, TrendingUp, DollarSign, AlertCircle, CheckCircle2, Clock, XCircle, Truck, Loader2, Download } from 'lucide-react'
 import { formatCurrency, formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { updateOrderStatus } from '@/lib/actions/ecommerce'
+import { updateOrderStatus, bulkUpdateOrderStatus } from '@/lib/actions/ecommerce'
 import { OrderStatus } from '@prisma/client'
 
 const STATUS_ACTIONS: Record<string, OrderStatus[]> = {
@@ -21,6 +21,7 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('all')
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
+  const [selectedOrdersIds, setSelectedOrdersIds] = useState<string[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
   const [receiptUrlInput, setReceiptUrlInput] = useState('')
 
@@ -58,6 +59,39 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
     }
   }
 
+  const handleBulkUpdate = async (status: string) => {
+    if (selectedOrdersIds.length === 0) return
+    setIsUpdating(true)
+    const res = await bulkUpdateOrderStatus(tenantId, selectedOrdersIds, status as OrderStatus)
+    setIsUpdating(false)
+    if (res.success) {
+      setOrders(prev => prev.map(o => selectedOrdersIds.includes(o.id) ? { ...o, orderStatus: status as OrderStatus } : o))
+      toast.success(`Updated ${selectedOrdersIds.length} orders`)
+      setSelectedOrdersIds([])
+    } else {
+      toast.error(res.error || 'Bulk update failed')
+    }
+  }
+
+  const handleExportCSV = () => {
+    const dataToExport = selectedOrdersIds.length > 0 ? orders.filter(o => selectedOrdersIds.includes(o.id)) : filtered
+    if (dataToExport.length === 0) {
+      toast.error('No orders to export')
+      return
+    }
+    const headers = ['Order ID', 'Customer', 'Items Count', 'Total', 'Status', 'Date']
+    let csv = headers.join(',') + '\n'
+    dataToExport.forEach(o => {
+      csv += `"${o.id}","${o.guestEmail || 'Registered User'}",${o.items.length},${o.totalAmount},"${o.orderStatus}","${o.createdAt}"\n`
+    })
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `ecommerce-orders.csv`
+    link.click()
+  }
+
   return (
     <div className="page-container animate-slide-up">
       <div className="section-header">
@@ -91,8 +125,8 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
         {/* Order list */}
         <div className={cn(selectedOrder ? 'lg:col-span-3' : 'lg:col-span-5')}>
           {/* Filters */}
-          <div className="flex gap-3 mb-4">
-            <div className="relative flex-1">
+          <div className="flex gap-3 mb-4 flex-wrap">
+            <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
               <input type="text" placeholder="Search orders..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" id="order-search" />
             </div>
@@ -105,12 +139,47 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
               <option value="completed">Completed</option>
               <option value="cancelled">Cancelled</option>
             </select>
+            {selectedOrdersIds.length > 0 && (
+              <select 
+                className="form-select w-40 border-indigo-300 text-indigo-700 bg-indigo-50"
+                onChange={(e) => {
+                  if (e.target.value) handleBulkUpdate(e.target.value)
+                  e.target.value = ''
+                }}
+                disabled={isUpdating}
+                value=""
+              >
+                <option value="" disabled>Bulk Action...</option>
+                <option value="paid">Mark Paid</option>
+                <option value="processing">Mark Processing</option>
+                <option value="shipped">Mark Shipped</option>
+                <option value="completed">Mark Completed</option>
+                <option value="cancelled">Mark Cancelled</option>
+              </select>
+            )}
+            <button onClick={handleExportCSV} className="btn btn-secondary px-3 py-1.5 flex items-center gap-1.5">
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
           </div>
 
           <div className="card overflow-hidden">
             <table className="data-table">
               <thead>
                 <tr>
+                  <th className="w-12">
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                      checked={filtered.length > 0 && selectedOrdersIds.length === filtered.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedOrdersIds(filtered.map(o => o.id))
+                        } else {
+                          setSelectedOrdersIds([])
+                        }
+                      }}
+                    />
+                  </th>
                   <th>Order ID</th>
                   <th>Customer</th>
                   <th>Items</th>
@@ -123,9 +192,20 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
                 {filtered.map(order => (
                   <tr
                     key={order.id}
-                    className={cn('cursor-pointer', selectedOrder?.id === order.id ? 'bg-indigo-50' : '')}
+                    className={cn('cursor-pointer hover:bg-slate-50', selectedOrder?.id === order.id ? 'bg-indigo-50' : '')}
                     onClick={() => handleSelectOrder(order)}
                   >
+                    <td onClick={(e) => e.stopPropagation()}>
+                      <input 
+                        type="checkbox" 
+                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                        checked={selectedOrdersIds.includes(order.id)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedOrdersIds(prev => [...prev, order.id])
+                          else setSelectedOrdersIds(prev => prev.filter(id => id !== order.id))
+                        }}
+                      />
+                    </td>
                     <td><span className="font-mono text-xs font-semibold text-indigo-700">{order.id.slice(0, 8).toUpperCase()}</span></td>
                     <td className="text-sm">{order.guestEmail || 'Registered User'}</td>
                     <td className="text-sm text-slate-500">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</td>
@@ -136,7 +216,7 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="text-center py-8 text-slate-500">No orders found.</td>
+                    <td colSpan={7} className="text-center py-8 text-slate-500">No orders found.</td>
                   </tr>
                 )}
               </tbody>

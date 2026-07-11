@@ -1,10 +1,26 @@
 'use client'
 
 import { useState } from 'react'
-import { Code2, Key, Link2, Copy, Trash2, Eye, EyeOff, CheckCircle2, ShieldAlert, Plus, Zap, Loader2 } from 'lucide-react'
+import { Code2, Key, Link2, Copy, Trash2, Eye, EyeOff, CheckCircle2, ShieldAlert, Plus, Zap, Loader2, Save, Edit2 } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { createApiKey, createWebhook, deleteApiKey, deleteWebhook, testWebhookDispatch, rotateApiKey } from '@/lib/actions/api'
+import { createApiKey, createWebhook, deleteApiKey, deleteWebhook, testWebhookDispatch, rotateApiKey, updateApiKey, updateWebhook } from '@/lib/actions/api'
+
+const WEBHOOK_EVENTS = [
+  { id: 'order.created', label: 'Order Created' },
+  { id: 'order.updated', label: 'Order Updated' },
+  { id: 'inventory.updated', label: 'Inventory Updated' },
+  { id: 'payment.captured', label: 'Payment Captured' }
+]
+
+const API_SCOPES = [
+  { id: 'catalog:read', label: 'Read Catalog' },
+  { id: 'catalog:write', label: 'Write Catalog' },
+  { id: 'orders:read', label: 'Read Orders' },
+  { id: 'orders:write', label: 'Write Orders' },
+  { id: 'inventory:read', label: 'Read Inventory' },
+  { id: 'inventory:write', label: 'Write Inventory' }
+]
 
 export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { initialKeys: any[], initialWebhooks: any[], tenantId: string }) {
   const [keys, setKeys] = useState(initialKeys)
@@ -13,6 +29,10 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
   const [isCreatingKey, setIsCreatingKey] = useState(false)
   const [isCreatingWebhook, setIsCreatingWebhook] = useState(false)
   const [testingWebhooks, setTestingWebhooks] = useState<Record<string, boolean>>({})
+  
+  const [editingWebhook, setEditingWebhook] = useState<any>(null)
+  const [editingKey, setEditingKey] = useState<any>(null)
+  const [isSaving, setIsSaving] = useState(false)
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -58,21 +78,52 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
   }
 
   const handleCreateWebhook = async () => {
-    const url = window.prompt('Enter the webhook endpoint URL (e.g. https://your-server.com/webhook):')
-    if (!url) return
-    if (!url.startsWith('http')) {
+    setEditingWebhook({ isNew: true, targetUrl: '', subscribedEvents: ['order.created'] })
+  }
+
+  const handleSaveWebhook = async () => {
+    if (!editingWebhook.targetUrl.startsWith('http')) {
       return toast.error('URL must start with http or https')
     }
-
-    setIsCreatingWebhook(true)
-    const res = await createWebhook(tenantId, url, ['order.created', 'inventory.updated'])
-    setIsCreatingWebhook(false)
-
-    if (res.success) {
-      setWebhooks([res.webhook, ...webhooks])
-      toast.success('Webhook endpoint added successfully')
+    setIsSaving(true)
+    if (editingWebhook.isNew) {
+      const res = await createWebhook(tenantId, editingWebhook.targetUrl, editingWebhook.subscribedEvents)
+      if (res.success) {
+        setWebhooks([res.webhook, ...webhooks])
+        toast.success('Webhook endpoint added')
+        setEditingWebhook(null)
+      } else {
+        toast.error('Failed to add webhook: ' + res.error)
+      }
     } else {
-      toast.error('Failed to add webhook: ' + res.error)
+      const res = await updateWebhook(tenantId, editingWebhook.id, {
+        targetUrl: editingWebhook.targetUrl,
+        subscribedEvents: editingWebhook.subscribedEvents
+      })
+      if (res.success) {
+        setWebhooks(webhooks.map(w => w.id === editingWebhook.id ? { ...w, targetUrl: editingWebhook.targetUrl, subscribedEvents: editingWebhook.subscribedEvents } : w))
+        toast.success('Webhook updated')
+        setEditingWebhook(null)
+      } else {
+        toast.error('Failed to update webhook: ' + res.error)
+      }
+    }
+    setIsSaving(false)
+  }
+
+  const handleSaveKey = async () => {
+    setIsSaving(true)
+    const res = await updateApiKey(tenantId, editingKey.id, {
+      keyName: editingKey.keyName,
+      scopes: editingKey.scopes
+    })
+    setIsSaving(false)
+    if (res.success) {
+      setKeys(keys.map(k => k.id === editingKey.id ? { ...k, keyName: editingKey.keyName, scopes: editingKey.scopes } : k))
+      toast.success('API Key updated')
+      setEditingKey(null)
+    } else {
+      toast.error('Failed to update API Key')
     }
   }
 
@@ -99,6 +150,16 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
     }
   }
 
+  const handleResetFailures = async (id: string) => {
+    const res = await updateWebhook(tenantId, id, { failureCount: 0 })
+    if (res.success) {
+      setWebhooks(webhooks.map(w => w.id === id ? { ...w, failureCount: 0 } : w))
+      toast.success('Failures reset')
+    } else {
+      toast.error('Failed to reset failures')
+    }
+  }
+
   return (
     <div className="page-container animate-slide-up">
       <div className="section-header">
@@ -121,23 +182,40 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
             </button>
           </div>
           <div className="divide-y divide-slate-100 flex-1 overflow-y-auto max-h-[400px]">
-            {keys.map(k => (
+            {keys.length === 0 && (
+              <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                <Key className="w-8 h-8 text-slate-300 mb-2" />
+                <p className="text-sm">No API keys generated yet.</p>
+              </div>
+            )}
+            {keys.length > 0 && keys.map(k => (
               <div key={k.id} className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <h4 className="font-semibold text-sm text-slate-900">{k.keyName}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">Created {formatDate(k.createdAt)} · Used {k.lastUsedAt ? formatDate(k.lastUsedAt, 'relative') : 'Never'} · {k.requestCount || 0} reqs</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Created {formatDate(k.createdAt)} · Used {k.lastUsedAt ? formatDate(k.lastUsedAt, 'relative') : 'Never'}</p>
                     {k.expiresAt && <p className="text-xs text-red-500 mt-0.5">Expires {formatDate(k.expiresAt)}</p>}
-                    <div className="flex gap-1 mt-1">
-                      {k.scopes?.map((s: string) => (
-                        <span key={s} className="badge badge-neutral text-[9px]">{s}</span>
-                      ))}
+                    
+                    <div className="mt-3">
+                      <div className="flex justify-between items-end mb-1">
+                        <span className="text-[10px] font-semibold text-slate-500 uppercase">Usage (Lifetime)</span>
+                        <span className="text-[10px] text-slate-700">{k.requestCount || 0} reqs</span>
+                      </div>
+                      <div className="h-1.5 w-48 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className={cn("h-full rounded-full transition-all duration-500", (k.requestCount || 0) > 10000 ? "bg-amber-500" : "bg-emerald-500")}
+                          style={{ width: `${Math.min(100, ((k.requestCount || 0) / 20000) * 100)}%` }}
+                        />
+                      </div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className={cn('badge text-[10px]', k.isActive && !k.expiresAt ? 'badge-success' : k.expiresAt ? 'badge-warning' : 'badge-neutral')}>
                       {k.isActive ? (k.expiresAt ? 'Expiring' : 'Active') : 'Revoked'}
                     </span>
+                    <button onClick={() => setEditingKey(k)} className="p-1 text-slate-400 hover:text-indigo-500 transition-colors" title="Edit Key">
+                      <Edit2 className="w-4 h-4" />
+                    </button>
                     <button onClick={() => handleRotateKey(k.id)} className="p-1 text-slate-400 hover:text-indigo-500 transition-colors" title="Rotate Key">
                       <Zap className="w-4 h-4" />
                     </button>
@@ -179,7 +257,6 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
                 </div>
               </div>
             ))}
-            {keys.length === 0 && <p className="p-4 text-sm text-slate-500">No API keys found.</p>}
           </div>
         </div>
 
@@ -196,15 +273,26 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
             </button>
           </div>
           <div className="divide-y divide-slate-100 flex-1 overflow-y-auto max-h-[400px]">
-            {webhooks.map(w => (
+            {webhooks.length === 0 && (
+              <div className="flex flex-col items-center justify-center p-8 text-center text-slate-500">
+                <Link2 className="w-8 h-8 text-slate-300 mb-2" />
+                <p className="text-sm">No webhooks configured yet.</p>
+              </div>
+            )}
+            {webhooks.length > 0 && webhooks.map(w => (
               <div key={w.id} className="p-4">
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex-1 min-w-0 pr-4">
                     <h4 className="font-mono text-sm text-slate-700 truncate">{w.targetUrl}</h4>
                     {w.failureCount > 0 && (
-                      <p className="text-xs text-red-500 mt-1 flex items-center gap-1">
-                        <ShieldAlert className="w-3 h-3" /> {w.failureCount} recent delivery failures
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <p className="text-xs text-red-500 flex items-center gap-1 font-medium">
+                          <ShieldAlert className="w-3 h-3" /> {w.failureCount} recent delivery failures
+                        </p>
+                        <button onClick={() => handleResetFailures(w.id)} className="text-[10px] text-slate-500 hover:text-slate-900 underline">
+                          Reset
+                        </button>
+                      </div>
                     )}
                   </div>
                   <span className={cn('badge text-[10px]', w.isActive ? 'badge-success' : 'badge-neutral')}>{w.isActive ? 'Active' : 'Disabled'}</span>
@@ -242,10 +330,111 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
                 </div>
               </div>
             ))}
-            {webhooks.length === 0 && <p className="p-4 text-sm text-slate-500">No webhooks found.</p>}
           </div>
         </div>
       </div>
+
+      {/* Edit Webhook Modal */}
+      {editingWebhook && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 animate-slide-up">
+            <h3 className="text-lg font-bold mb-4">{editingWebhook.isNew ? 'Add Webhook Endpoint' : 'Edit Webhook'}</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="form-label">Endpoint URL</label>
+                <input 
+                  type="url" 
+                  value={editingWebhook.targetUrl} 
+                  onChange={e => setEditingWebhook({...editingWebhook, targetUrl: e.target.value})}
+                  className="form-input" 
+                  placeholder="https://api.example.com/webhook"
+                />
+              </div>
+              <div>
+                <label className="form-label mb-2 block">Subscribed Events</label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-3 bg-slate-50">
+                  {WEBHOOK_EVENTS.map(event => (
+                    <label key={event.id} className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="form-checkbox text-indigo-600 rounded"
+                        checked={editingWebhook.subscribedEvents.includes(event.id)}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setEditingWebhook({
+                            ...editingWebhook,
+                            subscribedEvents: isChecked 
+                              ? [...editingWebhook.subscribedEvents, event.id]
+                              : editingWebhook.subscribedEvents.filter((id: string) => id !== event.id)
+                          });
+                        }}
+                      />
+                      <span className="text-sm font-medium text-slate-700">{event.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => setEditingWebhook(null)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleSaveWebhook} disabled={isSaving} className="btn btn-primary">
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit API Key Modal */}
+      {editingKey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 animate-slide-up">
+            <h3 className="text-lg font-bold mb-4">Edit API Key</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="form-label">Key Name</label>
+                <input 
+                  type="text" 
+                  value={editingKey.keyName} 
+                  onChange={e => setEditingKey({...editingKey, keyName: e.target.value})}
+                  className="form-input" 
+                />
+              </div>
+              <div>
+                <label className="form-label mb-2 block">Scopes</label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-3 bg-slate-50">
+                  {API_SCOPES.map(scope => (
+                    <label key={scope.id} className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="form-checkbox text-indigo-600 rounded"
+                        checked={(editingKey.scopes || []).includes(scope.id)}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          const currentScopes = editingKey.scopes || [];
+                          setEditingKey({
+                            ...editingKey,
+                            scopes: isChecked 
+                              ? [...currentScopes, scope.id]
+                              : currentScopes.filter((id: string) => id !== scope.id)
+                          });
+                        }}
+                      />
+                      <span className="text-sm font-medium text-slate-700">{scope.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => setEditingKey(null)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleSaveKey} disabled={isSaving} className="btn btn-primary">
+                {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -5,6 +5,13 @@ import { Plus, Edit2, Trash2, Globe, Eye, FileText, CheckCircle2, XCircle, Layou
 import { cn, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { saveAdminPage, deleteAdminPage } from '@/lib/actions/website'
+import { z } from 'zod'
+
+const layoutBlockSchema = z.array(z.object({
+  type: z.enum(['hero', 'text', 'features', 'catalog_grid', 'contact_form']),
+  config: z.any().optional(),
+  data: z.any().optional()
+}))
 
 export function PagesClient({ initialPages, tenantId }: { initialPages: any[], tenantId: string }) {
   const [pages, setPages] = useState(initialPages)
@@ -12,6 +19,8 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
   const [editingPage, setEditingPage] = useState<any>(null)
   const [isSaving, setIsSaving] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all') // 'all', 'published', 'draft'
+  const [jsonText, setJsonText] = useState('')
+  const [jsonError, setJsonError] = useState<string | null>(null)
 
   const handleDelete = async (pageId: string) => {
     if (!window.confirm('Are you sure you want to delete this page?')) return
@@ -25,25 +34,41 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
   }
 
   const handleEdit = (page?: any) => {
-    if (page) {
-      setEditingPage({ ...page })
-    } else {
-      setEditingPage({
-        title: '',
-        slug: '',
-        isPublished: false,
-        layoutBlocks: [
-          { type: 'hero', data: { heading: 'Welcome', subheading: 'Enter subtitle', cta: 'Get Started' } }
-        ],
-        seoMetadata: { description: '' }
-      })
+    const pageToEdit = page || {
+      title: '',
+      slug: '',
+      isPublished: false,
+      seoMetadata: { description: '' },
+      layoutBlocks: []
     }
+    setEditingPage(pageToEdit)
+    setJsonText(JSON.stringify(pageToEdit.layoutBlocks, null, 2))
+    setJsonError(null)
     setShowEditor(true)
+  }
+
+  const handleJsonChange = (val: string) => {
+    setJsonText(val)
+    try {
+      const parsed = JSON.parse(val)
+      const valid = layoutBlockSchema.safeParse(parsed)
+      if (!valid.success) {
+        setJsonError(valid.error.errors[0].message)
+      } else {
+        setJsonError(null)
+        setEditingPage({ ...editingPage, layoutBlocks: parsed })
+      }
+    } catch (err) {
+      setJsonError('Invalid JSON format')
+    }
   }
 
   const handleSave = async () => {
     if (!editingPage.title || !editingPage.slug) {
       return toast.error('Title and Slug are required')
+    }
+    if (jsonError) {
+      return toast.error('Please fix JSON errors before saving')
     }
 
     setIsSaving(true)
@@ -110,18 +135,36 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
                 <LayoutTemplate className="w-4 h-4" /> Layout Blocks (JSON Editor)
               </h3>
               <p className="text-xs text-slate-500 mb-2">In a real app, this would be a drag-and-drop page builder. For now, edit the JSON representation.</p>
-              <textarea
-                value={JSON.stringify(editingPage.layoutBlocks, null, 2)}
-                onChange={(e) => {
-                  try {
-                    const parsed = JSON.parse(e.target.value)
-                    setEditingPage({ ...editingPage, layoutBlocks: parsed })
-                  } catch (err) {
-                    // ignore parse errors while typing
-                  }
-                }}
-                className="w-full h-64 font-mono text-xs p-4 bg-slate-50 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none"
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <textarea
+                    value={jsonText}
+                    onChange={(e) => handleJsonChange(e.target.value)}
+                    className={cn("w-full h-96 font-mono text-xs p-4 bg-slate-50 rounded-lg border focus:ring-2 focus:ring-indigo-500 outline-none", jsonError ? "border-red-300 focus:ring-red-500" : "")}
+                  />
+                  {jsonError && <p className="text-xs text-red-500 mt-1 font-medium">{jsonError}</p>}
+                </div>
+                <div className="border border-slate-200 rounded-lg bg-slate-50 p-4 h-96 overflow-y-auto">
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Live Preview</h4>
+                  <div className="space-y-4">
+                    {editingPage.layoutBlocks?.map((block: any, i: number) => (
+                      <div key={i} className="p-3 bg-white rounded border border-slate-200 shadow-sm">
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs font-bold text-indigo-600 uppercase">{block.type}</span>
+                        </div>
+                        {block.type === 'hero' && <p className="text-sm font-medium">{block.data?.heading || 'No Heading'}</p>}
+                        {block.type === 'text' && <p className="text-xs text-slate-600 line-clamp-2">{block.data?.html || 'No Text'}</p>}
+                        {block.type === 'features' && <p className="text-xs text-slate-600">{block.data?.items?.length || 0} features configured</p>}
+                        {block.type === 'catalog_grid' && <p className="text-xs text-slate-600">Shows up to {block.config?.limit || 4} items</p>}
+                        {block.type === 'contact_form' && <p className="text-xs text-slate-600">Contact form block</p>}
+                      </div>
+                    ))}
+                    {(!editingPage.layoutBlocks || editingPage.layoutBlocks.length === 0) && (
+                      <div className="text-center text-slate-400 text-xs py-10">No valid layout blocks to preview</div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

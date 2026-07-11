@@ -41,6 +41,19 @@ export async function updateOrderStatus(tenantId: string, orderId: string, statu
   }
 }
 
+export async function bulkUpdateOrderStatus(tenantId: string, orderIds: string[], status: OrderStatus) {
+  try {
+    await prisma.tenantOrder.updateMany({
+      where: { id: { in: orderIds }, tenantId },
+      data: { orderStatus: status }
+    })
+    revalidatePath('/admin/ecommerce')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
 export async function cancelOrder(tenantId: string, orderId: string, reason?: string) {
   try {
     const order = await prisma.tenantOrder.update({

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Bell, Mail, MessageSquare, Settings2, Plus, Edit2, Trash2, Eye, CheckCircle2, Search, Loader2, X } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { updateNotificationTemplate, saveNotificationGateway, createNotificationTemplate, dispatchTestNotification, toggleNotificationGateway } from '@/lib/actions/notifications'
+import { updateNotificationTemplate, saveNotificationGateway, createNotificationTemplate, dispatchTestNotification, toggleNotificationGateway, deleteNotificationTemplate, retryNotificationLog } from '@/lib/actions/notifications'
 
 export function NotificationsClient({ initialTemplates, initialLogs = [], initialGateway, tenantId }: { initialTemplates: any[], initialLogs?: any[], initialGateway?: any, tenantId: string }) {
   const [templates, setTemplates] = useState(initialTemplates)
@@ -88,6 +88,31 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
       setSelectedTemplate(res.template)
     } else {
       toast.error(res.error || 'Failed to save template')
+    }
+  }
+
+  const handleDeleteTemplate = async () => {
+    if (!selectedTemplate) return
+    if (!confirm('Are you sure you want to delete this template?')) return
+    const toastId = toast.loading('Deleting...')
+    const res = await deleteNotificationTemplate(tenantId, selectedTemplate.id)
+    if (res.success) {
+      toast.success('Deleted', { id: toastId })
+      setTemplates(prev => prev.filter(t => t.id !== selectedTemplate.id))
+      setSelectedTemplate(null)
+    } else {
+      toast.error(res.error || 'Failed to delete', { id: toastId })
+    }
+  }
+
+  const handleRetryLog = async (logId: string) => {
+    const toastId = toast.loading('Retrying...')
+    const res = await retryNotificationLog(tenantId, logId)
+    if (res.success) {
+      toast.success('Queued for retry', { id: toastId })
+      setLogs(prev => prev.map((l: any) => l.id === logId ? { ...l, status: 'pending', retryCount: l.retryCount + 1, deliveryError: null } : l))
+    } else {
+      toast.error(res.error || 'Failed to retry', { id: toastId })
     }
   }
 
@@ -178,10 +203,15 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
               <div className="card p-5">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-lg font-semibold text-slate-900 capitalize">Edit: {selectedTemplate.templateKey.replace(/_/g, ' ')}</h3>
-                  <div className="flex gap-2">
-                    <button onClick={handleTestSend} className="btn btn-secondary btn-sm"><Eye className="w-4 h-4" /> Test Send</button>
-                    <button onClick={handleSave} disabled={isSaving} className="btn btn-primary btn-sm">
-                      {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null} Save
+                  <div className="flex items-center gap-2">
+                    <button onClick={handleTestSend} className="btn btn-secondary btn-sm flex items-center gap-1">
+                      <Eye className="w-3.5 h-3.5" /> Test
+                    </button>
+                    <button onClick={handleDeleteTemplate} className="btn btn-secondary btn-sm flex items-center gap-1 text-red-500 hover:bg-red-50 hover:border-red-200">
+                      <Trash2 className="w-3.5 h-3.5" /> Delete
+                    </button>
+                    <button onClick={handleSave} disabled={isSaving} className="btn btn-primary btn-sm flex items-center gap-1">
+                      {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />} Save
                     </button>
                   </div>
                 </div>
@@ -223,7 +253,7 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
             </div>
           </div>
           <table className="data-table">
-            <thead><tr><th>Recipient</th><th>Template</th><th>Channel</th><th>Status</th><th>Time</th></tr></thead>
+            <thead><tr><th>Recipient</th><th>Template</th><th>Channel</th><th>Status</th><th>Time</th><th className="text-right">Actions</th></tr></thead>
             <tbody>
               {logs.map((log: any) => (
                 <tr key={log.id}>
@@ -237,12 +267,18 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
                       <span className={cn('badge text-[10px]', log.status === 'delivered' ? 'badge-success' : (log.status === 'pending' ? 'badge-amber' : 'badge-error'))}>{log.status.toUpperCase()}</span>
                       {log.retryCount > 0 && <span className="text-[10px] text-slate-400">({log.retryCount} retries)</span>}
                     </div>
+                    {log.deliveryError && <p className="text-[10px] text-red-500 mt-1 max-w-xs truncate" title={log.deliveryError}>{log.deliveryError}</p>}
                   </td>
                   <td className="text-xs text-slate-500">{new Date(log.createdAt).toLocaleString()}</td>
+                  <td className="text-right">
+                    {log.status === 'failed' && (
+                      <button onClick={() => handleRetryLog(log.id)} className="btn btn-secondary btn-sm text-xs py-1 px-2">Retry</button>
+                    )}
+                  </td>
                 </tr>
               ))}
               {logs.length === 0 && (
-                <tr><td colSpan={5} className="text-center text-slate-500 py-8">No recent notification logs found.</td></tr>
+                <tr><td colSpan={6} className="text-center text-slate-500 py-8">No recent notification logs found.</td></tr>
               )}
             </tbody>
           </table>

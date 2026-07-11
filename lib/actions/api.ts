@@ -117,6 +117,32 @@ export async function rotateApiKey(tenantId: string, id: string) {
   }
 }
 
+export async function updateApiKey(tenantId: string, id: string, data: { keyName?: string, scopes?: string[] }) {
+  try {
+    const key = await prisma.tenantApiKey.updateMany({
+      where: { id, tenantId },
+      data
+    })
+    revalidatePath('/admin/api-portal')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateWebhook(tenantId: string, id: string, data: { targetUrl?: string, subscribedEvents?: string[], isActive?: boolean, failureCount?: number }) {
+  try {
+    const webhook = await prisma.tenantApiWebhook.updateMany({
+      where: { id, tenantId },
+      data
+    })
+    revalidatePath('/admin/api-portal')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
 export async function deleteWebhook(tenantId: string, id: string) {
   try {
     await prisma.tenantApiWebhook.deleteMany({

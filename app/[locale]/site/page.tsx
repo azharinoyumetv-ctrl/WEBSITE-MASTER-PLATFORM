@@ -31,6 +31,10 @@ export default async function SiteHomePage() {
   // Get home page
   const pageRes = await getPublicPage(tenantId, '/')
   
+  if (pageRes.isDraft) {
+    return <div className="p-20 text-center text-slate-500">This page is currently unpublished.</div>
+  }
+
   let blocks: any[] = []
   if (pageRes.success && pageRes.page?.layoutBlocks) {
     try {

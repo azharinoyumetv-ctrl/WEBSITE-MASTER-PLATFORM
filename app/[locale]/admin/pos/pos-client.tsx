@@ -15,6 +15,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
   const [activeSession, setActiveSession] = useState(initialSession)
   const [shiftAmount, setShiftAmount] = useState('0')
   const [showShiftModal, setShowShiftModal] = useState(!initialSession)
+  const [shiftSummary, setShiftSummary] = useState<any>(null)
   const [receiptHtml, setReceiptHtml] = useState<string | null>(null)
 
   useEffect(() => {
@@ -82,10 +83,15 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
     setIsProcessing(false)
     if (res.success) {
       setActiveSession(null)
+      setShiftSummary(res.summary)
       setShowShiftModal(true)
       setShiftAmount('0')
       toast.success('Shift closed successfully')
     } else toast.error(res.error)
+  }
+
+  const handleOpenCashDrawer = () => {
+    toast.success('Cash drawer opened via hardware stub.')
   }
 
   if (showShiftModal) {
@@ -127,6 +133,31 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
             {isProcessing ? 'Processing...' : activeSession ? 'Close Shift' : 'Open Shift'}
           </button>
         </div>
+        
+        {shiftSummary && !activeSession && (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl mt-4 animate-slide-up">
+            <h3 className="text-lg font-bold text-white mb-4">End of Day Summary</h3>
+            <div className="space-y-2 text-sm text-gray-300 mb-6">
+              <div className="flex justify-between"><span>Orders:</span> <span className="font-semibold text-white">{shiftSummary.orderCount}</span></div>
+              <div className="flex justify-between"><span>Total Revenue:</span> <span className="font-semibold text-white">{formatCurrency(shiftSummary.totalRevenue, baseCurrency)}</span></div>
+              <div className="border-t border-gray-800 my-2 pt-2 flex justify-between"><span>Cash Sales:</span> <span className="font-semibold text-white">{formatCurrency(shiftSummary.cashRevenue, baseCurrency)}</span></div>
+              <div className="flex justify-between"><span>Card Sales:</span> <span className="font-semibold text-white">{formatCurrency(shiftSummary.cardRevenue, baseCurrency)}</span></div>
+              <div className="border-t border-gray-800 my-2 pt-2 flex justify-between text-emerald-400"><span>Opening Balance:</span> <span>{formatCurrency(shiftSummary.openingBalance, baseCurrency)}</span></div>
+              <div className="flex justify-between text-emerald-400"><span>Expected Drawer:</span> <span>{formatCurrency(shiftSummary.openingBalance + shiftSummary.cashRevenue, baseCurrency)}</span></div>
+              <div className="flex justify-between text-emerald-400"><span>Actual Drawer:</span> <span>{formatCurrency(shiftSummary.closingBalance, baseCurrency)}</span></div>
+              {shiftSummary.closingBalance !== (shiftSummary.openingBalance + shiftSummary.cashRevenue) && (
+                <div className="flex justify-between text-amber-500 font-semibold pt-2">
+                  <span>Discrepancy:</span> 
+                  <span>{formatCurrency(shiftSummary.closingBalance - (shiftSummary.openingBalance + shiftSummary.cashRevenue), baseCurrency)}</span>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShiftSummary(null)} className="flex-1 btn btn-secondary py-2">Dismiss</button>
+              <button onClick={() => toast.success('Printing summary...')} className="flex-1 btn btn-primary bg-emerald-600 hover:bg-emerald-700 py-2 border-0">Print</button>
+            </div>
+          </div>
+        )}
       </div>
     )
   }
@@ -150,6 +181,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
             </div>
           </div>
           <div className="flex items-center gap-4 text-gray-400 text-xs">
+            <button onClick={handleOpenCashDrawer} className="text-emerald-400 hover:text-emerald-300 font-medium">Open Drawer</button>
             <button onClick={() => { setShiftAmount('0'); setShowShiftModal(true); }} className="text-emerald-400 hover:text-emerald-300 underline font-medium">Close Shift</button>
             <div className="flex items-center gap-1.5">
               <Wifi className="w-3.5 h-3.5 text-emerald-400" />

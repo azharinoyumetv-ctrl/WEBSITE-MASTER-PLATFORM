@@ -151,3 +151,45 @@ export async function sendTimelineWhatsApp(tenantId: string, contactId: string, 
     return { success: false, error: error.message }
   }
 }
+
+export async function bulkDeleteCrmContacts(tenantId: string, contactIds: string[]) {
+  try {
+    const res = await prisma.tenantCrmContact.deleteMany({
+      where: {
+        tenantId,
+        id: { in: contactIds }
+      }
+    })
+    revalidatePath('/admin/crm')
+    return { success: true, count: res.count }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function importCrmContacts(tenantId: string, contacts: any[]) {
+  try {
+    let imported = 0
+    const data = contacts.map(c => ({
+      tenantId,
+      firstName: String(c.firstName || '').substring(0, 64),
+      lastName: String(c.lastName || '').substring(0, 64),
+      email: String(c.email || '').substring(0, 128),
+      phoneNumber: c.phoneNumber ? String(c.phoneNumber).substring(0, 32) : null,
+      tags: Array.isArray(c.tags) ? c.tags : (c.tags ? String(c.tags).split(',').map(t => t.trim()).filter(Boolean) : []),
+    })).filter(c => c.firstName && c.email)
+
+    if (data.length > 0) {
+      const res = await prisma.tenantCrmContact.createMany({
+        data,
+        skipDuplicates: true
+      })
+      imported = res.count
+    }
+    
+    revalidatePath('/admin/crm')
+    return { success: true, count: imported }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

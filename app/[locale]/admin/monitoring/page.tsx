@@ -1,4 +1,4 @@
-import { getMonitoringStatus, getIncidentLogs } from '@/lib/actions/monitoring'
+import { getMonitoringStatus, getIncidentLogs, getMonitoringRules } from '@/lib/actions/monitoring'
 import { MonitoringClient } from './monitoring-client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -17,9 +17,10 @@ export default async function MonitoringPage() {
     return <div className="p-8 text-red-500">Error: No tenant context found.</div>
   }
 
-  const [res, incRes] = await Promise.all([
+  const [res, incRes, rulesRes] = await Promise.all([
     getMonitoringStatus(tenantId),
-    getIncidentLogs(tenantId)
+    getIncidentLogs(tenantId),
+    getMonitoringRules(tenantId)
   ])
   
   if (!res.success || !res.monitoring) {
@@ -31,6 +32,7 @@ export default async function MonitoringPage() {
       tenantId={tenantId}
       initialData={res.monitoring}
       initialIncidents={incRes.incidents || []}
+      initialRules={rulesRes.rules || []}
     />
   )
 }

@@ -166,12 +166,41 @@ export async function openSession(tenantId: string, terminalId: string, openedBy
 
 export async function closeSession(tenantId: string, sessionId: string, closedBy: string, closingBalance: number) {
   try {
+    const sessionToClose = await prisma.tenantPosSession.findUnique({ where: { id: sessionId, tenantId } })
+    if (!sessionToClose) throw new Error('Session not found')
+    
+    const closedAt = new Date()
+    
+    const orders = await prisma.tenantOrder.findMany({
+      where: {
+        tenantId,
+        createdAt: { gte: sessionToClose.openedAt, lte: closedAt },
+      },
+      include: { payments: true }
+    })
+    
+    let totalRevenue = 0
+    let cashRevenue = 0
+    let cardRevenue = 0
+    
+    orders.forEach(o => {
+      totalRevenue += Number(o.totalAmount)
+      o.payments.forEach(p => {
+        if (p.processorKey === 'pos_cash') cashRevenue += Number(p.amount)
+        if (p.processorKey === 'pos_card') cardRevenue += Number(p.amount)
+      })
+    })
+
     const session = await prisma.tenantPosSession.update({
       where: { id: sessionId, tenantId },
-      data: { closedBy, closingBalance, status: 'reconciled', closedAt: new Date() }
+      data: { closedBy, closingBalance, status: 'reconciled', closedAt }
     })
     revalidatePath('/admin/pos')
-    return { success: true, session }
+    return { 
+      success: true, 
+      session, 
+      summary: { totalRevenue, cashRevenue, cardRevenue, orderCount: orders.length, openingBalance: Number(sessionToClose.openingBalance), closingBalance } 
+    }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

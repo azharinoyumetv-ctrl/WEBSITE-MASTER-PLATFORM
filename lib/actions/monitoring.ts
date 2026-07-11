@@ -104,3 +104,50 @@ export async function getUnreadAlertCount(tenantId: string) {
     return { count: 0 }
   }
 }
+
+// Alert Rules CRUD
+export async function getMonitoringRules(tenantId: string) {
+  try {
+    const rules = await prisma.tenantMonitoringRule.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' }
+    })
+    return { success: true, rules }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function createMonitoringRule(tenantId: string, data: any) {
+  try {
+    const rule = await prisma.tenantMonitoringRule.create({
+      data: { tenantId, ...data }
+    })
+    return { success: true, rule }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateMonitoringRule(tenantId: string, ruleId: string, data: any) {
+  try {
+    const rule = await prisma.tenantMonitoringRule.update({
+      where: { id: ruleId, tenantId },
+      data
+    })
+    return { success: true, rule }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function deleteMonitoringRule(tenantId: string, ruleId: string) {
+  try {
+    await prisma.tenantMonitoringRule.deleteMany({
+      where: { id: ruleId, tenantId }
+    })
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

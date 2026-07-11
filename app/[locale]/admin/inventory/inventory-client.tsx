@@ -17,9 +17,14 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
   const [locations, setLocations] = useState(initialLocations)
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [adjustModal, setAdjustModal] = useState<any | null>(null)
   const [adjustQty, setAdjustQty] = useState('')
   const [isAdjusting, setIsAdjusting] = useState(false)
+
+  // QR State
+  const [qrModal, setQrModal] = useState<any | null>(null)
+  const [qrDataUrl, setQrDataUrl] = useState<string>('')
 
   // Location Management State
   const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
@@ -59,7 +64,8 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
   const filteredBalances = balances.filter(b => {
     const matchSearch = b.catalogItem?.title?.toLowerCase().includes(search.toLowerCase()) || false
     const matchLoc = !selectedLocation || b.locationId === selectedLocation
-    return matchSearch && matchLoc
+    const matchStatus = statusFilter === 'all' || b.status === statusFilter
+    return matchSearch && matchLoc && matchStatus
   })
 
   const criticalCount = balances.filter(b => b.status === 'critical').length
@@ -82,6 +88,45 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
       setAdjustQty('')
     } else {
       toast.error(res.error || 'Failed to adjust inventory')
+    }
+  }
+
+  const exportToCSV = () => {
+    const headers = ['Item', 'SKU', 'Location', 'Quantity On Hand', 'Reserved', 'Status', 'Last Updated']
+    const csvContent = [
+      headers.join(','),
+      ...filteredBalances.map(b => [
+        `"${b.catalogItem?.title || ''}"`,
+        `"${b.catalogItem?.sku || ''}"`,
+        `"${locations.find(l => l.id === b.locationId)?.name || 'Unknown'}"`,
+        b.quantityOnHand,
+        b.quantityReserved,
+        b.status,
+        new Date(b.updatedAt).toISOString()
+      ].join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', `inventory-export-${new Date().toISOString().split('T')[0]}.csv`)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  const generateQRCode = async (balance: any) => {
+    try {
+      const QRCode = (await import('qrcode')).default
+      const url = await QRCode.toDataURL(JSON.stringify({ 
+        id: balance.catalogItem?.id, 
+        sku: balance.catalogItem?.sku 
+      }))
+      setQrDataUrl(url)
+      setQrModal(balance)
+    } catch (err) {
+      toast.error('Failed to generate QR code')
     }
   }
 
@@ -299,9 +344,32 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
 
         {/* Inventory table */}
         <div className="lg:col-span-3">
-          <div className="relative mb-3">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-            <input type="text" placeholder="Search items..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" id="inventory-search" />
+          <div className="flex flex-col sm:flex-row gap-3 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input type="text" placeholder="Search inventory by item or SKU..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" />
+            </div>
+            <select className="form-select w-full sm:w-48" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+              <option value="all">All Statuses</option>
+              <option value="optimal">Optimal</option>
+              <option value="low">Low Stock</option>
+              <option value="critical">Critical</option>
+            </select>
+            <select className="form-select w-full sm:w-48" value={selectedLocation || ''} onChange={(e) => setSelectedLocation(e.target.value || null)}>
+              <option value="">All Locations</option>
+              {locations.map(l => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </select>
+            <button onClick={exportToCSV} className="btn btn-secondary">
+              Export CSV
+            </button>
+            <button onClick={() => setIsTransferModalOpen(true)} className="btn btn-secondary flex items-center gap-2">
+              <ArrowUpDown className="w-4 h-4" /> Transfer
+            </button>
+            <button onClick={() => setIsAddModalOpen(true)} className="btn btn-primary flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Add Stock
+            </button>
           </div>
           <div className="card overflow-hidden">
             <table className="data-table">
@@ -330,6 +398,13 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
                       <td><span className={`badge ${statusConf.color}`}>{statusConf.label}</span></td>
                       <td>
                         <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => generateQRCode(bal)}
+                            className="btn btn-secondary btn-sm"
+                            title="Generate QR"
+                          >
+                            QR
+                          </button>
                           <button
                             onClick={() => { setAdjustModal(bal); setAdjustQty('') }}
                             className="btn btn-secondary btn-sm"
@@ -575,6 +650,22 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
                 {isSavingLocation ? 'Saving...' : 'Save Location'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Modal */}
+      {qrModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 animate-scale-in text-center">
+            <h3 className="text-xl font-bold mb-2">{qrModal.catalogItem?.title}</h3>
+            <p className="text-slate-500 mb-6 font-mono text-sm">SKU: {qrModal.catalogItem?.sku}</p>
+            {qrDataUrl && (
+              <img src={qrDataUrl} alt="QR Code" className="w-48 h-48 mx-auto mb-6 rounded-lg shadow-sm border border-slate-100" />
+            )}
+            <button onClick={() => setQrModal(null)} className="btn btn-primary w-full">
+              Close
+            </button>
           </div>
         </div>
       )}

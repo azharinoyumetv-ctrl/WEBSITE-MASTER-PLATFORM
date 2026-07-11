@@ -26,45 +26,47 @@ model SystemTenant {
   updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  users              User[]
-  roles              Role[]
-  website            TenantWebsite?
-  pages              TenantPage[]
-  modules            TenantModule[]
-  auditLogs          AdminAuditLog[]
-  userProfiles       TenantUserProfile[]
-  invitations        TenantInvitation[]
-  policyRules        TenantPolicyRule[]
-  categories         TenantCategory[]
-  catalogItems       TenantCatalogItem[]
-  orders             TenantOrder[]
-  payments           TenantPayment[]
-  idempotencyKeys    PaymentIdempotencyKey[]
-  posTerminals       TenantPosTerminal[]
-  posSessions        TenantPosSession[]
-  inventoryLocations TenantInventoryLocation[]
-  inventoryBalances  TenantInventoryBalance[]
-  crmContacts        TenantCrmContact[]
-  crmTimeline        TenantCrmTimeline[]
-  bookingResources   TenantBookingResource[]
-  bookings           TenantBooking[]
-  configSnapshots    TenantConfigSnapshot[]
-  aiConfiguration    TenantAiConfiguration?
-  aiVectors          TenantAiKnowledgeVector[]
-  notifGateways      TenantNotificationGateway[]
-  notifTemplates     TenantNotificationTemplate[]
-  analyticsEvents    TenantAnalyticsEvent[]
-  analyticsSummaries TenantAnalyticsDailySummary[]
-  apiKeys            TenantApiKey[]
-  apiWebhooks        TenantApiWebhook[]
-  authCredentials    TenantAuthCredential[]
-  refreshTokens      TenantRefreshToken[]
-  storageFiles       TenantStorageRegistry[]
-  featureOverrides   TenantFeatureOverride[]
-  tenantOrderItems   TenantOrderItem[]
-  tenantUserRoles    TenantUserRole[]
-  notifLogs          TenantNotificationLog[]
-  incidentLogs       TenantIncidentLog[]
+  users                 User[]
+  roles                 Role[]
+  website               TenantWebsite?
+  pages                 TenantPage[]
+  modules               TenantModule[]
+  auditLogs             AdminAuditLog[]
+  userProfiles          TenantUserProfile[]
+  invitations           TenantInvitation[]
+  policyRules           TenantPolicyRule[]
+  categories            TenantCategory[]
+  catalogItems          TenantCatalogItem[]
+  orders                TenantOrder[]
+  payments              TenantPayment[]
+  idempotencyKeys       PaymentIdempotencyKey[]
+  posTerminals          TenantPosTerminal[]
+  posSessions           TenantPosSession[]
+  inventoryLocations    TenantInventoryLocation[]
+  inventoryBalances     TenantInventoryBalance[]
+  crmContacts           TenantCrmContact[]
+  crmTimeline           TenantCrmTimeline[]
+  bookingResources      TenantBookingResource[]
+  bookings              TenantBooking[]
+  configSnapshots       TenantConfigSnapshot[]
+  aiConfiguration       TenantAiConfiguration?
+  aiVectors             TenantAiKnowledgeVector[]
+  notifGateways         TenantNotificationGateway[]
+  notifTemplates        TenantNotificationTemplate[]
+  analyticsEvents       TenantAnalyticsEvent[]
+  analyticsSummaries    TenantAnalyticsDailySummary[]
+  apiKeys               TenantApiKey[]
+  apiWebhooks           TenantApiWebhook[]
+  authCredentials       TenantAuthCredential[]
+  refreshTokens         TenantRefreshToken[]
+  storageFiles          TenantStorageRegistry[]
+  featureOverrides      TenantFeatureOverride[]
+  tenantOrderItems      TenantOrderItem[]
+  tenantUserRoles       TenantUserRole[]
+  notifLogs             TenantNotificationLog[]
+  incidentLogs          TenantIncidentLog[]
+  tenantPaymentLedgers  TenantPaymentLedger[]
+  tenantMonitoringRules TenantMonitoringRule[]
 
   @@map("system_tenants")
 }
@@ -86,26 +88,26 @@ enum TenantPlan {
 // ============================================================
 
 model User {
-  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId     String     @map("tenant_id") @db.Uuid
-  email        String     @db.VarChar(255)
-  passwordHash String     @map("password_hash") @db.VarChar(255)
-  firstName    String?    @map("first_name") @db.VarChar(100)
-  lastName     String?    @map("last_name") @db.VarChar(100)
-  emailVerified  Boolean    @default(false) @map("email_verified")
-  verificationToken String? @unique @map("verification_token") @db.VarChar(255)
-  status       UserStatus @default(pending_verification)
-  tokenVersion Int        @default(1) @map("token_version")
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId          String     @map("tenant_id") @db.Uuid
+  email             String     @db.VarChar(255)
+  passwordHash      String     @map("password_hash") @db.VarChar(255)
+  firstName         String?    @map("first_name") @db.VarChar(100)
+  lastName          String?    @map("last_name") @db.VarChar(100)
+  emailVerified     Boolean    @default(false) @map("email_verified")
+  verificationToken String?    @unique @map("verification_token") @db.VarChar(255)
+  status            UserStatus @default(pending_verification)
+  tokenVersion      Int        @default(1) @map("token_version")
+  createdAt         DateTime   @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt         DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
-  tenant         SystemTenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userRoles      TenantUserRole[]
-  profile        TenantUserProfile?
-  authCredential TenantAuthCredential?
-  refreshTokens  TenantRefreshToken[]
-  uploadedFiles  TenantStorageRegistry[]
-  auditLogs      AdminAuditLog[]
+  tenant          SystemTenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  userRoles       TenantUserRole[]
+  profile         TenantUserProfile?
+  authCredential  TenantAuthCredential?
+  refreshTokens   TenantRefreshToken[]
+  uploadedFiles   TenantStorageRegistry[]
+  auditLogs       AdminAuditLog[]
   configSnapshots TenantConfigSnapshot[]
 
   @@unique([tenantId, email])
@@ -150,17 +152,17 @@ model TenantUserRole {
 }
 
 model TenantAuthCredential {
-  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId            String    @map("tenant_id") @db.Uuid
-  userId              String    @unique @map("user_id") @db.Uuid
-  passwordHash        String    @map("password_hash") @db.VarChar(255)
-  mfaSecretEncrypted  String?   @map("mfa_secret_encrypted") @db.Text
-  isMfaEnabled        Boolean   @default(false) @map("is_mfa_enabled")
-  failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
-  lockedUntil         DateTime? @map("locked_until") @db.Timestamptz
-  passwordResetToken  String?   @unique @map("password_reset_token") @db.VarChar(255)
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId             String    @map("tenant_id") @db.Uuid
+  userId               String    @unique @map("user_id") @db.Uuid
+  passwordHash         String    @map("password_hash") @db.VarChar(255)
+  mfaSecretEncrypted   String?   @map("mfa_secret_encrypted") @db.Text
+  isMfaEnabled         Boolean   @default(false) @map("is_mfa_enabled")
+  failedLoginAttempts  Int       @default(0) @map("failed_login_attempts")
+  lockedUntil          DateTime? @map("locked_until") @db.Timestamptz
+  passwordResetToken   String?   @unique @map("password_reset_token") @db.VarChar(255)
   passwordResetExpires DateTime? @map("password_reset_expires") @db.Timestamptz
-  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+  updatedAt            DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -417,9 +419,10 @@ model TenantOrder {
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz
 
-  tenant   SystemTenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  items    TenantOrderItem[]
-  payments TenantPayment[]
+  tenant               SystemTenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  items                TenantOrderItem[]
+  payments             TenantPayment[]
+  tenantPaymentLedgers TenantPaymentLedger[]
 
   @@index([tenantId, orderStatus])
   @@map("tenant_orders")
@@ -467,8 +470,9 @@ model TenantPayment {
   createdAt             DateTime      @default(now()) @map("created_at") @db.Timestamptz
   updatedAt             DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
-  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  order  TenantOrder  @relation(fields: [orderId], references: [id])
+  tenant               SystemTenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  order                TenantOrder           @relation(fields: [orderId], references: [id])
+  tenantPaymentLedgers TenantPaymentLedger[]
 
   @@index([tenantId, paymentStatus])
   @@map("tenant_payments")
@@ -963,16 +967,58 @@ model SystemApiRateLimit {
 }
 
 model TenantConfigSnapshot {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId    String   @map("tenant_id") @db.Uuid
-  configType  String   @map("config_type") @db.VarChar(64)
-  snapshot    Json     @map("snapshot")
-  actorId     String?  @map("actor_id") @db.Uuid
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  configType String   @map("config_type") @db.VarChar(64)
+  snapshot   Json     @map("snapshot")
+  actorId    String?  @map("actor_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  tenant      SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  actor       User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor  User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([tenantId, configType])
   @@map("tenant_config_snapshots")
+}
+
+model TenantPaymentLedger {
+  id          String   @id @default(cuid())
+  tenantId    String   @map("tenant_id") @db.Uuid
+  paymentId   String   @map("payment_id") @db.Uuid
+  orderId     String?  @map("order_id") @db.Uuid
+  type        String   @db.VarChar(32)
+  amount      Decimal  @db.Decimal(10, 2)
+  currency    String   @db.VarChar(3)
+  gateway     String?  @db.VarChar(32)
+  gatewayTxId String?  @map("gateway_tx_id") @db.VarChar(255)
+  status      String   @db.VarChar(32)
+  metadata    Json?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant  SystemTenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  payment TenantPayment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  order   TenantOrder?  @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, paymentId])
+  @@index([gatewayTxId])
+  @@map("tenant_payment_ledgers")
+}
+
+model TenantMonitoringRule {
+  id            String   @id @default(cuid())
+  tenantId      String   @map("tenant_id") @db.Uuid
+  name          String   @db.VarChar(255)
+  metric        String   @db.VarChar(128)
+  threshold     Decimal? @db.Decimal(10, 2)
+  operator      String?  @db.VarChar(10)
+  windowSeconds Int?     @map("window_seconds")
+  severity      String   @db.VarChar(32)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, metric])
+  @@map("tenant_monitoring_rules")
 }

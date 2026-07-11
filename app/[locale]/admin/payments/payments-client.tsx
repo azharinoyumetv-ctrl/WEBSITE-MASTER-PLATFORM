@@ -1,15 +1,19 @@
 'use client'
 
 import { useState } from 'react'
-import { CreditCard, DollarSign, TrendingUp, RefreshCw, AlertTriangle, CheckCircle2, Clock, Search } from 'lucide-react'
+import { CreditCard, DollarSign, TrendingUp, RefreshCw, AlertTriangle, CheckCircle2, Clock, Search, Edit2, Loader2 } from 'lucide-react'
 import { formatCurrency, formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
-import { refundPayment, capturePayment } from '@/lib/actions/payments'
+import { refundPayment, capturePayment, manualAdjustPayment } from '@/lib/actions/payments'
 import toast from 'react-hot-toast'
 
 export function PaymentsClient({ initialPayments, tenantId }: { initialPayments: any[], tenantId: string }) {
   const [payments, setPayments] = useState(initialPayments)
   const [search, setSearch] = useState('')
   const [isProcessing, setIsProcessing] = useState<Record<string, boolean>>({})
+  
+  const [adjustingPayment, setAdjustingPayment] = useState<any>(null)
+  const [adjustAmount, setAdjustAmount] = useState<string>('')
+  const [adjustReason, setAdjustReason] = useState<string>('')
 
   const filtered = payments.filter(p =>
     p.id.includes(search.toLowerCase()) || (p.externalTransactionId?.includes(search) ?? false)
@@ -32,6 +36,26 @@ export function PaymentsClient({ initialPayments, tenantId }: { initialPayments:
       setPayments(prev => prev.map(p => p.id === paymentId ? { ...p, ...res.payment } : p))
     } else {
       toast.error(`Failed to ${actionName}: ` + res.error)
+    }
+  }
+
+  const handleManualAdjust = async () => {
+    if (!adjustAmount || isNaN(Number(adjustAmount))) {
+      return toast.error('Enter a valid amount')
+    }
+    
+    setIsProcessing(prev => ({ ...prev, [adjustingPayment.id]: true }))
+    const res = await manualAdjustPayment(tenantId, adjustingPayment.id, Number(adjustAmount), adjustReason)
+    setIsProcessing(prev => ({ ...prev, [adjustingPayment.id]: false }))
+
+    if (res.success) {
+      toast.success('Payment adjusted successfully')
+      setPayments(prev => prev.map(p => p.id === adjustingPayment.id ? { ...p, ...res.payment } : p))
+      setAdjustingPayment(null)
+      setAdjustAmount('')
+      setAdjustReason('')
+    } else {
+      toast.error('Failed to adjust payment: ' + res.error)
     }
   }
 
@@ -113,13 +137,22 @@ export function PaymentsClient({ initialPayments, tenantId }: { initialPayments:
                       </button>
                     )}
                     {p.paymentStatus === 'succeeded' && (
-                      <button 
-                        onClick={() => handleAction(refundPayment, p.id, 'refunded')} 
-                        disabled={isProcessing[p.id]}
-                        className="btn btn-ghost btn-sm text-red-500"
-                      >
-                        {isProcessing[p.id] ? 'Processing...' : 'Refund'}
-                      </button>
+                      <>
+                        <button 
+                          onClick={() => handleAction(refundPayment, p.id, 'refunded')} 
+                          disabled={isProcessing[p.id]}
+                          className="btn btn-ghost btn-sm text-red-500"
+                        >
+                          {isProcessing[p.id] ? 'Processing...' : 'Refund'}
+                        </button>
+                        <button 
+                          onClick={() => setAdjustingPayment(p)} 
+                          disabled={isProcessing[p.id]}
+                          className="btn btn-ghost btn-sm text-indigo-500"
+                        >
+                          Adjust
+                        </button>
+                      </>
                     )}
                   </div>
                 </td>
@@ -136,6 +169,52 @@ export function PaymentsClient({ initialPayments, tenantId }: { initialPayments:
           <p className="text-xs text-slate-400">Showing {filtered.length} of {payments.length} transactions</p>
         </div>
       </div>
+
+      {adjustingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 animate-slide-up">
+            <h3 className="text-lg font-bold mb-4">Manual Adjustment</h3>
+            <p className="text-sm text-slate-500 mb-4">
+              Adjusting payment <span className="font-mono">{adjustingPayment.id.slice(0, 8)}</span>
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="form-label">Adjustment Amount</label>
+                <input 
+                  type="number" 
+                  step="0.01"
+                  value={adjustAmount} 
+                  onChange={e => setAdjustAmount(e.target.value)}
+                  className="form-input" 
+                  placeholder="-10.00 or 5.50"
+                />
+                <p className="text-[10px] text-slate-400 mt-1">Use negative values to deduct</p>
+              </div>
+              <div>
+                <label className="form-label">Reason</label>
+                <input 
+                  type="text" 
+                  value={adjustReason} 
+                  onChange={e => setAdjustReason(e.target.value)}
+                  className="form-input" 
+                  placeholder="e.g. Disputed charge, manual tip"
+                />
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => setAdjustingPayment(null)} className="btn btn-secondary">Cancel</button>
+              <button 
+                onClick={handleManualAdjust} 
+                disabled={isProcessing[adjustingPayment.id]} 
+                className="btn btn-primary"
+              >
+                {isProcessing[adjustingPayment.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Edit2 className="w-4 h-4" />} 
+                Adjust
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
