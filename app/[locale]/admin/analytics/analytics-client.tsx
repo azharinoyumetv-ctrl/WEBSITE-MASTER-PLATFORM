@@ -144,7 +144,7 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
               <Pie data={deviceData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} paddingAngle={4} dataKey="value">
-                {deviceData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                {deviceData.map((_: any, i: number) => <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />)}
               </Pie>
               <Tooltip />
             </PieChart>

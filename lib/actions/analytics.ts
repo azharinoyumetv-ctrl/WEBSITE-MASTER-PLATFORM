@@ -199,7 +199,7 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
     // Fetch all pageview events in range
     const pageviews = await prisma.tenantAnalyticsEvent.findMany({
       where: { tenantId, eventName: 'pageview', createdAt: { gte: startDate } },
-      select: { createdAt: true }
+      select: { createdAt: true, sessionId: true, eventPayload: true }
     })
 
     // Aggregate orders and pageviews by day string
@@ -212,9 +212,20 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
     }
 
     const pvByDay: Record<string, number> = {}
+    const sessionsByDay: Record<string, Record<string, { count: number, maxTime: number, minTime: number }>> = {}
+    
     for (const p of pageviews) {
       const day = p.createdAt.toISOString().split('T')[0]
       pvByDay[day] = (pvByDay[day] || 0) + 1
+      
+      const sid = p.sessionId || 'anon'
+      if (!sessionsByDay[day]) sessionsByDay[day] = {}
+      if (!sessionsByDay[day][sid]) {
+        sessionsByDay[day][sid] = { count: 0, minTime: p.createdAt.getTime(), maxTime: p.createdAt.getTime() }
+      }
+      sessionsByDay[day][sid].count++
+      sessionsByDay[day][sid].minTime = Math.min(sessionsByDay[day][sid].minTime, p.createdAt.getTime())
+      sessionsByDay[day][sid].maxTime = Math.max(sessionsByDay[day][sid].maxTime, p.createdAt.getTime())
     }
 
     // Generate summary entries per day per metric
@@ -234,14 +245,30 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
       const pvCount = pvByDay[dayStr] || 0
       const orderCount = ordersByDay[dayStr]?.count || 0
       const revenue = ordersByDay[dayStr]?.revenue || 0
+      
+      const sessions = sessionsByDay[dayStr] || {}
+      const sessionIds = Object.keys(sessions)
+      const uniqueVisitors = sessionIds.length
+      
+      let bounceCount = 0
+      let totalSessionSeconds = 0
+      
+      for (const sid of sessionIds) {
+        if (sessions[sid].count === 1) bounceCount++
+        const durationSec = (sessions[sid].maxTime - sessions[sid].minTime) / 1000
+        totalSessionSeconds += durationSec
+      }
+      
+      const bounceRate = uniqueVisitors > 0 ? (bounceCount / uniqueVisitors) * 100 : 0
+      const avgSessionSeconds = uniqueVisitors > 0 ? Math.floor(totalSessionSeconds / uniqueVisitors) : 0
 
       const metrics = [
         { metricKey: 'pageViews', metricValue: pvCount },
-        { metricKey: 'uniqueVisitors', metricValue: Math.floor(pvCount * 0.7) },
+        { metricKey: 'uniqueVisitors', metricValue: uniqueVisitors },
         { metricKey: 'conversions', metricValue: orderCount },
         { metricKey: 'revenue', metricValue: revenue },
-        { metricKey: 'bounceRate', metricValue: pvCount > 0 ? Math.round((Math.random() * 20 + 30) * 10) / 10 : 0 },
-        { metricKey: 'avgSessionSeconds', metricValue: pvCount > 0 ? Math.floor(Math.random() * 120) + 60 : 0 }
+        { metricKey: 'bounceRate', metricValue: bounceRate },
+        { metricKey: 'avgSessionSeconds', metricValue: avgSessionSeconds }
       ]
 
       for (const metric of metrics) {
