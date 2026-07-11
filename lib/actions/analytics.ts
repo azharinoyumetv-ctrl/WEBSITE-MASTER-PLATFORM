@@ -101,6 +101,21 @@ export async function getAnalytics(tenantId: string, rangeDays: number = 7) {
       uniqueVisitors: Math.round(p._count.pageUrl * 0.8) 
     }))
 
+    const deviceEvents = await prisma.tenantAnalyticsEvent.findMany({
+      where: { tenantId, createdAt: { gte: startDate } },
+      select: { deviceProperties: true }
+    })
+    
+    let mobile = 0, desktop = 0, tablet = 0;
+    for (const ev of deviceEvents) {
+      const dp = ev.deviceProperties as any;
+      const t = (dp?.type || dp?.deviceType || dp?.device || 'desktop').toLowerCase();
+      if (t === 'mobile') mobile++;
+      else if (t === 'tablet') tablet++;
+      else desktop++; // default to desktop if unknown to avoid zero total
+    }
+    const totalDevices = (mobile + desktop + tablet) || 1;
+
     return {
       success: true,
       analytics: {
@@ -113,9 +128,9 @@ export async function getAnalytics(tenantId: string, rangeDays: number = 7) {
         topPages: topPagesFormatted,
         dailyData: dailyData,
         deviceBreakdown: [
-          { device: 'Mobile', sessions: Math.round(totalPageViews * 0.6), percentage: 60 },
-          { device: 'Desktop', sessions: Math.round(totalPageViews * 0.3), percentage: 30 },
-          { device: 'Tablet', sessions: Math.round(totalPageViews * 0.1), percentage: 10 }
+          { device: 'Mobile', sessions: mobile, percentage: Math.round((mobile / totalDevices) * 100) },
+          { device: 'Desktop', sessions: desktop, percentage: Math.round((desktop / totalDevices) * 100) },
+          { device: 'Tablet', sessions: tablet, percentage: Math.round((tablet / totalDevices) * 100) }
         ]
       }
     }
@@ -216,7 +231,7 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
       const dayStr = date.toISOString().split('T')[0]
       const dayDate = new Date(dayStr + 'T00:00:00.000Z')
 
-      const pvCount = pvByDay[dayStr] || Math.floor(Math.random() * 120) + 20
+      const pvCount = pvByDay[dayStr] || 0
       const orderCount = ordersByDay[dayStr]?.count || 0
       const revenue = ordersByDay[dayStr]?.revenue || 0
 
@@ -225,8 +240,8 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
         { metricKey: 'uniqueVisitors', metricValue: Math.floor(pvCount * 0.7) },
         { metricKey: 'conversions', metricValue: orderCount },
         { metricKey: 'revenue', metricValue: revenue },
-        { metricKey: 'bounceRate', metricValue: Math.round((Math.random() * 20 + 30) * 10) / 10 },
-        { metricKey: 'avgSessionSeconds', metricValue: Math.floor(Math.random() * 120) + 60 }
+        { metricKey: 'bounceRate', metricValue: pvCount > 0 ? Math.round((Math.random() * 20 + 30) * 10) / 10 : 0 },
+        { metricKey: 'avgSessionSeconds', metricValue: pvCount > 0 ? Math.floor(Math.random() * 120) + 60 : 0 }
       ]
 
       for (const metric of metrics) {

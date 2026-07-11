@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useTransition } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { BarChart3, TrendingUp, Users, Eye, ShoppingCart, DollarSign, Globe, Smartphone, Monitor, Tablet, RefreshCw, Database } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis,
@@ -13,10 +13,12 @@ import { backfillAnalyticsSummaries } from '@/lib/actions/analytics'
 const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4']
 
 export function AnalyticsClient({ initialData, tenantId }: { initialData: any; tenantId?: string }) {
-  const [dateRange, setDateRange] = useState('7d')
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const currentDays = searchParams.get('days') || '7'
+  const dateRange = currentDays + 'd'
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
-  const router = useRouter()
 
   const deviceData = initialData.deviceBreakdown.map((d: any) => ({
     name: d.device, value: d.sessions, percentage: d.percentage,
@@ -46,7 +48,7 @@ export function AnalyticsClient({ initialData, tenantId }: { initialData: any; t
           {['7d', '30d', '90d'].map(r => (
             <button
               key={r}
-              onClick={() => setDateRange(r)}
+              onClick={() => router.push(`?days=${r.replace('d', '')}`)}
               className={cn('px-3 py-1.5 text-sm rounded-lg transition-colors', dateRange === r ? 'bg-indigo-600 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50')}
             >
               {r}

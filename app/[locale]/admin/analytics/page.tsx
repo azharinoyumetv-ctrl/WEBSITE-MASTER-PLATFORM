@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { AlertTriangle } from 'lucide-react'
 
-export default async function AnalyticsPage() {
+export default async function AnalyticsPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
   const session = await getServerSession(authOptions)
   
   if (!session || !session.user) {
@@ -18,7 +18,10 @@ export default async function AnalyticsPage() {
     return <div className="p-8 text-red-500">Error: No tenant context found.</div>
   }
 
-  const res = await getAnalytics(tenantId)
+  const daysParam = searchParams.days as string
+  const days = daysParam && !isNaN(parseInt(daysParam, 10)) ? parseInt(daysParam, 10) : 7
+
+  const res = await getAnalytics(tenantId, days)
 
   if (!res.success) {
     const errorMsg = (res as any).error || 'Unknown error'

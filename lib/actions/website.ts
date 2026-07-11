@@ -3,6 +3,9 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { encrypt } from '@/lib/crypto'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { requirePermission } from '@/lib/rbac'
 
 
 
@@ -67,6 +70,9 @@ export async function getAdminPages(tenantId: string) {
 // Admin: Save Page
 export async function saveAdminPage(tenantId: string, pageId: string | undefined, data: any) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) throw new Error('Unauthorized')
+    await requirePermission((session.user as any).id, tenantId, 'website', 'write')
     let page;
     if (pageId) {
       page = await prisma.tenantPage.update({
@@ -130,6 +136,9 @@ export async function getAdminWebsiteConfig(tenantId: string) {
 // Admin: Save Website Config
 export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) throw new Error('Unauthorized')
+    await requirePermission((session.user as any).id, tenantId, 'website', 'write')
     const website = await prisma.tenantWebsite.upsert({
       where: { tenantId },
       create: {
@@ -157,6 +166,9 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
 
 export async function saveTenantLogo(tenantId: string, logoUrl: string) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) throw new Error('Unauthorized')
+    await requirePermission((session.user as any).id, tenantId, 'settings', 'write')
     await prisma.systemTenant.update({
       where: { id: tenantId },
       data: { logoUrl }
@@ -171,6 +183,9 @@ export async function saveTenantLogo(tenantId: string, logoUrl: string) {
 
 export async function saveAiConfig(tenantId: string, data: { providerKey: string, apiSecret?: string, selectedModelName: string }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) throw new Error('Unauthorized')
+    await requirePermission((session.user as any).id, tenantId, 'settings', 'write')
     const encryptedSecret = data.apiSecret ? encrypt(data.apiSecret) : undefined
     const updateData: any = {
       providerKey: data.providerKey,
@@ -205,6 +220,9 @@ export async function savePaymentConfig(tenantId: string, data: {
   midtransServerKey: string 
 }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) throw new Error('Unauthorized')
+    await requirePermission((session.user as any).id, tenantId, 'settings', 'write')
     const updateData: any = {
       xenditEnabled: data.xenditEnabled,
       midtransEnabled: data.midtransEnabled

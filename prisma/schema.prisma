@@ -61,6 +61,7 @@ model SystemTenant {
   storageFiles       TenantStorageRegistry[]
   featureOverrides   TenantFeatureOverride[]
   tenantOrderItems   TenantOrderItem[]
+  tenantUserRoles    TenantUserRole[]
 
   @@map("system_tenants")
 }
@@ -93,7 +94,7 @@ model User {
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant         SystemTenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userRoles      UserRole[]
+  userRoles      TenantUserRole[]
   profile        TenantUserProfile?
   authCredential TenantAuthCredential?
   refreshTokens  TenantRefreshToken[]
@@ -120,7 +121,7 @@ model Role {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   tenant          SystemTenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  userRoles       UserRole[]
+  userRoles       TenantUserRole[]
   rolePermissions TenantRolePermission[]
   invitations     TenantInvitation[]
 
@@ -128,15 +129,17 @@ model Role {
   @@map("roles")
 }
 
-model UserRole {
-  userId String @map("user_id") @db.Uuid
-  roleId String @map("role_id") @db.Uuid
+model TenantUserRole {
+  tenantId String @map("tenant_id") @db.Uuid
+  userId   String @map("user_id") @db.Uuid
+  roleId   String @map("role_id") @db.Uuid
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  user   User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role   Role         @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
-  @@id([userId, roleId])
-  @@map("user_roles")
+  @@id([tenantId, userId, roleId])
+  @@map("tenant_user_roles")
 }
 
 model TenantAuthCredential {

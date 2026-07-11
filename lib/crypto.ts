@@ -3,10 +3,10 @@ import crypto from 'crypto'
 const ALGORITHM = 'aes-256-cbc'
 const IV_LENGTH = 16 // For AES, this is always 16
 
-// Ensure the key is exactly 32 bytes.
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY 
-  ? crypto.scryptSync(process.env.ENCRYPTION_KEY, 'salt', 32)
-  : crypto.scryptSync('default_insecure_key_for_dev_only', 'salt', 32)
+if (!process.env.ENCRYPTION_KEY) {
+  throw new Error('ENCRYPTION_KEY is required in environment variables for secure encryption.');
+}
+const ENCRYPTION_KEY = crypto.scryptSync(process.env.ENCRYPTION_KEY, 'salt', 32)
 
 export function encrypt(text: string): string {
   if (!text) return ''
