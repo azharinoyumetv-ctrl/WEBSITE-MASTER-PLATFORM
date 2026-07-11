@@ -18,7 +18,7 @@ export default async function MonitoringPage() {
   }
 
   const [res, incRes] = await Promise.all([
-    getMonitoringStatus(),
+    getMonitoringStatus(tenantId),
     getIncidentLogs(tenantId)
   ])
   

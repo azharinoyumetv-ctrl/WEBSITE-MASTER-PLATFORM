@@ -2,7 +2,7 @@
 
 import prisma from "@/lib/prisma"
 
-export async function getMonitoringStatus() {
+export async function getMonitoringStatus(tenantId: string) {
   let dbStatus = 'down'
   let dbLatency = '0ms'
   let dbConnections = 0
@@ -20,18 +20,19 @@ export async function getMonitoringStatus() {
   // NextJS is obviously up if this code is running
   const nextjsLatency = `${Date.now() - startTime}ms`
 
-  const alerts = await prisma.adminAuditLog.findMany({
+  const alerts = await prisma.tenantIncidentLog.findMany({
+    where: { tenantId },
     orderBy: { createdAt: 'desc' },
     take: 5
   })
   
   const formattedAlerts = alerts.length > 0 ? alerts.map(a => ({
     id: a.id,
-    severity: a.actionPerformed.includes('failed') ? 'WARNING' : 'NOTICE',
-    message: a.actionPerformed,
-    service: a.targetResource,
+    severity: a.status === 'investigating' ? 'WARNING' : (a.status === 'resolved' ? 'NOTICE' : 'CRITICAL'),
+    message: a.title,
+    service: a.serviceName,
     timestamp: a.createdAt.toISOString(),
-    resolved: true
+    resolved: a.status === 'resolved'
   })) : []
 
   // Real-time metric gathering for tenant (if applicable) or system-wide

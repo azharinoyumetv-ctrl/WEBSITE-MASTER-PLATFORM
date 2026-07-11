@@ -245,7 +245,7 @@ export default async function AdminDashboard() {
   const [metricsRes, analyticsRes, monitoringRes] = await Promise.all([
     getDashboardMetrics(tenantId),
     getAnalytics(tenantId),
-    getMonitoringStatus()
+    getMonitoringStatus(tenantId)
   ])
 
   const metricsError = !metricsRes.success ? (metricsRes as any).error : null

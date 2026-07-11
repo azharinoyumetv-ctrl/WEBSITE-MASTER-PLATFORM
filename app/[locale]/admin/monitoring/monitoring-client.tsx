@@ -20,7 +20,7 @@ export function MonitoringClient({ tenantId, initialData, initialIncidents }: { 
   const handleRefresh = async () => {
     setIsRefreshing(true)
     const [res, incRes] = await Promise.all([
-      getMonitoringStatus(),
+      getMonitoringStatus(tenantId),
       getIncidentLogs(tenantId)
     ])
     if (res.success && res.monitoring) setData(res.monitoring)
