@@ -4,12 +4,64 @@ import { useState, useEffect } from 'react'
 import { Settings, Globe, Palette, Shield, CreditCard, Building2, Save, Loader2, MessageSquare, Bot } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig } from '@/lib/actions/website'
+import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig, getWebsiteConfigSnapshots, restoreWebsiteConfigSnapshot } from '@/lib/actions/website'
+import { generateBillingInvoice } from '@/lib/actions/billing'
 
 export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig, tenantId }: { initialWebsite: any, initialTenant: any, initialAiConfig?: any, tenantId: string }) {
-  const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing' | 'ai'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history'>('general')
   const [logoPreview, setLogoPreview] = useState<string | null>(initialTenant?.logoUrl || null)
   const [isUploading, setIsUploading] = useState(false)
+  const [snapshots, setSnapshots] = useState<any[]>([])
+  const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false)
+  
+  useEffect(() => {
+    if (activeTab === 'history') {
+      setIsLoadingSnapshots(true)
+      getWebsiteConfigSnapshots(tenantId).then(res => {
+        if (res.success) setSnapshots(res.snapshots || [])
+        setIsLoadingSnapshots(false)
+      })
+    }
+  }, [activeTab, tenantId])
+
+  const handleRestoreSnapshot = async (snapshotId: string) => {
+    if (!confirm('Are you sure you want to restore this configuration snapshot? This will overwrite your current theme settings.')) return
+    setIsSaving(true)
+    const res = await restoreWebsiteConfigSnapshot(tenantId, snapshotId)
+    setIsSaving(false)
+    if (res.success) {
+      toast.success('Configuration restored successfully')
+      window.location.reload()
+    } else {
+      toast.error(res.error || 'Failed to restore snapshot')
+    }
+  }
+
+  const handleExportConfig = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(websiteData, null, 2))
+    const downloadAnchorNode = document.createElement('a')
+    downloadAnchorNode.setAttribute("href", dataStr)
+    downloadAnchorNode.setAttribute("download", `config-backup-${tenantId}.json`)
+    document.body.appendChild(downloadAnchorNode)
+    downloadAnchorNode.click()
+    downloadAnchorNode.remove()
+  }
+
+  const handleImportConfig = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      try {
+        const json = JSON.parse(e.target?.result as string)
+        setWebsiteData(prev => ({ ...prev, ...json }))
+        toast.success('Configuration imported. Click "Save Changes" to apply.')
+      } catch (err) {
+        toast.error('Invalid JSON file')
+      }
+    }
+    reader.readAsText(file)
+  }
   
   const [websiteData, setWebsiteData] = useState({
     siteTitle: initialWebsite?.siteTitle || 'Website',
@@ -105,6 +157,22 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
     }
   }
 
+  const handleUpgradePlan = async () => {
+    try {
+      setIsSaving(true)
+      const res = await generateBillingInvoice(tenantId)
+      if (res.success && res.invoiceUrl) {
+        window.location.href = res.invoiceUrl
+      } else {
+        toast.error(res.error || 'Failed to generate invoice')
+      }
+    } catch (e: any) {
+      toast.error(e.message || 'Error occurred')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -165,6 +233,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
             { id: 'theme', label: 'Brand & Theme', icon: Palette },
             { id: 'ai', label: 'AI & Automations', icon: Bot },
             { id: 'billing', label: 'Billing & Plan', icon: CreditCard },
+            { id: 'history', label: 'History & Backups', icon: Save },
           ].map(tab => (
             <button
               key={tab.id}
@@ -591,9 +660,55 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                   <span className="badge badge-success uppercase tracking-wider">{initialTenant?.plan || 'core'}</span>
                 </div>
                 <div className="mt-6 flex gap-3">
-                  <button onClick={() => toast('Stripe Portal URL not configured in environment', { icon: 'ℹ️' })} className="btn btn-secondary">View Invoices</button>
-                  <button onClick={() => toast('Please contact support to upgrade your plan', { icon: '💳' })} className="btn btn-primary">Upgrade Plan</button>
+                  <button onClick={handleUpgradePlan} disabled={isSaving} className="btn btn-secondary">
+                    {isSaving ? 'Processing...' : 'View Invoices'}
+                  </button>
+                  <button onClick={handleUpgradePlan} disabled={isSaving} className="btn btn-primary">
+                    {isSaving ? 'Processing...' : 'Upgrade Plan'}
+                  </button>
                 </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div className="space-y-6">
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Save className="w-4 h-4 text-slate-400" /> Export / Import Config
+                </h3>
+                <div className="flex gap-4">
+                  <button onClick={handleExportConfig} className="btn btn-secondary">Export JSON</button>
+                  <label className="btn btn-secondary cursor-pointer">
+                    Import JSON
+                    <input type="file" accept=".json" className="hidden" onChange={handleImportConfig} />
+                  </label>
+                </div>
+              </div>
+
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-slate-400" /> Configuration Snapshots
+                </h3>
+                {isLoadingSnapshots ? (
+                  <div className="py-4 text-sm text-slate-500">Loading snapshots...</div>
+                ) : snapshots.length === 0 ? (
+                  <div className="py-4 text-sm text-slate-500">No snapshots available.</div>
+                ) : (
+                  <div className="space-y-4">
+                    {snapshots.map((snap, idx) => (
+                      <div key={snap.id} className="flex items-center justify-between p-4 border border-slate-100 rounded-lg">
+                        <div>
+                          <div className="font-medium text-slate-900">Snapshot {snapshots.length - idx}</div>
+                          <div className="text-sm text-slate-500">{new Date(snap.createdAt).toLocaleString()}</div>
+                        </div>
+                        <button onClick={() => handleRestoreSnapshot(snap.id)} className="btn btn-secondary text-sm">
+                          Restore
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}

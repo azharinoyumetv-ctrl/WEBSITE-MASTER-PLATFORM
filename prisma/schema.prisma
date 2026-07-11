@@ -95,6 +95,7 @@ model User {
   emailVerified  Boolean    @default(false) @map("email_verified")
   verificationToken String? @unique @map("verification_token") @db.VarChar(255)
   status       UserStatus @default(pending_verification)
+  tokenVersion Int        @default(1) @map("token_version")
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
 

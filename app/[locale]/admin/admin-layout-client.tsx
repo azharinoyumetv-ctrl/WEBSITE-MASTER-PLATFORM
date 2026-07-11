@@ -11,7 +11,7 @@ import {
   Activity, FileText, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getUnreadAlertCount } from '@/lib/actions/monitoring'
+import { getUnreadAlertCount, getMonitoringStatus } from '@/lib/actions/monitoring'
 
 type NavItem = {
   href: string
@@ -204,6 +204,8 @@ export function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () 
   const t = useTranslations('AdminSidebar')
   const [unreadCount, setUnreadCount] = useState(0)
   const [sysStatus, setSysStatus] = useState('operational')
+  const [recentAlerts, setRecentAlerts] = useState<any[]>([])
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   
   useEffect(() => {
     if (tenant?.id) {
@@ -211,6 +213,11 @@ export function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () 
         if (res?.count !== undefined) {
           setUnreadCount(res.count)
           setSysStatus(res.count > 0 ? 'issues' : 'operational')
+        }
+      })
+      getMonitoringStatus(tenant.id).then((res: any) => {
+        if (res?.monitoring?.alertHistory) {
+          setRecentAlerts(res.monitoring.alertHistory)
         }
       })
     }
@@ -267,14 +274,45 @@ export function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () 
         </div>
 
         {/* Alert bell */}
-        <Link href="/admin/notifications" className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors">
-          <Bell className="w-5 h-5" />
-          {unreadCount > 0 && (
-            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
-              {unreadCount > 9 ? '9+' : unreadCount}
-            </span>
+        <div className="relative">
+          <button 
+            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+            className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+          
+          {isDropdownOpen && (
+            <>
+              <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50 overflow-hidden">
+                <div className="p-3 border-b border-slate-100 font-medium text-sm">Recent Notifications</div>
+                <div className="max-h-64 overflow-y-auto">
+                  {recentAlerts.length > 0 ? (
+                    recentAlerts.map(alert => (
+                      <div key={alert.id} className="p-3 border-b border-slate-50 hover:bg-slate-50 text-sm">
+                        <div className="font-medium text-slate-900">{alert.message}</div>
+                        <div className="text-xs text-slate-500 mt-1">{alert.time}</div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 text-center text-sm text-slate-500">No recent notifications</div>
+                  )}
+                </div>
+                <div className="p-2 border-t border-slate-100 bg-slate-50 text-center">
+                  <Link href="/admin/notifications" className="text-xs font-medium text-indigo-600 hover:text-indigo-700" onClick={() => setIsDropdownOpen(false)}>
+                    View all notifications
+                  </Link>
+                </div>
+              </div>
+            </>
           )}
-        </Link>
+        </div>
 
         {/* Public site link */}
         <Link

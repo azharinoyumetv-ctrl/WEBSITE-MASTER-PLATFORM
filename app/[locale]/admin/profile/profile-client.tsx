@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { User, Mail, Phone, Save, Loader2 } from 'lucide-react'
-import { updateProfile } from '@/lib/actions/profile'
+import { User, Mail, Phone, Save, Loader2, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { updateProfile, generateMfaSecret, verifyAndEnableMfa } from '@/lib/actions/profile'
 import toast from 'react-hot-toast'
+import QRCode from 'qrcode'
 
 export function ProfileClient({ initialUser, tenantId }: { initialUser: any, tenantId: string }) {
   const [formData, setFormData] = useState({
@@ -12,6 +13,40 @@ export function ProfileClient({ initialUser, tenantId }: { initialUser: any, ten
     phoneNumber: initialUser?.profile?.phoneNumber || '',
   })
   const [isSaving, setIsSaving] = useState(false)
+
+  const [isMfaEnabled, setIsMfaEnabled] = useState(initialUser?.authCredential?.isMfaEnabled || false)
+  const [mfaSecret, setMfaSecret] = useState('')
+  const [mfaQr, setMfaQr] = useState('')
+  const [mfaToken, setMfaToken] = useState('')
+  const [isMfaLoading, setIsMfaLoading] = useState(false)
+
+  const handleEnableMfa = async () => {
+    setIsMfaLoading(true)
+    const res = await generateMfaSecret(tenantId, initialUser.id)
+    if (res.success && res.uri) {
+      setMfaSecret(res.secret)
+      const qr = await QRCode.toDataURL(res.uri)
+      setMfaQr(qr)
+    } else {
+      toast.error('Failed to generate MFA secret')
+    }
+    setIsMfaLoading(false)
+  }
+
+  const handleVerifyMfa = async () => {
+    setIsMfaLoading(true)
+    const res = await verifyAndEnableMfa(tenantId, initialUser.id, mfaSecret, mfaToken)
+    if (res.success) {
+      toast.success('MFA enabled successfully')
+      setIsMfaEnabled(true)
+      setMfaSecret('')
+      setMfaQr('')
+      setMfaToken('')
+    } else {
+      toast.error(res.error || 'Invalid token')
+    }
+    setIsMfaLoading(false)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -100,6 +135,56 @@ export function ProfileClient({ initialUser, tenantId }: { initialUser: any, ten
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="max-w-2xl mt-6">
+        <div className="card p-6">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-4">
+            <ShieldAlert className="w-5 h-5 text-indigo-600" /> Two-Factor Authentication
+          </h3>
+          {isMfaEnabled ? (
+            <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 p-4 rounded-lg">
+              <ShieldCheck className="w-5 h-5" />
+              <span>MFA is currently enabled for your account.</span>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-slate-500">
+                Enhance your account security by enabling Two-Factor Authentication (MFA).
+              </p>
+              {!mfaSecret ? (
+                <button onClick={handleEnableMfa} disabled={isMfaLoading} className="btn btn-primary">
+                  {isMfaLoading ? 'Loading...' : 'Setup MFA'}
+                </button>
+              ) : (
+                <div className="bg-slate-50 p-4 rounded-lg space-y-4">
+                  <div className="flex justify-center bg-white p-4 rounded-lg w-max mx-auto border border-slate-200">
+                    {mfaQr && <img src={mfaQr} alt="MFA QR Code" className="w-48 h-48" />}
+                  </div>
+                  <p className="text-center text-sm text-slate-500 font-mono bg-slate-100 p-2 rounded">
+                    {mfaSecret}
+                  </p>
+                  <p className="text-sm text-center text-slate-600">
+                    Scan the QR code with your authenticator app, then enter the 6-digit code below to verify.
+                  </p>
+                  <div className="flex gap-2 max-w-sm mx-auto">
+                    <input 
+                      type="text" 
+                      maxLength={6} 
+                      value={mfaToken} 
+                      onChange={e => setMfaToken(e.target.value)} 
+                      placeholder="000000" 
+                      className="form-input text-center text-lg tracking-widest"
+                    />
+                    <button onClick={handleVerifyMfa} disabled={isMfaLoading || mfaToken.length < 6} className="btn btn-primary">
+                      Verify
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

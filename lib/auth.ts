@@ -31,19 +31,10 @@ export const authOptions: NextAuthOptions = {
 
         const ip = (req.headers as any)?.['x-forwarded-for'] || (req.headers as any)?.['x-real-ip'] || 'unknown'
         
-        // --- Rate Limiting & CAPTCHA ---
-        const rl = await prisma.systemApiRateLimit.upsert({
-          where: { provider_ipAddress: { provider: 'auth', ipAddress: ip } },
-          update: { count: { increment: 1 } },
-          create: { provider: 'auth', ipAddress: ip, resetTime: new Date(Date.now() + 15 * 60 * 1000) }
-        })
-
-        if (rl.resetTime < new Date()) {
-          await prisma.systemApiRateLimit.update({
-            where: { id: rl.id },
-            data: { count: 1, resetTime: new Date(Date.now() + 15 * 60 * 1000) }
-          })
-          rl.count = 1
+        const { checkRateLimit } = require('@/lib/rate-limit')
+        const rl = await checkRateLimit(ip, 'auth', 20, 15 * 60 * 1000)
+        if (rl.limited) {
+          throw new Error("Too many attempts. Please try again later.")
         }
 
         if (rl.count > 3) {
@@ -165,6 +156,7 @@ export const authOptions: NextAuthOptions = {
           tenantId: user.tenantId,
           roles: user.userRoles.map(ur => ur.role.name),
           sessionId,
+          tokenVersion: user.tokenVersion
         }
       }
     })
@@ -176,8 +168,20 @@ export const authOptions: NextAuthOptions = {
         token.tenantId = (user as any).tenantId
         token.roles = (user as any).roles
         token.sessionId = (user as any).sessionId
+        token.tokenVersion = (user as any).tokenVersion
       }
       
+      if (token.id) {
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id as string },
+          select: { tokenVersion: true }
+        })
+        if (!dbUser || dbUser.tokenVersion !== token.tokenVersion) {
+          // Token version mismatch or user deleted
+          return {} as any
+        }
+      }
+
       if (token.sessionId) {
         const dbToken = await prisma.tenantRefreshToken.findUnique({ 
           where: { tokenHash: token.sessionId as string },

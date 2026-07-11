@@ -311,6 +311,9 @@ export async function savePaymentConfig(tenantId: string, data: {
     }
 
     if (data.xenditSecret && data.xenditSecret !== 'sk_live_****') {
+      if (!data.xenditSecret.startsWith('xnd_') && !data.xenditSecret.startsWith('sk_')) {
+        throw new Error('Invalid Xendit secret format. Must start with xnd_ or sk_')
+      }
       const encryptedStr = encrypt(data.xenditSecret)
       const [iv, ciphertext] = encryptedStr.split(':')
       updateData.xenditEncryptedSecret = ciphertext
@@ -325,6 +328,9 @@ export async function savePaymentConfig(tenantId: string, data: {
     }
 
     if (data.midtransServerKey && data.midtransServerKey !== 'Mid-server-****') {
+      if (!data.midtransServerKey.startsWith('Mid-server-') && !data.midtransServerKey.startsWith('SB-Mid-server-')) {
+        throw new Error('Invalid Midtrans server key format. Must start with Mid-server- or SB-Mid-server-')
+      }
       const encryptedStr = encrypt(data.midtransServerKey)
       const [iv, ciphertext] = encryptedStr.split(':')
       updateData.midtransEncryptedServerKey = ciphertext

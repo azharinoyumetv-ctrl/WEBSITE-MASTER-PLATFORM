@@ -2,6 +2,8 @@
 
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 
 export async function registerTenantAdmin(data: any) {
   try {
@@ -43,7 +45,7 @@ export async function registerTenantAdmin(data: any) {
         data: {
           companyName,
           subdomain,
-          status: "pending_verification",
+          status: "active",
           plan: "core"
         }
       })
@@ -136,6 +138,28 @@ export async function registerTenantAdmin(data: any) {
   } catch (error: any) {
     console.error("Registration error:", error)
     return { success: false, error: error.message || "An unexpected error occurred." }
+  }
+}
+
+export async function revokeAllSessions(userId: string) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user || (session.user as any).id !== userId) throw new Error("Unauthorized")
+
+    await prisma.$transaction([
+      prisma.user.update({
+        where: { id: userId },
+        data: { tokenVersion: { increment: 1 } }
+      }),
+      prisma.tenantRefreshToken.updateMany({
+        where: { userId },
+        data: { isRevoked: true }
+      })
+    ])
+    
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
   }
 }
 

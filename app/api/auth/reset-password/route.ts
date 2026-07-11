@@ -1,9 +1,17 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: Request) {
   try {
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const rl = await checkRateLimit(ip, 'auth_reset_password', 5, 15 * 60 * 1000)
+    
+    if (rl.limited) {
+      return NextResponse.json({ error: "Too many attempts. Please try again later." }, { status: 429 })
+    }
+
     const { token, password } = await req.json()
     if (!token || !password) return NextResponse.json({ error: "Missing fields" }, { status: 400 })
 
