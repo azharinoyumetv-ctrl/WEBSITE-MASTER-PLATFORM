@@ -183,7 +183,7 @@ export async function recordAnalyticsEvent(
  * Backfill or seed daily analytics summaries for the past N days.
  * Used for testing or bootstrapping analytics data after initial setup.
  * Safe to call multiple times — uses upsert to avoid duplicate records.
- * Blends real order data with reasonable synthetic pageview values.
+ * Uses real order data and aggregates real pageview events into sessions.
  */
 export async function backfillAnalyticsSummaries(tenantId: string, days: number = 7) {
   try {

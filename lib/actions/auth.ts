@@ -89,8 +89,9 @@ export async function registerTenantAdmin(data: any) {
       })
 
       // 5. Assign Role to User
-      await tx.userRole.create({
+      await tx.tenantUserRole.create({
         data: {
+          tenantId: tenant.id,
           userId: user.id,
           roleId: adminRole.id
         }
