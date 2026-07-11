@@ -150,7 +150,8 @@ export async function transferStock(tenantId: string, sourceLocationId: string, 
             locationId: targetLocationId,
             catalogItemId,
             quantityOnHand: quantity,
-            status: computeStatus(quantity, 5)
+            lowStockThreshold: sourceBalance.lowStockThreshold,
+            status: computeStatus(quantity, sourceBalance.lowStockThreshold)
           }
         })
       }

@@ -13,8 +13,8 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
   
   // New Contact Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [newContact, setNewContact] = useState<{firstName: string, lastName: string, email: string, phoneNumber: string, tags: string[]}>({ firstName: '', lastName: '', email: '', phoneNumber: '', tags: [] })
   const [isCreating, setIsCreating] = useState(false)
-  const [newContact, setNewContact] = useState({ firstName: '', lastName: '', email: '', phoneNumber: '' })
 
   // Edit / Tags State
   const [editingContact, setEditingContact] = useState<any | null>(null)
@@ -38,7 +38,8 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
       toast.success('Contact created successfully')
       setContacts([res.contact, ...contacts])
       setIsModalOpen(false)
-      setNewContact({ firstName: '', lastName: '', email: '', phoneNumber: '' })
+      setNewContact({ firstName: '', lastName: '', email: '', phoneNumber: '', tags: [] })
+      setTagInput('')
       if (!selected) setSelected(res.contact)
     } else {
       toast.error(res.error || 'Failed to create contact')
@@ -349,6 +350,19 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
               <div>
                 <label className="form-label">Phone Number</label>
                 <input type="tel" className="form-input" value={newContact.phoneNumber} onChange={e => setNewContact({...newContact, phoneNumber: e.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">Tags (comma separated)</label>
+                <input 
+                  type="text" 
+                  className="form-input" 
+                  placeholder="e.g. vip, lead" 
+                  value={tagInput} 
+                  onChange={e => {
+                    setTagInput(e.target.value)
+                    setNewContact({ ...newContact, tags: e.target.value.split(',').map(t => t.trim()).filter(t => t) })
+                  }} 
+                />
               </div>
             </div>
             <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">

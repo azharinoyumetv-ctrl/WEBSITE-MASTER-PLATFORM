@@ -23,7 +23,7 @@ export async function getBookingData(tenantId: string) {
     const crmContacts = await prisma.tenantCrmContact.findMany({ where: { id: { in: customerIds } } })
 
     const mappedBookings = bookings.map(b => {
-      let customerName = 'Guest Customer'
+      let customerName = 'Unknown Customer'
       const user = users.find(u => u.id === b.customerId)
       const crmContact = crmContacts.find(c => c.id === b.customerId)
       
@@ -74,7 +74,7 @@ export async function createBooking(tenantId: string, data: any) {
 
     const mappedBooking = {
       ...booking,
-      customerName: data.customerName || 'Guest Customer',
+      customerName: data.customerName || (booking.metadata && typeof booking.metadata === 'object' && 'customerName' in booking.metadata ? (booking.metadata as any).customerName : 'Unknown Customer'),
       resourceName: booking.resource?.resourceName || 'Unknown Resource'
     }
     
@@ -154,7 +154,7 @@ export async function getBookingsByDateRange(tenantId: string, startDate: Date, 
     const crmContacts = await prisma.tenantCrmContact.findMany({ where: { id: { in: customerIds } } })
 
     const mappedBookings = bookings.map(b => {
-      let customerName = 'Guest Customer'
+      let customerName = 'Unknown Customer'
       const user = users.find(u => u.id === b.customerId)
       const crmContact = crmContacts.find(c => c.id === b.customerId)
       

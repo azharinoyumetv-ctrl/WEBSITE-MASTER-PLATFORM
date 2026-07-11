@@ -25,7 +25,7 @@ export async function getCrmData(tenantId: string) {
   }
 }
 
-export async function createCrmContact(tenantId: string, data: { firstName: string, lastName: string, email: string, phoneNumber?: string }) {
+export async function createCrmContact(tenantId: string, data: { firstName: string, lastName: string, email: string, phoneNumber?: string, tags?: string[] }) {
   try {
     const contact = await prisma.tenantCrmContact.create({
       data: {
@@ -34,7 +34,7 @@ export async function createCrmContact(tenantId: string, data: { firstName: stri
         lastName: data.lastName,
         email: data.email,
         phoneNumber: data.phoneNumber || null,
-        tags: ["manually_added"],
+        tags: Array.isArray(data.tags) ? data.tags : [],
       }
     })
 

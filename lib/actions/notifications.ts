@@ -121,30 +121,48 @@ export async function createNotificationTemplate(tenantId: string, data: { templ
   }
 }
 
+import nodemailer from 'nodemailer'
+
 export async function dispatchTestNotification(tenantId: string, templateId: string) {
   try {
-    // In a real implementation, this would fetch the gateway config,
-    // compile the template using Handlebars or similar, and send the notification via an external API.
-    // For now, we simulate a successful dispatch.
     const template = await prisma.tenantNotificationTemplate.findUnique({
       where: { id: templateId, tenantId }
     })
-    if (!template) {
-      throw new Error('Template not found')
-    }
+    if (!template) throw new Error('Template not found')
     
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
-    // Log the dispatch
     const gateway = await prisma.tenantNotificationGateway.findFirst({
       where: { tenantId, channelType: template.channelType, isActive: true }
     })
+    if (!gateway) throw new Error('No active gateway found for this channel')
+
+    const config = gateway.encryptedCredentials as any
+    const password = config.password ? decrypt(config.password) : ''
     
+    if (template.channelType === 'email') {
+      const transporter = nodemailer.createTransport({
+        host: config.host,
+        port: parseInt(config.port, 10),
+        secure: config.encryption === 'SSL' || config.port === '465',
+        auth: {
+          user: config.username,
+          pass: password,
+        }
+      })
+      
+      const mailOptions = {
+        from: config.username,
+        to: 'test@example.com',
+        subject: template.subjectLine || 'Test Notification',
+        html: template.htmlBodyMarkup
+      }
+
+      await transporter.sendMail(mailOptions)
+    }
+
     await prisma.tenantNotificationLog.create({
       data: {
         tenantId,
-        gatewayId: gateway?.id,
+        gatewayId: gateway.id,
         recipient: 'test@example.com',
         channelType: template.channelType,
         status: 'delivered',
@@ -187,19 +205,64 @@ export async function processNotificationQueue(tenantId: string) {
       take: 10
     })
     
+    let processed = 0
     for (const log of pendingLogs) {
-      const isSuccess = Math.random() > 0.3 // 70% success rate mock
-      await prisma.tenantNotificationLog.update({
-        where: { id: log.id },
-        data: {
-          status: isSuccess ? 'delivered' : 'failed',
-          sentAt: isSuccess ? new Date() : null,
-          retryCount: { increment: 1 },
-          deliveryError: isSuccess ? null : 'Simulated network timeout'
+      if (!log.gatewayId) {
+        await prisma.tenantNotificationLog.update({
+          where: { id: log.id },
+          data: { status: 'failed', deliveryError: 'No gateway assigned', retryCount: 3 }
+        })
+        continue
+      }
+      
+      const gateway = await prisma.tenantNotificationGateway.findUnique({ where: { id: log.gatewayId } })
+      if (!gateway || !gateway.isActive) {
+         await prisma.tenantNotificationLog.update({
+          where: { id: log.id },
+          data: { status: 'failed', deliveryError: 'Gateway inactive or missing', retryCount: 3 }
+        })
+        continue
+      }
+      
+      try {
+        if (log.channelType === 'email') {
+          const config = gateway.encryptedCredentials as any
+          const password = config.password ? decrypt(config.password) : ''
+          const transporter = nodemailer.createTransport({
+            host: config.host,
+            port: parseInt(config.port, 10),
+            secure: config.encryption === 'SSL' || config.port === '465',
+            auth: {
+              user: config.username,
+              pass: password,
+            }
+          })
+          
+          await transporter.sendMail({
+            from: config.username,
+            to: log.recipient,
+            subject: 'System Notification',
+            text: 'You have a new notification.'
+          })
         }
-      })
+        
+        await prisma.tenantNotificationLog.update({
+          where: { id: log.id },
+          data: { status: 'delivered', sentAt: new Date(), deliveryError: null }
+        })
+        processed++
+      } catch (err: any) {
+        await prisma.tenantNotificationLog.update({
+          where: { id: log.id },
+          data: { 
+            status: 'failed', 
+            deliveryError: err.message,
+            retryCount: log.retryCount + 1
+          }
+        })
+      }
     }
-    return { success: true, processed: pendingLogs.length }
+    return { success: true, processed }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
