@@ -3,6 +3,10 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import bcrypt from "bcryptjs"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import prisma from "@/lib/prisma"
+import crypto from "crypto"
+import * as OTPAuth from "otpauth"
+import { checkRateLimit } from "@/lib/rate-limit"
+
 export const authOptions: NextAuthOptions = {
   // @ts-ignore - Adapter type mismatch in some next-auth versions, safe to ignore
   adapter: PrismaAdapter(prisma),
@@ -31,7 +35,6 @@ export const authOptions: NextAuthOptions = {
 
         const ip = (req.headers as any)?.['x-forwarded-for'] || (req.headers as any)?.['x-real-ip'] || 'unknown'
         
-        const { checkRateLimit } = require('@/lib/rate-limit')
         const rl = await checkRateLimit(ip, 'auth', 20, 15 * 60 * 1000)
         if (rl.limited) {
           throw new Error("Too many attempts. Please try again later.")
@@ -43,7 +46,6 @@ export const authOptions: NextAuthOptions = {
             throw new Error("CAPTCHA_REQUIRED")
           }
           try {
-            const crypto = require('crypto')
             const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default', 'salt', 32), Buffer.alloc(16, 0))
             let decrypted = decipher.update(captchaToken, 'hex', 'utf8')
             decrypted += decipher.final('utf8')
@@ -119,12 +121,10 @@ export const authOptions: NextAuthOptions = {
             throw new Error("MFA_REQUIRED")
           }
           try {
-            const crypto = require('crypto')
             const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default', 'salt', 32), Buffer.alloc(16, 0))
             let mfaSecret = decipher.update(user.authCredential.mfaSecretEncrypted, 'hex', 'utf8')
             mfaSecret += decipher.final('utf8')
             
-            const OTPAuth = require('otpauth')
             const totp = new OTPAuth.TOTP({
               secret: OTPAuth.Secret.fromBase32(mfaSecret)
             })
@@ -138,7 +138,6 @@ export const authOptions: NextAuthOptions = {
         }
         // ------------------------
 
-        const crypto = require('crypto')
         const sessionId = crypto.randomBytes(32).toString('hex')
         await prisma.tenantRefreshToken.create({
            data: {
@@ -211,7 +210,6 @@ export const authOptions: NextAuthOptions = {
           })
           
           // Create new token
-          const crypto = require('crypto')
           const newSessionId = crypto.randomBytes(32).toString('hex')
           await prisma.tenantRefreshToken.create({
             data: {
