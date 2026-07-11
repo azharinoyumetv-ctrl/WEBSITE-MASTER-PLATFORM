@@ -132,9 +132,20 @@ function handleRouting(request: NextRequest) {
   // Set X-Next-Intl-Locale for next-intl server components
   requestHeaders.set('X-Next-Intl-Locale', localeInUrl)
 
+  if (pathWithoutLocale === '/login') {
+    const origin = getBaseUrl(request)
+    const redirectUrl = new URL(`/${localeInUrl}/auth/login${request.nextUrl.search}`, origin)
+    return NextResponse.redirect(redirectUrl)
+  }
+
   if (isPublicSite) {
-    // Prevent double rewrite
-    if (pathWithoutLocale === '/site' || pathWithoutLocale.startsWith('/site/')) {
+    // Prevent double rewrite and exclude fixed public routes
+    if (
+      pathWithoutLocale === '/site' || 
+      pathWithoutLocale.startsWith('/site/') ||
+      pathWithoutLocale.startsWith('/checkout') ||
+      pathWithoutLocale.startsWith('/orders')
+    ) {
       return NextResponse.next({ request: { headers: requestHeaders } })
     }
     // Rewrite to /en/site or /en/site/about

@@ -31,7 +31,7 @@ export default async function CheckoutPage() {
     <div className="min-h-screen bg-slate-50 py-12">
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-slate-900 mb-8">Checkout</h1>
-        <CheckoutClient tenantId={tenant.id} items={items} />
+        <CheckoutClient tenantId={tenantId} items={items} />
       </div>
     </div>
   )

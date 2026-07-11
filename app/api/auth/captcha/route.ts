@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
-import svgCaptcha from 'svg-captcha'
 import prisma from '@/lib/prisma'
 import crypto from 'crypto'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(req: Request) {
+  // @ts-ignore
+  const svgCaptcha = (await import('svg-captcha')).default || await import('svg-captcha')
   const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
   
   const captcha = svgCaptcha.create({
