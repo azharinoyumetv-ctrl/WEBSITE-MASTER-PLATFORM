@@ -14,6 +14,25 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
   const [selectedResource, setSelectedResource] = useState(initialResources[0] || null)
   const [showNewModal, setShowNewModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Week View Navigation
+  const [weekOffset, setWeekOffset] = useState(0)
+  
+  const getWeekDays = () => {
+    const today = new Date()
+    const currentDay = today.getDay()
+    const diff = today.getDate() - currentDay + (currentDay === 0 ? -6 : 1) // adjust when day is sunday
+    const startOfWeek = new Date(today.setDate(diff + (weekOffset * 7)))
+    startOfWeek.setHours(0,0,0,0)
+    
+    return Array.from({length: 7}).map((_, i) => {
+      const d = new Date(startOfWeek)
+      d.setDate(d.getDate() + i)
+      return d
+    })
+  }
+
+  const currentWeekDays = getWeekDays()
 
   const [newBooking, setNewBooking] = useState({
     customerEmail: '',
@@ -133,31 +152,35 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
             <div className="p-4 border-b border-slate-100 flex items-center justify-between">
               <h3 className="text-sm font-semibold text-slate-900">Week View</h3>
               <div className="flex items-center gap-1">
-                <button className="p-1.5 rounded text-slate-400 hover:bg-slate-100"><ChevronLeft className="w-4 h-4" /></button>
-                <button className="p-1.5 rounded text-slate-400 hover:bg-slate-100"><ChevronRight className="w-4 h-4" /></button>
+                <button onClick={() => setWeekOffset(w => w - 1)} className="p-1.5 rounded text-slate-400 hover:bg-slate-100"><ChevronLeft className="w-4 h-4" /></button>
+                <button onClick={() => setWeekOffset(0)} className="text-xs font-medium text-slate-500 hover:text-slate-900 mx-2">Today</button>
+                <button onClick={() => setWeekOffset(w => w + 1)} className="p-1.5 rounded text-slate-400 hover:bg-slate-100"><ChevronRight className="w-4 h-4" /></button>
               </div>
             </div>
             <div className="overflow-x-auto">
               <div className="grid grid-cols-8 min-w-[600px]">
                 <div className="text-[10px] text-slate-400 p-2" />
-                {DAYS.map(d => (
-                  <div key={d} className="text-center text-xs font-semibold text-slate-500 p-2 border-l border-slate-100">{d}</div>
+                {currentWeekDays.map(d => (
+                  <div key={d.toISOString()} className="text-center p-2 border-l border-slate-100 flex flex-col">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">{DAYS[(d.getDay() + 6) % 7]}</span>
+                    <span className={cn("text-sm font-bold", d.toDateString() === new Date().toDateString() ? 'text-indigo-600' : 'text-slate-700')}>{d.getDate()}</span>
+                  </div>
                 ))}
                 {HOURS.map(hour => (
                   <div key={`row-${hour}`} className="contents">
                     <div className="text-[10px] text-slate-400 p-2 text-right border-t border-slate-100">{hour}</div>
-                    {DAYS.map((d, di) => {
-                      const hasBooking = bookings.some((b) => {
-                        const h = new Date(b.startTime).getHours()
-                        return parseInt(hour) === h && new Date(b.startTime).getDay() === (di + 1) % 7 // Basic check
+                    {currentWeekDays.map((d) => {
+                      const dayBookings = bookings.filter((b) => {
+                        const bTime = new Date(b.startTime)
+                        return bTime.toDateString() === d.toDateString() && bTime.getHours() === parseInt(hour)
                       })
                       return (
-                        <div key={`${d}-${hour}`} className="border-l border-t border-slate-100 p-1 min-h-[40px]">
-                          {hasBooking && (
-                            <div className="bg-indigo-500 rounded text-white text-[9px] p-1 font-medium leading-tight truncate">
-                              {bookings.find(b => new Date(b.startTime).getHours() === parseInt(hour))?.customerName}
+                        <div key={`${d.toISOString()}-${hour}`} className="border-l border-t border-slate-100 p-1 min-h-[40px]">
+                          {dayBookings.map(b => (
+                            <div key={b.id} className="bg-indigo-500 rounded text-white text-[9px] p-1 mb-1 font-medium leading-tight truncate">
+                              {b.customerName}
                             </div>
-                          )}
+                          ))}
                         </div>
                       )
                     })}
@@ -186,11 +209,14 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
                 {bookings.map(b => (
                   <tr key={b.id}>
                     <td>
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center">
-                          <User className="w-3.5 h-3.5 text-indigo-600" />
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center">
+                            <User className="w-3.5 h-3.5 text-indigo-600" />
+                          </div>
+                          <span className="text-sm font-medium text-slate-800">{b.customerName}</span>
                         </div>
-                        <span className="text-sm font-medium text-slate-800">{b.customerName}</span>
+                        {b.notes && <span className="text-xs text-slate-500 italic max-w-xs truncate">{b.notes}</span>}
                       </div>
                     </td>
                     <td className="text-sm text-slate-600">{b.resourceName}</td>

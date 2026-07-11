@@ -17,12 +17,25 @@ export async function getBookingData(tenantId: string) {
       orderBy: { startTime: 'desc' }
     })
 
-    // Map bookings to match frontend expectations (adding customerName and resourceName dynamically)
-    const mappedBookings = bookings.map(b => ({
-      ...b,
-      customerName: 'Guest Customer', // Fallback display name
-      resourceName: b.resource?.resourceName || 'Unknown Resource'
-    }))
+    // To resolve customerName, we need to try finding a User or CrmContact with that customerId
+    const customerIds = Array.from(new Set(bookings.map(b => b.customerId)))
+    const users = await prisma.user.findMany({ where: { id: { in: customerIds } } })
+    const crmContacts = await prisma.tenantCrmContact.findMany({ where: { id: { in: customerIds } } })
+
+    const mappedBookings = bookings.map(b => {
+      let customerName = 'Guest Customer'
+      const user = users.find(u => u.id === b.customerId)
+      const crmContact = crmContacts.find(c => c.id === b.customerId)
+      
+      if (user) customerName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
+      else if (crmContact) customerName = `${crmContact.firstName} ${crmContact.lastName}`
+
+      return {
+        ...b,
+        customerName,
+        resourceName: b.resource?.resourceName || 'Unknown Resource'
+      }
+    })
 
     return { success: true, resources, bookings: mappedBookings }
   } catch (error: any) {
@@ -36,15 +49,19 @@ export async function createBooking(tenantId: string, data: any) {
       where: { tenantId }
     })
     
-    if (!user) {
-      return { success: false, error: 'No tenant admin user found to associate booking.' }
-    }
+    // Try to find CRM contact if no user matches or if it's meant to be a CRM contact
+    const contact = await prisma.tenantCrmContact.findFirst({
+      where: { tenantId }
+    })
+
+    const customerId = user ? user.id : (contact ? contact.id : '00000000-0000-0000-0000-000000000000')
+
 
     const booking = await prisma.tenantBooking.create({
       data: {
         tenantId,
         resourceId: data.resourceId,
-        customerId: user.id,
+        customerId: customerId,
         bookingStatus: 'confirmed',
         startTime: data.startTime,
         endTime: data.endTime,
@@ -77,6 +94,81 @@ export async function updateBookingStatus(tenantId: string, bookingId: string, s
     
     revalidatePath('/admin/booking')
     return { success: true, booking }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+// Resource CRUD
+export async function createBookingResource(tenantId: string, data: { resourceName: string, resourceType: string }) {
+  try {
+    const resource = await prisma.tenantBookingResource.create({
+      data: { ...data, tenantId }
+    })
+    revalidatePath('/admin/booking')
+    return { success: true, resource }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateBookingResource(tenantId: string, id: string, data: any) {
+  try {
+    const resource = await prisma.tenantBookingResource.update({
+      where: { id, tenantId },
+      data
+    })
+    revalidatePath('/admin/booking')
+    return { success: true, resource }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function deleteBookingResource(tenantId: string, id: string) {
+  try {
+    await prisma.tenantBookingResource.delete({
+      where: { id, tenantId }
+    })
+    revalidatePath('/admin/booking')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+// Calendar API
+export async function getBookingsByDateRange(tenantId: string, startDate: Date, endDate: Date) {
+  try {
+    const bookings = await prisma.tenantBooking.findMany({
+      where: {
+        tenantId,
+        startTime: { gte: startDate },
+        endTime: { lte: endDate }
+      },
+      include: { resource: true }
+    })
+
+    const customerIds = Array.from(new Set(bookings.map(b => b.customerId)))
+    const users = await prisma.user.findMany({ where: { id: { in: customerIds } } })
+    const crmContacts = await prisma.tenantCrmContact.findMany({ where: { id: { in: customerIds } } })
+
+    const mappedBookings = bookings.map(b => {
+      let customerName = 'Guest Customer'
+      const user = users.find(u => u.id === b.customerId)
+      const crmContact = crmContacts.find(c => c.id === b.customerId)
+      
+      if (user) customerName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email
+      else if (crmContact) customerName = `${crmContact.firstName} ${crmContact.lastName}`
+
+      return {
+        ...b,
+        customerName,
+        resourceName: b.resource?.resourceName || 'Unknown Resource'
+      }
+    })
+
+    return { success: true, bookings: mappedBookings }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

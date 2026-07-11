@@ -22,6 +22,12 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
   const [filterStatus, setFilterStatus] = useState('all')
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
   const [isUpdating, setIsUpdating] = useState(false)
+  const [receiptUrlInput, setReceiptUrlInput] = useState('')
+
+  const handleSelectOrder = (order: any) => {
+    setSelectedOrder(order)
+    setReceiptUrlInput(order.receiptUrl || '')
+  }
 
   const filtered = orders.filter(o => {
     const matchSearch = o.id.includes(search.toLowerCase()) || (o.guestEmail?.includes(search) ?? false)
@@ -38,13 +44,13 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
 
   const advanceStatus = async (orderId: string, newStatus: OrderStatus) => {
     setIsUpdating(true)
-    const res = await updateOrderStatus(tenantId, orderId, newStatus)
+    const res = await updateOrderStatus(tenantId, orderId, newStatus, receiptUrlInput || undefined)
     setIsUpdating(false)
 
     if (res.success) {
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, orderStatus: newStatus } : o))
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, orderStatus: newStatus, receiptUrl: receiptUrlInput || o.receiptUrl } : o))
       if (selectedOrder?.id === orderId) {
-        setSelectedOrder((prev: any) => prev ? { ...prev, orderStatus: newStatus } : prev)
+        setSelectedOrder((prev: any) => prev ? { ...prev, orderStatus: newStatus, receiptUrl: receiptUrlInput || prev.receiptUrl } : prev)
       }
       toast.success(`Order status updated to ${newStatus}`)
     } else {
@@ -118,7 +124,7 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
                   <tr
                     key={order.id}
                     className={cn('cursor-pointer', selectedOrder?.id === order.id ? 'bg-indigo-50' : '')}
-                    onClick={() => setSelectedOrder(order)}
+                    onClick={() => handleSelectOrder(order)}
                   >
                     <td><span className="font-mono text-xs font-semibold text-indigo-700">{order.id.slice(0, 8).toUpperCase()}</span></td>
                     <td className="text-sm">{order.guestEmail || 'Registered User'}</td>
@@ -203,23 +209,49 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
               )}
 
               {/* Actions */}
-              {STATUS_ACTIONS[selectedOrder.orderStatus]?.length > 0 && (
-                <div className="border-t border-slate-100 pt-3 space-y-2">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Update Status</p>
-                  {STATUS_ACTIONS[selectedOrder.orderStatus].map((next: string) => (
-                    <button
-                      key={next}
-                      disabled={isUpdating}
-                      onClick={() => advanceStatus(selectedOrder.id, next as OrderStatus)}
-                      className={cn('btn btn-sm w-full capitalize flex justify-center items-center', next === 'cancelled' ? 'btn-danger' : 'btn-primary')}
-                      id={`order-status-${next}`}
-                    >
-                      {isUpdating && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
-                      Mark as {next}
-                    </button>
-                  ))}
-                </div>
-              )}
+              <div className="border-t border-slate-100 pt-3 space-y-3">
+                {selectedOrder.orderStatus !== 'cancelled' && (
+                  <div>
+                    <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Receipt URL</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="url" 
+                        value={receiptUrlInput}
+                        onChange={e => setReceiptUrlInput(e.target.value)}
+                        placeholder="https://..."
+                        className="form-input text-sm flex-1"
+                      />
+                      <button 
+                        onClick={() => advanceStatus(selectedOrder.id, selectedOrder.orderStatus)}
+                        disabled={isUpdating}
+                        className="btn btn-secondary btn-sm whitespace-nowrap"
+                      >
+                        Save
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {STATUS_ACTIONS[selectedOrder.orderStatus]?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Update Status</p>
+                    <div className="space-y-2">
+                      {STATUS_ACTIONS[selectedOrder.orderStatus].map((next: string) => (
+                        <button
+                          key={next}
+                          disabled={isUpdating}
+                          onClick={() => advanceStatus(selectedOrder.id, next as OrderStatus)}
+                          className={cn('btn btn-sm w-full capitalize flex justify-center items-center', next === 'cancelled' ? 'btn-danger' : 'btn-primary')}
+                          id={`order-status-${next}`}
+                        >
+                          {isUpdating && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
+                          Mark as {next}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}

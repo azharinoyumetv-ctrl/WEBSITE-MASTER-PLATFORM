@@ -4,10 +4,12 @@ import { useState } from 'react'
 import { Bell, Mail, MessageSquare, Settings2, Plus, Edit2, Trash2, Eye, CheckCircle2, Search, Loader2, X } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { updateNotificationTemplate, saveNotificationGateway, createNotificationTemplate, dispatchTestNotification } from '@/lib/actions/notifications'
+import { updateNotificationTemplate, saveNotificationGateway, createNotificationTemplate, dispatchTestNotification, toggleNotificationGateway } from '@/lib/actions/notifications'
 
-export function NotificationsClient({ initialTemplates, tenantId }: { initialTemplates: any[], tenantId: string }) {
+export function NotificationsClient({ initialTemplates, initialLogs = [], initialGateway, tenantId }: { initialTemplates: any[], initialLogs?: any[], initialGateway?: any, tenantId: string }) {
   const [templates, setTemplates] = useState(initialTemplates)
+  const [logs, setLogs] = useState(initialLogs)
+  const [gateway, setGateway] = useState(initialGateway)
   const [activeTab, setActiveTab] = useState<'templates' | 'logs' | 'settings'>('templates')
   const [selectedTemplate, setSelectedTemplate] = useState<any | null>(null)
   
@@ -18,13 +20,16 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
   
   // Settings values
   const [smtpConfig, setSmtpConfig] = useState({
-    host: '',
-    port: '587',
-    encryption: 'TLS',
-    username: '',
-    password: ''
+    host: initialGateway?.providerConfig?.host || '',
+    port: initialGateway?.providerConfig?.port || '587',
+    encryption: initialGateway?.providerConfig?.encryption || 'TLS',
+    username: initialGateway?.providerConfig?.username || '',
+    password: initialGateway?.providerConfig?.password || ''
   })
   const [isSavingSmtp, setIsSavingSmtp] = useState(false)
+  
+  const [isGatewayActive, setIsGatewayActive] = useState(initialGateway?.isActive ?? false)
+  const [isTogglingGateway, setIsTogglingGateway] = useState(false)
 
   // New Template State
   const [isNewTemplateModalOpen, setIsNewTemplateModalOpen] = useState(false)
@@ -91,10 +96,29 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
     const res = await saveNotificationGateway(tenantId, 'email', 'custom_smtp', smtpConfig)
     setIsSavingSmtp(false)
 
-    if (res.success) {
+    if (res.success && res.gateway) {
+      setGateway(res.gateway)
+      setIsGatewayActive(res.gateway.isActive)
       toast.success('SMTP Configuration Saved')
     } else {
       toast.error(res.error || 'Failed to save configuration')
+    }
+  }
+
+  const handleToggleGateway = async () => {
+    if (!gateway) {
+      toast.error('Save configuration first')
+      return
+    }
+    setIsTogglingGateway(true)
+    const newState = !isGatewayActive
+    const res = await toggleNotificationGateway(tenantId, gateway.id, newState)
+    setIsTogglingGateway(false)
+    if (res.success) {
+      setIsGatewayActive(newState)
+      toast.success(`Gateway ${newState ? 'enabled' : 'disabled'}`)
+    } else {
+      toast.error(res.error || 'Failed to toggle gateway')
     }
   }
 
@@ -201,7 +225,25 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
           <table className="data-table">
             <thead><tr><th>Recipient</th><th>Template</th><th>Channel</th><th>Status</th><th>Time</th></tr></thead>
             <tbody>
-              <tr><td colSpan={5} className="text-center text-slate-500 py-8">No recent notification logs found.</td></tr>
+              {logs.map((log: any) => (
+                <tr key={log.id}>
+                  <td className="font-medium text-slate-800 text-sm">{log.recipient}</td>
+                  <td className="text-xs text-slate-500 font-mono">{log.channelType}</td>
+                  <td>
+                    <span className={cn('badge text-[10px] uppercase', log.channelType === 'email' ? 'badge-blue' : 'badge-emerald')}>{log.channelType}</span>
+                  </td>
+                  <td>
+                    <div className="flex items-center gap-1">
+                      <span className={cn('badge text-[10px]', log.status === 'delivered' ? 'badge-success' : (log.status === 'pending' ? 'badge-amber' : 'badge-error'))}>{log.status.toUpperCase()}</span>
+                      {log.retryCount > 0 && <span className="text-[10px] text-slate-400">({log.retryCount} retries)</span>}
+                    </div>
+                  </td>
+                  <td className="text-xs text-slate-500">{new Date(log.createdAt).toLocaleString()}</td>
+                </tr>
+              ))}
+              {logs.length === 0 && (
+                <tr><td colSpan={5} className="text-center text-slate-500 py-8">No recent notification logs found.</td></tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -209,7 +251,22 @@ export function NotificationsClient({ initialTemplates, tenantId }: { initialTem
 
       {activeTab === 'settings' && (
         <div className="card p-5 max-w-2xl">
-          <h3 className="text-sm font-semibold text-slate-900 mb-4">SMTP Configuration</h3>
+          <div className="flex items-center justify-between mb-6 border-b border-slate-100 pb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">SMTP Configuration</h3>
+              <p className="text-xs text-slate-500">Enable or configure your email gateway</p>
+            </div>
+            {gateway && (
+              <button 
+                onClick={handleToggleGateway} 
+                disabled={isTogglingGateway}
+                className={cn('px-4 py-1.5 rounded-full text-xs font-medium transition-colors', isGatewayActive ? 'bg-emerald-100 text-emerald-700 hover:bg-emerald-200' : 'bg-slate-100 text-slate-600 hover:bg-slate-200')}
+              >
+                {isTogglingGateway ? <Loader2 className="w-3 h-3 animate-spin inline mr-1" /> : null}
+                {isGatewayActive ? 'Gateway Enabled' : 'Gateway Disabled'}
+              </button>
+            )}
+          </div>
           <div className="space-y-4">
             <div>
               <label className="form-label">SMTP Host</label>

@@ -62,6 +62,8 @@ model SystemTenant {
   featureOverrides   TenantFeatureOverride[]
   tenantOrderItems   TenantOrderItem[]
   tenantUserRoles    TenantUserRole[]
+  notifLogs          TenantNotificationLog[]
+  incidentLogs       TenantIncidentLog[]
 
   @@map("system_tenants")
 }
@@ -261,11 +263,11 @@ model TenantInvitation {
 // ============================================================
 
 model TenantWebsite {
-  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId          String   @unique @map("tenant_id") @db.Uuid
-  siteTitle         String   @map("site_title") @db.VarChar(255)
-  faviconUrl        String?  @map("favicon_url") @db.Text
-  themeConfig       Json     @default("{}") @map("theme_config")
+  id                            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId                      String   @unique @map("tenant_id") @db.Uuid
+  siteTitle                     String   @map("site_title") @db.VarChar(255)
+  faviconUrl                    String?  @map("favicon_url") @db.Text
+  themeConfig                   Json     @default("{}") @map("theme_config")
   globalSeoMetadata             Json     @default("{\"keywords\":[],\"description\":\"\"}") @map("global_seo_metadata")
   isActive                      Boolean  @default(true) @map("is_active")
   xenditEncryptedSecret         String?  @map("xendit_encrypted_secret") @db.Text
@@ -277,7 +279,7 @@ model TenantWebsite {
   midtransEncryptedServerKeyIv  String?  @map("midtrans_encrypted_server_key_iv") @db.VarChar(64)
   midtransEnabled               Boolean  @default(false) @map("midtrans_enabled")
   createdAt                     DateTime @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
+  updatedAt                     DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
@@ -402,6 +404,7 @@ model TenantOrder {
   promoCode       String?     @map("promo_code") @db.VarChar(50)
   discountAmount  Decimal     @default(0) @map("discount_amount") @db.Decimal(12, 2)
   notes           String?     @db.Text
+  receiptUrl      String?     @map("receipt_url") @db.Text
   createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz
   updatedAt       DateTime    @updatedAt @map("updated_at") @db.Timestamptz
 
@@ -558,6 +561,7 @@ model TenantInventoryBalance {
   quantityOnHand    Int      @default(0) @map("quantity_on_hand")
   quantityReserved  Int      @default(0) @map("quantity_reserved")
   lowStockThreshold Int      @default(5) @map("low_stock_threshold")
+  status            String   @default("in_stock") @map("stock_status") @db.VarChar(32)
   updatedAt         DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant      SystemTenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -633,17 +637,18 @@ model TenantBookingResource {
 }
 
 model TenantBooking {
-  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenantId      String        @map("tenant_id") @db.Uuid
-  resourceId    String        @map("resource_id") @db.Uuid
-  customerId    String        @map("customer_id") @db.Uuid
-  bookingStatus BookingStatus @default(pending_payment) @map("booking_status")
-  startTime     DateTime      @map("start_time") @db.Timestamptz
-  endTime       DateTime      @map("end_time") @db.Timestamptz
-  metadata      Json          @default("{}")
-  notes         String?       @db.Text
-  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz
-  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz
+  id              String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId        String        @map("tenant_id") @db.Uuid
+  resourceId      String        @map("resource_id") @db.Uuid
+  customerId      String        @map("customer_id") @db.Uuid
+  bookingStatus   BookingStatus @default(pending_payment) @map("booking_status")
+  startTime       DateTime      @map("start_time") @db.Timestamptz
+  endTime         DateTime      @map("end_time") @db.Timestamptz
+  paymentIntentId String?       @map("payment_intent_id") @db.VarChar(255)
+  metadata        Json          @default("{}")
+  notes           String?       @db.Text
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant   SystemTenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   resource TenantBookingResource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
@@ -707,7 +712,8 @@ model TenantNotificationGateway {
   isActive             Boolean  @default(true) @map("is_active")
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz
 
-  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  tenant SystemTenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  logs   TenantNotificationLog[]
 
   @@unique([tenantId, channelType, providerName])
   @@map("tenant_notification_gateways")
@@ -728,6 +734,25 @@ model TenantNotificationTemplate {
   @@unique([tenantId, templateKey])
   @@index([tenantId, templateKey])
   @@map("tenant_notification_templates")
+}
+
+model TenantNotificationLog {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String    @map("tenant_id") @db.Uuid
+  gatewayId     String?   @map("gateway_id") @db.Uuid
+  recipient     String    @db.VarChar(255)
+  channelType   String    @map("channel_type") @db.VarChar(32)
+  status        String    @default("pending") @db.VarChar(32)
+  deliveryError String?   @map("delivery_error") @db.Text
+  sentAt        DateTime? @map("sent_at") @db.Timestamptz
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  retryCount    Int       @default(0) @map("retry_count")
+
+  tenant  SystemTenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  gateway TenantNotificationGateway? @relation(fields: [gatewayId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("tenant_notification_logs")
 }
 
 // ============================================================
@@ -881,6 +906,23 @@ model SystemAuditLog {
 
   @@index([tenantId, createdAt(sort: Desc)])
   @@map("system_audit_logs")
+}
+
+model TenantIncidentLog {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String    @map("tenant_id") @db.Uuid
+  status      String    @default("investigating") @db.VarChar(32)
+  title       String    @db.VarChar(255)
+  description String    @db.Text
+  serviceName String    @map("service_name") @db.VarChar(100)
+  resolvedAt  DateTime? @map("resolved_at") @db.Timestamptz
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@map("tenant_incident_logs")
 }
 
 model SystemBackupLedger {

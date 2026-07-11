@@ -24,6 +24,57 @@ export async function getInventory(tenantId: string) {
   }
 }
 
+// ------------------------------------------------------------------
+// LOCATIONS CRUD
+// ------------------------------------------------------------------
+
+export async function createLocation(tenantId: string, locationName: string, locationType: string = 'warehouse') {
+  try {
+    const loc = await prisma.tenantInventoryLocation.create({
+      data: { tenantId, locationName, locationType }
+    })
+    revalidatePath('/admin/inventory')
+    return { success: true, location: loc }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateLocation(tenantId: string, locationId: string, data: { locationName?: string, locationType?: string, isActive?: boolean }) {
+  try {
+    const loc = await prisma.tenantInventoryLocation.update({
+      where: { id: locationId, tenantId },
+      data
+    })
+    revalidatePath('/admin/inventory')
+    return { success: true, location: loc }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function deleteLocation(tenantId: string, locationId: string) {
+  try {
+    await prisma.tenantInventoryLocation.deleteMany({
+      where: { id: locationId, tenantId }
+    })
+    revalidatePath('/admin/inventory')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+// ------------------------------------------------------------------
+// BALANCES CRUD
+// ------------------------------------------------------------------
+
+function computeStatus(qty: number, threshold: number): string {
+  if (qty <= 0) return 'critical'
+  if (qty <= threshold) return 'low'
+  return 'optimal'
+}
+
 export async function adjustInventory(tenantId: string, balanceId: string, quantityAdjustment: number) {
   try {
     const balance = await prisma.tenantInventoryBalance.findUnique({
@@ -38,7 +89,8 @@ export async function adjustInventory(tenantId: string, balanceId: string, quant
     const updated = await prisma.tenantInventoryBalance.update({
       where: { id: balanceId },
       data: {
-        quantityOnHand: newQty
+        quantityOnHand: newQty,
+        status: newStatus
       }
     })
 
@@ -71,7 +123,10 @@ export async function transferStock(tenantId: string, sourceLocationId: string, 
       // Deduct from source
       await tx.tenantInventoryBalance.update({
         where: { id: sourceBalance.id },
-        data: { quantityOnHand: sourceBalance.quantityOnHand - quantity }
+        data: { 
+          quantityOnHand: sourceBalance.quantityOnHand - quantity,
+          status: computeStatus(sourceBalance.quantityOnHand - quantity, sourceBalance.lowStockThreshold)
+        }
       })
 
       // Add to target
@@ -83,7 +138,10 @@ export async function transferStock(tenantId: string, sourceLocationId: string, 
         if (targetBalance.tenantId !== tenantId) throw new Error('Target balance tenant mismatch')
         await tx.tenantInventoryBalance.update({
           where: { id: targetBalance.id },
-          data: { quantityOnHand: targetBalance.quantityOnHand + quantity }
+          data: { 
+            quantityOnHand: targetBalance.quantityOnHand + quantity,
+            status: computeStatus(targetBalance.quantityOnHand + quantity, targetBalance.lowStockThreshold)
+          }
         })
       } else {
         await tx.tenantInventoryBalance.create({
@@ -91,7 +149,8 @@ export async function transferStock(tenantId: string, sourceLocationId: string, 
             tenantId,
             locationId: targetLocationId,
             catalogItemId,
-            quantityOnHand: quantity
+            quantityOnHand: quantity,
+            status: computeStatus(quantity, 5)
           }
         })
       }
@@ -121,7 +180,8 @@ export async function addInventoryBalance(tenantId: string, locationId: string, 
         locationId,
         catalogItemId,
         quantityOnHand: quantity,
-        lowStockThreshold
+        lowStockThreshold,
+        status: computeStatus(quantity, lowStockThreshold)
       },
       include: { catalogItem: true, location: true }
     })
@@ -141,9 +201,13 @@ export async function updateInventoryBalance(tenantId: string, balanceId: string
 
     if (!balance) return { success: false, error: 'Balance not found' }
 
+    const qty = data.quantityOnHand ?? balance.quantityOnHand
+    const threshold = data.lowStockThreshold ?? balance.lowStockThreshold
+    const status = computeStatus(qty, threshold)
+
     const updated = await prisma.tenantInventoryBalance.update({
       where: { id: balanceId },
-      data,
+      data: { ...data, status },
       include: { catalogItem: true, location: true }
     })
 

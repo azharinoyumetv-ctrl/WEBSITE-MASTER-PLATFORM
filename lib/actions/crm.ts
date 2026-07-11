@@ -55,3 +55,99 @@ export async function createCrmContact(tenantId: string, data: { firstName: stri
     return { success: false, error: error.message }
   }
 }
+
+export async function updateCrmContact(tenantId: string, id: string, data: any) {
+  try {
+    const contact = await prisma.tenantCrmContact.update({
+      where: { id, tenantId },
+      data
+    })
+    revalidatePath('/admin/crm')
+    return { success: true, contact }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function deleteCrmContact(tenantId: string, id: string) {
+  try {
+    await prisma.tenantCrmContact.delete({
+      where: { id, tenantId }
+    })
+    revalidatePath('/admin/crm')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function addTimelineEvent(tenantId: string, contactId: string, eventType: string, eventPayload: any) {
+  try {
+    const event = await prisma.tenantCrmTimeline.create({
+      data: {
+        tenantId,
+        contactId,
+        eventType,
+        sourceModule: 'crm',
+        eventPayload,
+        occurredAt: new Date()
+      }
+    })
+    revalidatePath('/admin/crm')
+    return { success: true, event }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function sendTimelineWhatsApp(tenantId: string, contactId: string, message: string) {
+  try {
+    const contact = await prisma.tenantCrmContact.findUnique({
+      where: { id: contactId, tenantId }
+    })
+    if (!contact || !contact.phoneNumber) throw new Error('Contact has no phone number')
+
+    const token = process.env.META_WA_TOKEN
+    const phoneId = process.env.META_WA_PHONE_ID
+    
+    // 1. Send via Meta Graph API
+    if (token && phoneId) {
+      const response = await fetch(`https://graph.facebook.com/v17.0/${phoneId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          messaging_product: 'whatsapp',
+          to: contact.phoneNumber.replace(/\D/g, ''),
+          type: 'text',
+          text: { body: message }
+        })
+      })
+      if (!response.ok) {
+        const err = await response.text()
+        console.error('WhatsApp API Error:', err)
+        throw new Error('WhatsApp API delivery failed')
+      }
+    } else {
+      console.warn('WhatsApp API not configured, simulating delivery')
+    }
+
+    // 2. Record in timeline
+    const event = await prisma.tenantCrmTimeline.create({
+      data: {
+        tenantId,
+        contactId,
+        eventType: 'whatsapp_sent',
+        sourceModule: 'crm',
+        eventPayload: { message, status: 'sent' },
+        occurredAt: new Date()
+      }
+    })
+    revalidatePath('/admin/crm')
+    return { success: true, event }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

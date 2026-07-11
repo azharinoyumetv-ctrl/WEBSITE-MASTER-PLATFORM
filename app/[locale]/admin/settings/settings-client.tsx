@@ -101,7 +101,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
     if (res.success && aiRes.success && paymentRes.success) {
       toast.success('Settings saved successfully')
     } else {
-      toast.error(res.error || aiRes.error || paymentRes.error || 'Failed to save settings')
+      toast.error(res.error?.toString() || aiRes.error?.toString() || paymentRes.error?.toString() || 'Failed to save settings')
     }
   }
 

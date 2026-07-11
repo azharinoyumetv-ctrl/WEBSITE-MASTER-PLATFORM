@@ -4,14 +4,18 @@ import { useState, useEffect } from 'react'
 import { Monitor, ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, QrCode, Search, Wifi, WifiOff, Clock } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { processPosPayment } from '@/lib/actions/pos'
+import { processPosPayment, openSession, closeSession, generateReceipt } from '@/lib/actions/pos'
 
-export function PosClient({ initialTerminal, initialCatalogItems, tenantId, baseCurrency = 'USD' }: { initialTerminal: any, initialCatalogItems: any[], tenantId: string, baseCurrency?: string }) {
+export function PosClient({ initialTerminal, initialCatalogItems, initialSession, tenantId, userId, baseCurrency = 'USD' }: { initialTerminal: any, initialCatalogItems: any[], initialSession: any, tenantId: string, userId: string, baseCurrency?: string }) {
   const [cart, setCart] = useState<Array<{id: string; title: string; price: number; qty: number}>>([])
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'qr'>('card')
   const [isProcessing, setIsProcessing] = useState(false)
   const [time, setTime] = useState(new Date())
   const [search, setSearch] = useState('')
+  const [activeSession, setActiveSession] = useState(initialSession)
+  const [shiftAmount, setShiftAmount] = useState('0')
+  const [showShiftModal, setShowShiftModal] = useState(!initialSession)
+  const [receiptHtml, setReceiptHtml] = useState<string | null>(null)
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000)
@@ -51,9 +55,80 @@ export function PosClient({ initialTerminal, initialCatalogItems, tenantId, base
     if (res.success) {
       toast.success(`Payment of ${formatCurrency(grandTotal, baseCurrency)} processed via ${paymentMethod.toUpperCase()}`)
       setCart([])
+      
+      // Generate receipt
+      const receiptRes = await generateReceipt(tenantId, res.order.id)
+      if (receiptRes.success) setReceiptHtml(receiptRes.receiptHtml)
     } else {
       toast.error(res.error || 'Failed to process payment')
     }
+  }
+
+  const handleOpenShift = async () => {
+    setIsProcessing(true)
+    const res = await openSession(tenantId, initialTerminal.id, userId, parseFloat(shiftAmount) || 0)
+    setIsProcessing(false)
+    if (res.success) {
+      setActiveSession(res.session)
+      setShowShiftModal(false)
+      toast.success('Shift opened successfully')
+    } else toast.error(res.error)
+  }
+
+  const handleCloseShift = async () => {
+    if(!activeSession) return
+    setIsProcessing(true)
+    const res = await closeSession(tenantId, activeSession.id, userId, parseFloat(shiftAmount) || 0)
+    setIsProcessing(false)
+    if (res.success) {
+      setActiveSession(null)
+      setShowShiftModal(true)
+      setShiftAmount('0')
+      toast.success('Shift closed successfully')
+    } else toast.error(res.error)
+  }
+
+  if (showShiftModal) {
+    return (
+      <div className="h-screen bg-gray-950 flex flex-col items-center justify-center p-4">
+        <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
+          <div className="flex items-center gap-4 mb-6 pb-6 border-b border-gray-800">
+            <div className="w-12 h-12 rounded-xl bg-emerald-600/20 flex items-center justify-center">
+              <Monitor className="w-6 h-6 text-emerald-500" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">{initialTerminal?.terminalName || 'Terminal'}</h2>
+              <p className="text-gray-400 text-sm">Status: {activeSession ? 'Closing Shift' : 'Opening Shift'}</p>
+            </div>
+          </div>
+          
+          <div className="space-y-4 mb-8">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                {activeSession ? 'Closing Register Balance' : 'Opening Register Balance'}
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
+                <input 
+                  type="number" 
+                  value={shiftAmount}
+                  onChange={e => setShiftAmount(e.target.value)}
+                  className="w-full bg-gray-800 border border-gray-700 rounded-xl py-3 pl-8 pr-4 text-white font-medium focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
+              </div>
+            </div>
+          </div>
+          
+          <button 
+            onClick={activeSession ? handleCloseShift : handleOpenShift}
+            disabled={isProcessing}
+            className="w-full btn btn-primary py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
+          >
+            {isProcessing ? 'Processing...' : activeSession ? 'Close Shift' : 'Open Shift'}
+          </button>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -74,7 +149,8 @@ export function PosClient({ initialTerminal, initialCatalogItems, tenantId, base
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3 text-gray-400 text-xs">
+          <div className="flex items-center gap-4 text-gray-400 text-xs">
+            <button onClick={() => { setShiftAmount('0'); setShowShiftModal(true); }} className="text-emerald-400 hover:text-emerald-300 underline font-medium">Close Shift</button>
             <div className="flex items-center gap-1.5">
               <Wifi className="w-3.5 h-3.5 text-emerald-400" />
               <span>Online</span>
@@ -237,6 +313,22 @@ export function PosClient({ initialTerminal, initialCatalogItems, tenantId, base
           </button>
         </div>
       </div>
+
+      {/* Receipt Modal */}
+      {receiptHtml && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 flex flex-col items-center">
+            <div className="w-full max-h-[60vh] overflow-y-auto mb-6 border border-gray-200 p-2" dangerouslySetInnerHTML={{__html: receiptHtml}} />
+            <div className="flex gap-3 w-full">
+              <button onClick={() => setReceiptHtml(null)} className="btn btn-secondary flex-1">Close</button>
+              <button onClick={() => {
+                const w = window.open(); 
+                if(w) { w.document.write(receiptHtml); w.print(); w.close(); }
+              }} className="btn btn-primary flex-1 bg-emerald-600 border-0 hover:bg-emerald-700">Print</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

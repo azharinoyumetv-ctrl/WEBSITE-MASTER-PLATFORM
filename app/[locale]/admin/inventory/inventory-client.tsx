@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Warehouse, AlertTriangle, CheckCircle2, TrendingDown, MapPin, Package, RefreshCw, ArrowUpDown, Search, Loader2, Plus, Edit2, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { adjustInventory, transferStock, addInventoryBalance, updateInventoryBalance, deleteInventoryBalance } from '@/lib/actions/inventory'
+import { adjustInventory, transferStock, addInventoryBalance, updateInventoryBalance, deleteInventoryBalance, createLocation, updateLocation, deleteLocation } from '@/lib/actions/inventory'
 
 const STATUS_CONFIG = {
   optimal: { label: 'Optimal', color: 'badge-success', icon: CheckCircle2 },
@@ -14,11 +14,19 @@ const STATUS_CONFIG = {
 
 export function InventoryClient({ initialLocations, initialBalances, catalogItems, tenantId }: { initialLocations: any[], initialBalances: any[], catalogItems: any[], tenantId: string }) {
   const [balances, setBalances] = useState(initialBalances)
+  const [locations, setLocations] = useState(initialLocations)
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [adjustModal, setAdjustModal] = useState<any | null>(null)
   const [adjustQty, setAdjustQty] = useState('')
   const [isAdjusting, setIsAdjusting] = useState(false)
+
+  // Location Management State
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
+  const [locationName, setLocationName] = useState('')
+  const [locationType, setLocationType] = useState('warehouse')
+  const [editingLocation, setEditingLocation] = useState<any | null>(null)
+  const [isSavingLocation, setIsSavingLocation] = useState(false)
 
   // Add State
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
@@ -43,8 +51,10 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
   const [isTransferring, setIsTransferring] = useState(false)
 
   // Sync state if initial balances change via revalidatePath
-  // (Next.js passes new props after server action invalidates cache)
-  useEffect(() => { setBalances(initialBalances) }, [initialBalances])
+  useEffect(() => { 
+    setBalances(initialBalances)
+    setLocations(initialLocations)
+  }, [initialBalances, initialLocations])
 
   const filteredBalances = balances.filter(b => {
     const matchSearch = b.catalogItem?.title?.toLowerCase().includes(search.toLowerCase()) || false
@@ -154,6 +164,46 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
     }
   }
 
+  const handleSaveLocation = async () => {
+    if (!locationName) {
+      toast.error('Location name is required')
+      return
+    }
+    setIsSavingLocation(true)
+    if (editingLocation) {
+      const res = await updateLocation(tenantId, editingLocation.id, { locationName, locationType })
+      if (res.success) {
+        toast.success('Location updated')
+        setLocations(prev => prev.map(l => l.id === editingLocation.id ? res.location : l))
+        setIsLocationModalOpen(false)
+      } else {
+        toast.error(res.error || 'Failed to update location')
+      }
+    } else {
+      const res = await createLocation(tenantId, locationName, locationType)
+      if (res.success) {
+        toast.success('Location created')
+        setLocations(prev => [...prev, res.location])
+        setIsLocationModalOpen(false)
+      } else {
+        toast.error(res.error || 'Failed to create location')
+      }
+    }
+    setIsSavingLocation(false)
+  }
+
+  const handleDeleteLocation = async (id: string) => {
+    if (!confirm('Are you sure? This will delete all inventory in this location.')) return
+    const res = await deleteLocation(tenantId, id)
+    if (res.success) {
+      toast.success('Location deleted')
+      setLocations(prev => prev.filter(l => l.id !== id))
+      if (selectedLocation === id) setSelectedLocation(null)
+    } else {
+      toast.error(res.error || 'Failed to delete location')
+    }
+  }
+
   return (
     <div className="page-container animate-slide-up">
       <div className="section-header">
@@ -177,7 +227,7 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
           { label: 'Total Stock Units', value: totalItems, icon: Package, color: 'bg-indigo-600' },
-          { label: 'Locations', value: initialLocations.length, icon: MapPin, color: 'bg-blue-600' },
+          { label: 'Locations', value: locations.length, icon: MapPin, color: 'bg-blue-600' },
           { label: 'Low Stock', value: lowCount, icon: AlertTriangle, color: 'bg-amber-500' },
           { label: 'Critical', value: criticalCount, icon: TrendingDown, color: 'bg-red-500' },
         ].map(s => (
@@ -205,7 +255,15 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
         {/* Locations sidebar */}
         <div className="lg:col-span-1">
           <div className="card p-4">
-            <h3 className="text-sm font-semibold text-slate-900 mb-3">Locations</h3>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-slate-900">Locations</h3>
+              <button 
+                onClick={() => { setEditingLocation(null); setLocationName(''); setLocationType('warehouse'); setIsLocationModalOpen(true) }}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-medium flex items-center gap-1"
+              >
+                <Plus className="w-3 h-3" /> Add
+              </button>
+            </div>
             <div className="space-y-1">
               <button
                 onClick={() => setSelectedLocation(null)}
@@ -213,18 +271,27 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
               >
                 All Locations
               </button>
-              {initialLocations.map(loc => (
-                <button
-                  key={loc.id}
-                  onClick={() => setSelectedLocation(loc.id)}
-                  className={cn('w-full text-left px-3 py-2 rounded-lg text-sm transition-colors', selectedLocation === loc.id ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-50')}
-                >
-                  <div className="flex items-center gap-2">
-                    <div className={cn('w-2 h-2 rounded-full', loc.isActive ? 'bg-emerald-500' : 'bg-slate-300')} />
-                    <span className="truncate">{loc.locationName}</span>
+              {locations.map(loc => (
+                <div key={loc.id} className="group relative flex items-center">
+                  <button
+                    onClick={() => setSelectedLocation(loc.id)}
+                    className={cn('flex-1 text-left px-3 py-2 rounded-lg text-sm transition-colors', selectedLocation === loc.id ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-50')}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className={cn('w-2 h-2 rounded-full', loc.isActive ? 'bg-emerald-500' : 'bg-slate-300')} />
+                      <span className="truncate">{loc.locationName}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 ml-4 mt-0.5 capitalize">{loc.locationType}</p>
+                  </button>
+                  <div className="absolute right-2 opacity-0 group-hover:opacity-100 flex items-center gap-1">
+                    <button onClick={() => { setEditingLocation(loc); setLocationName(loc.locationName); setLocationType(loc.locationType); setIsLocationModalOpen(true) }} className="p-1 hover:bg-slate-200 rounded">
+                      <Edit2 className="w-3 h-3 text-slate-500" />
+                    </button>
+                    <button onClick={() => handleDeleteLocation(loc.id)} className="p-1 hover:bg-red-100 rounded">
+                      <Trash2 className="w-3 h-3 text-red-500" />
+                    </button>
                   </div>
-                  <p className="text-xs text-slate-400 ml-4 mt-0.5 capitalize">{loc.locationType}</p>
-                </button>
+                </div>
               ))}
             </div>
           </div>
@@ -474,6 +541,38 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
               <button onClick={handleEdit} disabled={isEditing} className="btn btn-primary">
                 {isEditing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 {isEditing ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Location Modal */}
+      {isLocationModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-modal w-full max-w-sm animate-scale-in">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-semibold">{editingLocation ? 'Edit Location' : 'New Location'}</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="form-label">Location Name</label>
+                <input type="text" value={locationName} onChange={(e) => setLocationName(e.target.value)} className="form-input" placeholder="e.g. Main Warehouse" />
+              </div>
+              <div>
+                <label className="form-label">Location Type</label>
+                <select className="form-select" value={locationType} onChange={(e) => setLocationType(e.target.value)}>
+                  <option value="warehouse">Warehouse</option>
+                  <option value="storefront">Storefront</option>
+                  <option value="supplier">Supplier Dropship</option>
+                </select>
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+              <button onClick={() => setIsLocationModalOpen(false)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleSaveLocation} disabled={isSavingLocation} className="btn btn-primary">
+                {isSavingLocation ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {isSavingLocation ? 'Saving...' : 'Save Location'}
               </button>
             </div>
           </div>

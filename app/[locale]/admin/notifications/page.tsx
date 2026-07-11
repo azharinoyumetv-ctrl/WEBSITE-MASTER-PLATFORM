@@ -1,4 +1,4 @@
-import { getNotificationTemplates } from '@/lib/actions/notifications'
+import { getNotificationTemplates, getNotificationLogs, getNotificationGateway } from '@/lib/actions/notifications'
 import { NotificationsClient } from './notifications-client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -18,7 +18,11 @@ export default async function NotificationsPage() {
     return <div className="p-8 text-red-500">Error: No tenant context found.</div>
   }
 
-  const res = await getNotificationTemplates(tenantId)
+  const [res, logsRes, gatewayRes] = await Promise.all([
+    getNotificationTemplates(tenantId),
+    getNotificationLogs(tenantId),
+    getNotificationGateway(tenantId, 'email')
+  ])
 
   if (!res.success) {
     const errorMsg = (res as any).error || 'Unknown error'
@@ -37,5 +41,10 @@ export default async function NotificationsPage() {
 
   const initialTemplates = res.templates!
 
-  return <NotificationsClient initialTemplates={initialTemplates} tenantId={tenantId} />
+  return <NotificationsClient 
+    initialTemplates={initialTemplates} 
+    initialLogs={logsRes.success ? (logsRes as any).logs : []}
+    initialGateway={gatewayRes.success ? (gatewayRes as any).gateway : null}
+    tenantId={tenantId} 
+  />
 }

@@ -36,8 +36,10 @@ export default async function POSPage() {
     <PosClient 
       initialTerminal={res.terminal} 
       initialCatalogItems={res.catalogItems} 
+      initialSession={res.activeSession}
       tenantId={tenantId} 
       baseCurrency={baseCurrency}
+      userId={(session.user as any).id}
     />
   )
 }

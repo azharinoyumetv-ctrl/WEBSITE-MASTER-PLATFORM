@@ -90,6 +90,19 @@ export async function saveNotificationGateway(tenantId: string, channelType: str
   }
 }
 
+export async function toggleNotificationGateway(tenantId: string, gatewayId: string, isActive: boolean) {
+  try {
+    const gateway = await prisma.tenantNotificationGateway.update({
+      where: { id: gatewayId, tenantId },
+      data: { isActive }
+    })
+    revalidatePath('/admin/notifications')
+    return { success: true, gateway }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
 export async function createNotificationTemplate(tenantId: string, data: { templateKey: string, channelType: string, subjectLine?: string, htmlBodyMarkup: string }) {
   try {
     const template = await prisma.tenantNotificationTemplate.create({
@@ -123,7 +136,83 @@ export async function dispatchTestNotification(tenantId: string, templateId: str
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 800))
     
+    // Log the dispatch
+    const gateway = await prisma.tenantNotificationGateway.findFirst({
+      where: { tenantId, channelType: template.channelType, isActive: true }
+    })
+    
+    await prisma.tenantNotificationLog.create({
+      data: {
+        tenantId,
+        gatewayId: gateway?.id,
+        recipient: 'test@example.com',
+        channelType: template.channelType,
+        status: 'delivered',
+        sentAt: new Date()
+      }
+    })
+    
     return { success: true, message: `Test ${template.channelType.toUpperCase()} dispatched successfully.` }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function dispatchNotification(tenantId: string, recipient: string, channelType: string) {
+  try {
+    const gateway = await prisma.tenantNotificationGateway.findFirst({
+      where: { tenantId, channelType, isActive: true }
+    })
+
+    const log = await prisma.tenantNotificationLog.create({
+      data: {
+        tenantId,
+        gatewayId: gateway?.id,
+        recipient,
+        channelType,
+        status: 'pending'
+      }
+    })
+
+    return { success: true, log }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function processNotificationQueue(tenantId: string) {
+  try {
+    const pendingLogs = await prisma.tenantNotificationLog.findMany({
+      where: { tenantId, status: { in: ['pending', 'failed'] }, retryCount: { lt: 3 } },
+      take: 10
+    })
+    
+    for (const log of pendingLogs) {
+      const isSuccess = Math.random() > 0.3 // 70% success rate mock
+      await prisma.tenantNotificationLog.update({
+        where: { id: log.id },
+        data: {
+          status: isSuccess ? 'delivered' : 'failed',
+          sentAt: isSuccess ? new Date() : null,
+          retryCount: { increment: 1 },
+          deliveryError: isSuccess ? null : 'Simulated network timeout'
+        }
+      })
+    }
+    return { success: true, processed: pendingLogs.length }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function getNotificationLogs(tenantId: string) {
+  try {
+    const logs = await prisma.tenantNotificationLog.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' },
+      take: 100
+    })
+    return { success: true, logs }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

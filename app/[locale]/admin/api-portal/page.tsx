@@ -18,8 +18,8 @@ export default async function ApiPortalPage() {
   }
 
   const res = await getApiData(tenantId)
-  const initialKeys = res.success ? res.keys : []
-  const initialWebhooks = res.success ? res.webhooks : []
+  const keys = (res.success && Array.isArray((res as any).keys)) ? (res as any).keys : []
+  const hooks = (res.success && Array.isArray((res as any).webhooks)) ? (res as any).webhooks : []
 
-  return <ApiPortalClient initialKeys={initialKeys} initialWebhooks={initialWebhooks} tenantId={tenantId} />
+  return <ApiPortalClient initialKeys={keys} initialWebhooks={hooks} tenantId={tenantId} />
 }
