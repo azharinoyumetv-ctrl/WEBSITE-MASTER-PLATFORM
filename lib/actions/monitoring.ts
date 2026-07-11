@@ -84,3 +84,23 @@ export async function getIncidentLogs(tenantId: string) {
     return { success: false, error: error.message }
   }
 }
+
+export async function getUnreadAlertCount(tenantId: string) {
+  try {
+    const incidentCount = await prisma.tenantIncidentLog.count({
+      where: { tenantId, status: 'investigating' }
+    })
+    
+    const failedNotifs = await prisma.tenantNotificationLog.count({
+      where: { 
+        gateway: { tenantId },
+        status: 'FAILED',
+        createdAt: { gte: new Date(Date.now() - 24 * 60 * 60 * 1000) }
+      }
+    })
+    
+    return { count: incidentCount + failedNotifs }
+  } catch (error) {
+    return { count: 0 }
+  }
+}

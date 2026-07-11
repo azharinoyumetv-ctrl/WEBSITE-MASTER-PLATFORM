@@ -52,6 +52,7 @@ export function FeatureFlagsClient({ initialFlags, tenantId }: { initialFlags: a
           <thead>
             <tr>
               <th>Flag Key & Description</th>
+              <th>Environment</th>
               <th>System Default</th>
               <th>Rollout %</th>
               <th className="text-right">Tenant Override</th>
@@ -66,6 +67,9 @@ export function FeatureFlagsClient({ initialFlags, tenantId }: { initialFlags: a
                     <span className="font-mono text-sm font-semibold text-slate-800">{flag.flagKey}</span>
                   </div>
                   <p className="text-xs text-slate-500 max-w-md">{flag.description}</p>
+                </td>
+                <td>
+                  <span className="text-xs font-mono text-slate-500 uppercase tracking-wider">{flag.environment || 'production'}</span>
                 </td>
                 <td>
                   <span className={cn('badge text-[10px]', flag.defaultState ? 'badge-success' : 'badge-neutral')}>

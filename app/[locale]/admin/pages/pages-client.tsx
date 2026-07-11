@@ -4,13 +4,25 @@ import { useState } from 'react'
 import { Plus, Edit2, Trash2, Globe, Eye, FileText, CheckCircle2, XCircle, LayoutTemplate, Save, Loader2 } from 'lucide-react'
 import { cn, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { saveAdminPage } from '@/lib/actions/website'
+import { saveAdminPage, deleteAdminPage } from '@/lib/actions/website'
 
 export function PagesClient({ initialPages, tenantId }: { initialPages: any[], tenantId: string }) {
   const [pages, setPages] = useState(initialPages)
   const [showEditor, setShowEditor] = useState(false)
   const [editingPage, setEditingPage] = useState<any>(null)
   const [isSaving, setIsSaving] = useState(false)
+  const [statusFilter, setStatusFilter] = useState('all') // 'all', 'published', 'draft'
+
+  const handleDelete = async (pageId: string) => {
+    if (!window.confirm('Are you sure you want to delete this page?')) return
+    const res = await deleteAdminPage(tenantId, pageId)
+    if (res.success) {
+      setPages(pages.filter((p: any) => p.id !== pageId))
+      toast.success('Page deleted')
+    } else {
+      toast.error('Failed to delete page: ' + res.error)
+    }
+  }
 
   const handleEdit = (page?: any) => {
     if (page) {
@@ -148,6 +160,12 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
     )
   }
 
+  const filteredPages = pages.filter((p: any) => {
+    if (statusFilter === 'published') return p.isPublished
+    if (statusFilter === 'draft') return !p.isPublished
+    return true
+  })
+
   return (
     <div className="page-container animate-slide-up">
       <div className="section-header">
@@ -159,6 +177,14 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
           <Plus className="w-4 h-4" />
           Create Page
         </button>
+      </div>
+
+      <div className="flex gap-2 mb-4">
+        <select className="form-select max-w-[200px]" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+          <option value="all">All Pages</option>
+          <option value="published">Published</option>
+          <option value="draft">Drafts</option>
+        </select>
       </div>
 
       <div className="card overflow-hidden">
@@ -173,13 +199,13 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
             </tr>
           </thead>
           <tbody>
-            {pages.length === 0 ? (
+            {filteredPages.length === 0 ? (
               <tr>
                 <td colSpan={5} className="text-center py-8 text-slate-500">
                   No pages found. Create your first page!
                 </td>
               </tr>
-            ) : pages.map((page) => (
+            ) : filteredPages.map((page: any) => (
               <tr key={page.id} className="group">
                 <td>
                   <div className="flex items-center gap-3">
@@ -211,6 +237,11 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
                     <button onClick={() => handleEdit(page)} className="btn btn-ghost btn-sm text-indigo-600">
                       <Edit2 className="w-4 h-4" />
                     </button>
+                    {page.slug !== 'home' && (
+                      <button onClick={() => handleDelete(page.id)} className="btn btn-ghost btn-sm text-red-500">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>

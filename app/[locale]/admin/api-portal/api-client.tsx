@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Code2, Key, Link2, Copy, Trash2, Eye, EyeOff, CheckCircle2, ShieldAlert, Plus, Zap, Loader2 } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { createApiKey, createWebhook, deleteApiKey, deleteWebhook, testWebhookDispatch } from '@/lib/actions/api'
+import { createApiKey, createWebhook, deleteApiKey, deleteWebhook, testWebhookDispatch, rotateApiKey } from '@/lib/actions/api'
 
 export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { initialKeys: any[], initialWebhooks: any[], tenantId: string }) {
   const [keys, setKeys] = useState(initialKeys)
@@ -39,6 +39,21 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
       toast.success('API Key deleted')
     } else {
       toast.error('Failed to delete key')
+    }
+  }
+
+  const handleRotateKey = async (id: string) => {
+    if (!confirm('Rotate this key? The old key will expire in 7 days.')) return
+    const res = await rotateApiKey(tenantId, id)
+    if (res.success && res.key) {
+      // Create a local var to avoid type errors in callbacks
+      const newKey = res.key
+      setKeys(keys.map(k => k.id === id ? { ...k, expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() } : k))
+      setKeys(prev => [newKey, ...prev])
+      toast.success('API Key rotated')
+      setShowKey(newKey.id)
+    } else {
+      toast.error('Failed to rotate key')
     }
   }
 
@@ -111,10 +126,21 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
                 <div className="flex items-start justify-between mb-2">
                   <div>
                     <h4 className="font-semibold text-sm text-slate-900">{k.keyName}</h4>
-                    <p className="text-xs text-slate-500 mt-0.5">Created {formatDate(k.createdAt)} · Used {k.lastUsedAt ? formatDate(k.lastUsedAt, 'relative') : 'Never'}</p>
+                    <p className="text-xs text-slate-500 mt-0.5">Created {formatDate(k.createdAt)} · Used {k.lastUsedAt ? formatDate(k.lastUsedAt, 'relative') : 'Never'} · {k.requestCount || 0} reqs</p>
+                    {k.expiresAt && <p className="text-xs text-red-500 mt-0.5">Expires {formatDate(k.expiresAt)}</p>}
+                    <div className="flex gap-1 mt-1">
+                      {k.scopes?.map((s: string) => (
+                        <span key={s} className="badge badge-neutral text-[9px]">{s}</span>
+                      ))}
+                    </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className={cn('badge text-[10px]', k.isActive ? 'badge-success' : 'badge-neutral')}>{k.isActive ? 'Active' : 'Revoked'}</span>
+                    <span className={cn('badge text-[10px]', k.isActive && !k.expiresAt ? 'badge-success' : k.expiresAt ? 'badge-warning' : 'badge-neutral')}>
+                      {k.isActive ? (k.expiresAt ? 'Expiring' : 'Active') : 'Revoked'}
+                    </span>
+                    <button onClick={() => handleRotateKey(k.id)} className="p-1 text-slate-400 hover:text-indigo-500 transition-colors" title="Rotate Key">
+                      <Zap className="w-4 h-4" />
+                    </button>
                     <button onClick={() => handleDeleteKey(k.id)} className="p-1 text-slate-400 hover:text-red-500 transition-colors" title="Revoke Key">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -188,6 +214,18 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
                   <p className="text-xs font-semibold text-slate-500 uppercase">Subscribed Events</p>
                   <div className="flex flex-wrap gap-1">
                     {(w.subscribedEvents as string[] || []).map((e: string) => <span key={e} className="text-[10px] px-1.5 py-0.5 bg-slate-100 text-slate-600 rounded font-mono">{e}</span>)}
+                  </div>
+                </div>
+
+                <div className="mt-3 space-y-1">
+                  <p className="text-xs font-semibold text-slate-500 uppercase">Signing Secret</p>
+                  <div className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
+                    <code className="text-[10px] font-mono text-slate-600 truncate flex-1">{w.secretSigningToken || 'Hidden'}</code>
+                    {w.secretSigningToken && (
+                      <button onClick={() => copyToClipboard(w.secretSigningToken)} className="text-slate-400 hover:text-indigo-500">
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    )}
                   </div>
                 </div>
 

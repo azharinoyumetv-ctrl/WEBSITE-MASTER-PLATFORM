@@ -3,7 +3,24 @@ import { NextResponse } from 'next/server'
 export async function POST(req: Request) {
   try {
     const body = await req.json()
-    const { providerKey, apiSecret, customBaseUrl } = body
+    const { providerKey, customBaseUrl } = body
+    let { apiSecret } = body
+
+    if (!apiSecret) {
+      const { getServerSession } = require('next-auth')
+      const { authOptions } = require('@/lib/auth')
+      const session = await getServerSession(authOptions)
+      if (session?.user) {
+        const { decrypt } = require('@/lib/crypto')
+        const prisma = require('@/lib/prisma').default
+        const config = await prisma.tenantAiConfiguration.findUnique({
+          where: { tenantId: (session.user as any).tenantId }
+        })
+        if (config?.encryptedApiSecret) {
+          apiSecret = decrypt(config.encryptedApiSecret)
+        }
+      }
+    }
 
     if (!apiSecret || !providerKey) {
       return NextResponse.json({ error: 'Missing provider or API key' }, { status: 400 })

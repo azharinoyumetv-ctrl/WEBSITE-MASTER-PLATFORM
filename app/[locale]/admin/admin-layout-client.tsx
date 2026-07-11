@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Globe, Users, Shield, Package, ShoppingCart,
   CreditCard, Monitor, Warehouse, Users2, CalendarCheck, Sparkles,
@@ -11,6 +11,7 @@ import {
   Activity, FileText, Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { getUnreadAlertCount } from '@/lib/actions/monitoring'
 
 type NavItem = {
   href: string
@@ -108,9 +109,9 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
           <Globe className="w-4 h-4 text-white" />
         </div>
         {!collapsed && (
-          <div>
-            <h2 className="text-white font-bold text-lg leading-tight">Master website platform</h2>
-            <p className="text-slate-400 text-[10px] uppercase tracking-wider mt-1"><span className="text-indigo-400 font-semibold italic">Modular website</span> Powered by DagangOS.</p>
+          <div className="overflow-hidden">
+            <h2 className="text-white font-bold text-lg leading-tight truncate">Website Master</h2>
+            <p className="text-slate-400 text-[10px] uppercase tracking-wider mt-0.5 truncate"><span className="text-indigo-400 font-semibold">Platform</span> / DagangOS</p>
           </div>
         )}
       </div>
@@ -198,9 +199,22 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
   )
 }
 
-function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () => void, tenant?: any }) {
+export function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () => void, tenant?: any }) {
   const pathname = usePathname()
   const t = useTranslations('AdminSidebar')
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [sysStatus, setSysStatus] = useState('operational')
+  
+  useEffect(() => {
+    if (tenant?.id) {
+      getUnreadAlertCount(tenant.id).then(res => {
+        if (res?.count !== undefined) {
+          setUnreadCount(res.count)
+          setSysStatus(res.count > 0 ? 'issues' : 'operational')
+        }
+      })
+    }
+  }, [tenant?.id])
   
   // Derive page title from pathname
   const getPageTitle = () => {
@@ -218,7 +232,7 @@ function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () => void
   }
 
   return (
-    <header className="h-16 border-b border-slate-200 bg-white/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6">
+    <header className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 md:px-6">
       <div className="flex items-center gap-3">
         <button
           onClick={onMobileMenuToggle}
@@ -236,16 +250,31 @@ function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () => void
         <LanguageSwitcher />
 
         {/* Status indicator */}
-        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full">
-          <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-          <span className="text-xs font-medium text-emerald-700">All Systems Operational</span>
+        <div className={cn(
+          "hidden sm:flex items-center gap-2 px-3 py-1.5 border rounded-full",
+          sysStatus === 'operational' ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"
+        )}>
+          <div className={cn(
+            "w-1.5 h-1.5 rounded-full animate-pulse",
+            sysStatus === 'operational' ? "bg-emerald-500" : "bg-amber-500"
+          )} />
+          <span className={cn(
+            "text-xs font-medium",
+            sysStatus === 'operational' ? "text-emerald-700" : "text-amber-700"
+          )}>
+            {sysStatus === 'operational' ? 'All Systems Operational' : 'Active Incidents'}
+          </span>
         </div>
 
         {/* Alert bell */}
-        <button className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors">
+        <Link href="/admin/notifications" className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors">
           <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-red-500 rounded-full" />
-        </button>
+          {unreadCount > 0 && (
+            <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
+        </Link>
 
         {/* Public site link */}
         <Link

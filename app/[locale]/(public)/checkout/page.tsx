@@ -1,4 +1,4 @@
-import { getTenantFromHost } from '@/lib/tenant'
+import { getPublicWebsiteConfig } from '@/lib/actions/website'
 import { getCatalogItems } from '@/lib/actions/catalog'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -6,23 +6,26 @@ import { CheckoutClient } from './checkout-client'
 import { Metadata } from 'next'
 
 export async function generateMetadata(): Promise<Metadata> {
-  const host = headers().get('host') || ''
-  const tenant = await getTenantFromHost(host)
+  const headersList = await headers()
+  const tenantDomain = headersList.get('x-tenant-id') || 'default'
+  const websiteRes = await getPublicWebsiteConfig(tenantDomain)
   return {
-    title: `Checkout - ${tenant?.name || 'Store'}`,
+    title: `Checkout - ${websiteRes.website?.siteTitle || 'Store'}`,
   }
 }
 
 export default async function CheckoutPage() {
-  const host = headers().get('host') || ''
-  const tenant = await getTenantFromHost(host)
+  const headersList = await headers()
+  const tenantDomain = headersList.get('x-tenant-id') || 'default'
+  const websiteRes = await getPublicWebsiteConfig(tenantDomain)
 
-  if (!tenant) {
-    redirect('/')
+  if (!websiteRes.success || !websiteRes.website) {
+    redirect('/404')
   }
-
-  const res = await getCatalogItems(tenant.id)
-  const items = res.items || []
+  
+  const tenantId = websiteRes.website.tenantId
+  const itemsRes = await getCatalogItems(tenantId)
+  const items = itemsRes.items || []
 
   return (
     <div className="min-h-screen bg-slate-50 py-12">

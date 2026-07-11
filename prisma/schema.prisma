@@ -48,6 +48,7 @@ model SystemTenant {
   crmTimeline        TenantCrmTimeline[]
   bookingResources   TenantBookingResource[]
   bookings           TenantBooking[]
+  configSnapshots    TenantConfigSnapshot[]
   aiConfiguration    TenantAiConfiguration?
   aiVectors          TenantAiKnowledgeVector[]
   notifGateways      TenantNotificationGateway[]
@@ -91,6 +92,8 @@ model User {
   passwordHash String     @map("password_hash") @db.VarChar(255)
   firstName    String?    @map("first_name") @db.VarChar(100)
   lastName     String?    @map("last_name") @db.VarChar(100)
+  emailVerified  Boolean    @default(false) @map("email_verified")
+  verificationToken String? @unique @map("verification_token") @db.VarChar(255)
   status       UserStatus @default(pending_verification)
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz
@@ -102,6 +105,7 @@ model User {
   refreshTokens  TenantRefreshToken[]
   uploadedFiles  TenantStorageRegistry[]
   auditLogs      AdminAuditLog[]
+  configSnapshots TenantConfigSnapshot[]
 
   @@unique([tenantId, email])
   @@index([tenantId, status])
@@ -153,6 +157,8 @@ model TenantAuthCredential {
   isMfaEnabled        Boolean   @default(false) @map("is_mfa_enabled")
   failedLoginAttempts Int       @default(0) @map("failed_login_attempts")
   lockedUntil         DateTime? @map("locked_until") @db.Timestamptz
+  passwordResetToken  String?   @unique @map("password_reset_token") @db.VarChar(255)
+  passwordResetExpires DateTime? @map("password_reset_expires") @db.Timestamptz
   updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz
 
   tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
@@ -802,6 +808,7 @@ model TenantApiKey {
   keyPrefix    String    @map("key_prefix") @db.VarChar(16)
   keyHash      String    @unique @map("key_hash") @db.VarChar(255)
   rateLimitRpm Int       @default(60) @map("rate_limit_rpm")
+  requestCount Int       @default(0) @map("request_count")
   scopes       Json      @default("[\"catalog:read\"]")
   isActive     Boolean   @default(true) @map("is_active")
   expiresAt    DateTime? @map("expires_at") @db.Timestamptz
@@ -868,6 +875,7 @@ model SystemFeatureFlag {
   flagKey      String   @unique @map("flag_key") @db.VarChar(64)
   description  String?  @db.Text
   defaultState Boolean  @default(false) @map("default_state")
+  environment  String   @default("production") @db.VarChar(32)
   createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz
 
   overrides TenantFeatureOverride[]
@@ -948,5 +956,20 @@ model SystemApiRateLimit {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
 
   @@unique([provider, ipAddress])
-  @@map("system_api_rate_limit")
+  @@map("system_api_rate_limits")
+}
+
+model TenantConfigSnapshot {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  configType  String   @map("config_type") @db.VarChar(64)
+  snapshot    Json     @map("snapshot")
+  actorId     String?  @map("actor_id") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant      SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  actor       User?        @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, configType])
+  @@map("tenant_config_snapshots")
 }

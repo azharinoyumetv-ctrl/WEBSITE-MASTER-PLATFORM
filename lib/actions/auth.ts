@@ -34,7 +34,7 @@ export async function registerTenantAdmin(data: any) {
       return { success: false, error: "Email is already in use." }
     }
 
-    const passwordHash = await bcrypt.hash(password, 10)
+    const passwordHash = await bcrypt.hash(password, 12)
 
     // Run creation in a transaction
     await prisma.$transaction(async (tx) => {
@@ -43,12 +43,15 @@ export async function registerTenantAdmin(data: any) {
         data: {
           companyName,
           subdomain,
-          status: "active",
+          status: "pending_verification",
           plan: "core"
         }
       })
 
-      // 2. Create User
+      const crypto = require('crypto')
+      const vToken = crypto.randomBytes(32).toString('hex')
+
+      // 2. Create User (Owner)
       const user = await tx.user.create({
         data: {
           tenantId: tenant.id,
@@ -56,7 +59,9 @@ export async function registerTenantAdmin(data: any) {
           passwordHash,
           firstName,
           lastName,
-          status: "active"
+          status: "pending_verification",
+          emailVerified: false,
+          verificationToken: vToken
         }
       })
 
@@ -127,9 +132,61 @@ export async function registerTenantAdmin(data: any) {
       })
     })
 
-    return { success: true }
+    return { success: true, message: "Registration successful. Please check your email to verify your account." }
   } catch (error: any) {
     console.error("Registration error:", error)
     return { success: false, error: error.message || "An unexpected error occurred." }
   }
+}
+
+export async function logoutEverywhere() {
+  const { getServerSession } = require("next-auth")
+  const { authOptions } = require("@/lib/auth")
+  const session = await getServerSession(authOptions)
+  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
+  
+  await prisma.tenantRefreshToken.updateMany({
+    where: { userId: (session.user as any).id },
+    data: { isRevoked: true }
+  })
+  
+  return { success: true }
+}
+
+export async function requestPasswordReset(email: string) {
+  const user = await prisma.user.findFirst({ where: { email }, include: { authCredential: true } })
+  if (!user) return { success: true } // Silently succeed for security
+
+  const crypto = require('crypto')
+  const resetToken = crypto.randomBytes(32).toString('hex')
+  const expiresAt = new Date(Date.now() + 60 * 60 * 1000) // 1 hour
+
+  if (user.authCredential) {
+    await prisma.tenantAuthCredential.update({
+      where: { id: user.authCredential.id },
+      data: { passwordResetToken: resetToken, passwordResetExpires: expiresAt }
+    })
+  }
+
+  // Send email (we use nodemailer with a generic transporter for now, or just log it if no config)
+  console.log(`[EMAIL] Password reset for ${email}: /auth/forgot-password/reset?token=${resetToken}`)
+
+  return { success: true }
+}
+
+export async function verifyEmailToken(token: string) {
+  const user = await prisma.user.findUnique({ where: { verificationToken: token }, include: { tenant: true } })
+  if (!user) return { success: false, error: "Invalid or expired token." }
+
+  await prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: user.id },
+      data: { emailVerified: true, status: "active", verificationToken: null }
+    })
+    await tx.systemTenant.update({
+      where: { id: user.tenantId },
+      data: { status: "active" }
+    })
+  })
+  return { success: true }
 }

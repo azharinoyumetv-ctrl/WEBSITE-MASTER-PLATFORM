@@ -166,7 +166,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
                   <div className="border-t border-slate-100 pt-6 mb-8">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{t('whats_included')}</p>
                     <ul className="space-y-2.5">
-                      {product.features.map((feat, idx) => (
+                      {product.features.map((feat: string, idx: number) => (
                         <li key={idx} className="flex items-start gap-2.5 text-slate-600 text-sm">
                           <span className="text-emerald-500 font-bold">✓</span>
                           <span>{feat}</span>

@@ -23,7 +23,7 @@ export async function getApiData(tenantId: string) {
 
 import crypto from 'crypto'
 
-export async function createApiKey(tenantId: string, keyName: string) {
+export async function createApiKey(tenantId: string, keyName: string, scopes: string[] = ['read', 'write']) {
   try {
     const user = await prisma.user.findFirst({
       where: { tenantId }
@@ -43,7 +43,7 @@ export async function createApiKey(tenantId: string, keyName: string) {
         keyName,
         keyPrefix: 'live_',
         keyHash: keyHash,
-        scopes: ['read', 'write']
+        scopes: scopes
       }
     })
     
@@ -82,6 +82,36 @@ export async function deleteApiKey(tenantId: string, id: string) {
     })
     revalidatePath('/admin/api-portal')
     return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function rotateApiKey(tenantId: string, id: string) {
+  try {
+    const oldKey = await prisma.tenantApiKey.findFirst({ where: { id, tenantId } })
+    if (!oldKey) throw new Error('Key not found')
+    
+    await prisma.tenantApiKey.update({
+      where: { id },
+      data: { expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } // 7 days grace
+    })
+    
+    const rawKey = crypto.randomBytes(24).toString('hex')
+    const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex')
+    const newKey = await prisma.tenantApiKey.create({
+      data: {
+        tenantId,
+        createdBy: oldKey.createdBy,
+        keyName: oldKey.keyName,
+        keyPrefix: oldKey.keyPrefix,
+        keyHash: keyHash,
+        scopes: oldKey.scopes
+      }
+    })
+    
+    revalidatePath('/admin/api-portal')
+    return { success: true, key: { ...newKey, rawKey } }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

@@ -105,6 +105,26 @@ export async function saveAdminPage(tenantId: string, pageId: string | undefined
   }
 }
 
+// Admin: Delete Page
+export async function deleteAdminPage(tenantId: string, pageId: string) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) throw new Error('Unauthorized')
+    await requirePermission((session.user as any).id, tenantId, 'website', 'write')
+    
+    // Soft delete
+    await prisma.tenantPage.update({
+      where: { id: pageId, tenantId },
+      data: { isDeleted: true }
+    })
+    revalidatePath('/admin/pages')
+    revalidatePath('/site')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
 // Admin: Get Website Config
 export async function getAdminWebsiteConfig(tenantId: string) {
   try {
@@ -139,27 +159,89 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
     const session = await getServerSession(authOptions)
     if (!session?.user) throw new Error('Unauthorized')
     await requirePermission((session.user as any).id, tenantId, 'website', 'write')
-    const website = await prisma.tenantWebsite.upsert({
+    const website = await prisma.$transaction(async (tx) => {
+      const w = await tx.tenantWebsite.upsert({
+        where: { tenantId },
+        create: {
+          tenantId,
+          siteTitle: data.siteTitle,
+          themeConfig: data.themeConfig,
+          globalSeoMetadata: data.globalSeoMetadata,
+          isActive: data.isActive
+        },
+        update: {
+          siteTitle: data.siteTitle,
+          themeConfig: data.themeConfig,
+          globalSeoMetadata: data.globalSeoMetadata,
+          isActive: data.isActive
+        }
+      })
+      
+      await tx.tenantConfigSnapshot.create({
+        data: {
+          tenantId,
+          configType: 'website_theme',
+          snapshot: data,
+          actorId: (session.user as any).id
+        }
+      })
+      
+      return w
+    })
+    
+    revalidatePath('/admin/settings')
+    revalidatePath('/site')
+    return { success: true, website }
+  } catch (error: any) {
+    console.error("saveAdminWebsiteConfig error:", error);
+    return { success: false, error: error.message }
+  }
+}
+
+export async function getWebsiteConfigSnapshots(tenantId: string) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) throw new Error('Unauthorized')
+    await requirePermission((session.user as any).id, tenantId, 'settings', 'read')
+    
+    const snapshots = await prisma.tenantConfigSnapshot.findMany({
+      where: { tenantId, configType: 'website_theme' },
+      orderBy: { createdAt: 'desc' },
+      take: 10
+    })
+    return { success: true, snapshots }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function restoreWebsiteConfigSnapshot(tenantId: string, snapshotId: string) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) throw new Error('Unauthorized')
+    await requirePermission((session.user as any).id, tenantId, 'website', 'write')
+    
+    const snapshot = await prisma.tenantConfigSnapshot.findUnique({
+      where: { id: snapshotId }
+    })
+    
+    if (!snapshot || snapshot.tenantId !== tenantId) throw new Error('Snapshot not found')
+    
+    const data = snapshot.snapshot as any
+    const website = await prisma.tenantWebsite.update({
       where: { tenantId },
-      create: {
-        tenantId,
-        siteTitle: data.siteTitle,
-        themeConfig: data.themeConfig,
-        globalSeoMetadata: data.globalSeoMetadata,
-        isActive: data.isActive
-      },
-      update: {
+      data: {
         siteTitle: data.siteTitle,
         themeConfig: data.themeConfig,
         globalSeoMetadata: data.globalSeoMetadata,
         isActive: data.isActive
       }
     })
+    
     revalidatePath('/admin/settings')
     revalidatePath('/site')
     return { success: true, website }
   } catch (error: any) {
-    console.error("saveAdminWebsiteConfig error:", error);
     return { success: false, error: error.message }
   }
 }

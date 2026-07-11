@@ -19,12 +19,58 @@ export const authOptions: NextAuthOptions = {
       name: "Credentials",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
+        captchaToken: { label: "Captcha Token", type: "text" },
+        captchaAnswer: { label: "Captcha Answer", type: "text" },
+        mfaCode: { label: "MFA Code", type: "text" }
       },
       async authorize(credentials, req) {
         if (!credentials?.email || !credentials?.password) {
           throw new Error("Missing credentials")
         }
+
+        const ip = (req.headers as any)?.['x-forwarded-for'] || (req.headers as any)?.['x-real-ip'] || 'unknown'
+        
+        // --- Rate Limiting & CAPTCHA ---
+        const rl = await prisma.systemApiRateLimit.upsert({
+          where: { provider_ipAddress: { provider: 'auth', ipAddress: ip } },
+          update: { count: { increment: 1 } },
+          create: { provider: 'auth', ipAddress: ip, resetTime: new Date(Date.now() + 15 * 60 * 1000) }
+        })
+
+        if (rl.resetTime < new Date()) {
+          await prisma.systemApiRateLimit.update({
+            where: { id: rl.id },
+            data: { count: 1, resetTime: new Date(Date.now() + 15 * 60 * 1000) }
+          })
+          rl.count = 1
+        }
+
+        if (rl.count > 3) {
+          const { captchaToken, captchaAnswer } = credentials
+          if (!captchaToken || !captchaAnswer) {
+            throw new Error("CAPTCHA_REQUIRED")
+          }
+          try {
+            const crypto = require('crypto')
+            const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default', 'salt', 32), Buffer.alloc(16, 0))
+            let decrypted = decipher.update(captchaToken, 'hex', 'utf8')
+            decrypted += decipher.final('utf8')
+            const payload = JSON.parse(decrypted)
+
+            if (payload.expires < Date.now()) throw new Error('Expired')
+            if (payload.answer !== captchaAnswer.toLowerCase()) throw new Error('Wrong answer')
+            
+            // Valid captcha, reset count
+            await prisma.systemApiRateLimit.update({
+              where: { id: rl.id },
+              data: { count: 0 }
+            })
+          } catch (e) {
+            throw new Error("INVALID_CAPTCHA")
+          }
+        }
+        // -------------------------------
 
         // We check across all users since we'll rely on the DB unique constraint
         const user = await prisma.user.findFirst({
@@ -56,12 +102,69 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Invalid credentials")
         }
 
+        const currentHash = user.authCredential?.passwordHash || user.passwordHash;
+        if (currentHash) {
+          const cost = bcrypt.getRounds(currentHash);
+          if (cost < 12) {
+            const newHash = await bcrypt.hash(credentials.password, 12);
+            if (user.authCredential) {
+              await prisma.tenantAuthCredential.update({
+                where: { id: user.authCredential.id },
+                data: { passwordHash: newHash }
+              });
+            } else {
+              await prisma.user.update({
+                where: { id: user.id },
+                data: { passwordHash: newHash }
+              });
+            }
+          }
+        }
+
+        // --- MFA Verification ---
+        if (user.authCredential?.isMfaEnabled && user.authCredential.mfaSecretEncrypted) {
+          const { mfaCode } = credentials
+          if (!mfaCode) {
+            throw new Error("MFA_REQUIRED")
+          }
+          try {
+            const crypto = require('crypto')
+            const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default', 'salt', 32), Buffer.alloc(16, 0))
+            let mfaSecret = decipher.update(user.authCredential.mfaSecretEncrypted, 'hex', 'utf8')
+            mfaSecret += decipher.final('utf8')
+            
+            const OTPAuth = require('otpauth')
+            const totp = new OTPAuth.TOTP({
+              secret: OTPAuth.Secret.fromBase32(mfaSecret)
+            })
+            const delta = totp.validate({ token: mfaCode, window: 1 })
+            if (delta === null) {
+              throw new Error("INVALID_MFA")
+            }
+          } catch (e) {
+            throw new Error("INVALID_MFA")
+          }
+        }
+        // ------------------------
+
+        const crypto = require('crypto')
+        const sessionId = crypto.randomBytes(32).toString('hex')
+        await prisma.tenantRefreshToken.create({
+           data: {
+             tenantId: user.tenantId,
+             userId: user.id,
+             tokenHash: sessionId,
+             expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+           }
+        })
+
         return {
           id: user.id,
           email: user.email,
           name: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
           tenantId: user.tenantId,
           roles: user.userRoles.map(ur => ur.role.name),
+          sessionId,
         }
       }
     })
@@ -72,7 +175,20 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id
         token.tenantId = (user as any).tenantId
         token.roles = (user as any).roles
+        token.sessionId = (user as any).sessionId
       }
+      
+      if (token.sessionId) {
+        const dbToken = await prisma.tenantRefreshToken.findUnique({ 
+          where: { tokenHash: token.sessionId as string },
+          select: { isRevoked: true }
+        })
+        if (!dbToken || dbToken.isRevoked) {
+          // Token has been revoked or deleted
+          return {} as any
+        }
+      }
+
       return token
     },
     async session({ session, token }) {

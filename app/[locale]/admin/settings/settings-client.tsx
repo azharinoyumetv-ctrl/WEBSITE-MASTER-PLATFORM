@@ -41,7 +41,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
 
   useEffect(() => {
     const fetchModels = async () => {
-      if (aiData.providerKey === 'platform_managed' || !aiData.apiSecret) {
+      if (aiData.providerKey === 'platform_managed') {
         setAvailableModels([])
         return
       }
@@ -86,12 +86,12 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
     setIsSaving(true)
     const res = await saveAdminWebsiteConfig(tenantId, websiteData)
     
-    let aiRes = { success: true, error: '' }
+    let aiRes: any = { success: true, error: '' }
     if (activeTab === 'ai') {
       aiRes = await saveAiConfig(tenantId, aiData)
     }
 
-    let paymentRes = { success: true, error: '' }
+    let paymentRes: any = { success: true, error: '' }
     if (activeTab === 'general') {
       paymentRes = await savePaymentConfig(tenantId, paymentConfig)
     }
@@ -591,8 +591,8 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                   <span className="badge badge-success uppercase tracking-wider">{initialTenant?.plan || 'core'}</span>
                 </div>
                 <div className="mt-6 flex gap-3">
-                  <button className="btn btn-secondary">View Invoices</button>
-                  <button className="btn btn-primary">Upgrade Plan</button>
+                  <button onClick={() => toast('Stripe Portal URL not configured in environment', { icon: 'ℹ️' })} className="btn btn-secondary">View Invoices</button>
+                  <button onClick={() => toast('Please contact support to upgrade your plan', { icon: '💳' })} className="btn btn-primary">Upgrade Plan</button>
                 </div>
               </div>
             </div>

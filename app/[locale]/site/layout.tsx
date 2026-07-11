@@ -56,7 +56,10 @@ export default async function SiteLayout({
   try {
     if (website.themeConfig) {
       const parsed = typeof website.themeConfig === 'string' ? JSON.parse(website.themeConfig) : website.themeConfig;
-      if (parsed.colors) themeConfig = parsed;
+      if (parsed.colors) {
+        themeConfig.colors = { ...themeConfig.colors, ...parsed.colors };
+      }
+      themeConfig = { ...themeConfig, ...parsed, colors: themeConfig.colors };
     }
   } catch (e) {
     console.error("Failed to parse theme config", e)

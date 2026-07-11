@@ -97,7 +97,7 @@ export default async function SiteHomePage() {
 
         // 3. CATALOG GRID
         if (block.type === 'catalog_grid') {
-          const items = catalogItems.filter((i: any) => i.isPublished).slice(0, block.config?.limit || 4)
+          const items = (catalogItems || []).filter((i: any) => i.isPublished).slice(0, block.config?.limit || 4)
           return (
             <div key={block.id} className="py-20 bg-white">
               <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

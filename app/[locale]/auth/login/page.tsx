@@ -17,6 +17,25 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [captchaSvg, setCaptchaSvg] = useState('')
+  const [captchaToken, setCaptchaToken] = useState('')
+  const [captchaAnswer, setCaptchaAnswer] = useState('')
+  const [mfaRequired, setMfaRequired] = useState(false)
+  const [mfaCode, setMfaCode] = useState('')
+
+  const fetchCaptcha = async () => {
+    try {
+      const res = await fetch('/api/auth/captcha')
+      if (res.ok) {
+        const data = await res.json()
+        setCaptchaSvg(data.svg)
+        setCaptchaToken(data.token)
+        setCaptchaAnswer('')
+      }
+    } catch (e) {
+      console.error(e)
+    }
+  }
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -27,11 +46,22 @@ export default function LoginPage() {
       const res = await signIn('credentials', {
         email,
         password,
+        captchaToken,
+        captchaAnswer,
+        mfaCode,
         redirect: false,
       })
 
       if (res?.error) {
-        setError(res.error)
+        if (res.error === "CAPTCHA_REQUIRED" || res.error === "INVALID_CAPTCHA") {
+          setError(res.error === "INVALID_CAPTCHA" ? "Invalid CAPTCHA answer." : "Too many failed attempts. Please solve the CAPTCHA.")
+          fetchCaptcha()
+        } else if (res.error === "MFA_REQUIRED" || res.error === "INVALID_MFA") {
+          setMfaRequired(true)
+          setError(res.error === "INVALID_MFA" ? "Invalid authenticator code." : "")
+        } else {
+          setError(res.error)
+        }
       } else {
         toast.success('Login successful! Redirecting...')
         router.push('/admin/dashboard')
@@ -185,6 +215,48 @@ export default function LoginPage() {
             
 
 
+            {/* MFA Input */}
+            {mfaRequired && (
+              <div className="animate-in fade-in slide-in-from-top-2">
+                <label className="block text-sm font-medium text-slate-300 mb-1.5">Authenticator Code</label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={mfaCode}
+                    onChange={(e) => setMfaCode(e.target.value)}
+                    placeholder="6-digit code"
+                    required
+                    className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white 
+                               placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40
+                               focus:border-indigo-500/40 transition-all text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Captcha Input */}
+            {captchaSvg && (
+              <div className="animate-in fade-in slide-in-from-top-2 bg-white/5 p-4 rounded-xl border border-white/10">
+                <label className="block text-sm font-medium text-slate-300 mb-2">Security Check</label>
+                <div className="flex gap-4 items-center">
+                  <div 
+                    className="bg-white rounded overflow-hidden flex-shrink-0"
+                    dangerouslySetInnerHTML={{ __html: captchaSvg }} 
+                  />
+                  <input
+                    type="text"
+                    value={captchaAnswer}
+                    onChange={(e) => setCaptchaAnswer(e.target.value)}
+                    placeholder="Type characters"
+                    required
+                    className="w-full px-4 py-2 bg-slate-900 border border-white/10 rounded-lg text-white 
+                               placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+
             {/* Submit */}
             <button
               type="submit"
@@ -215,7 +287,7 @@ export default function LoginPage() {
 
           <div className="mt-8 pt-6 border-t border-white/5">
             <p className="text-center text-xs text-slate-600">
-              Protected by Ed25519 JWT + Argon2id · AES-256 at rest · TLS 1.3
+              Protected by Ed25519 JWT + Bcrypt · AES-256 at rest · TLS 1.3
             </p>
           </div>
         </div>
