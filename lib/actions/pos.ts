@@ -151,12 +151,24 @@ export async function deleteTerminal(tenantId: string, id: string) {
   }
 }
 
-// Session CRUD
+// Session & Cash Drawer CRUD
 export async function openSession(tenantId: string, terminalId: string, openedBy: string, openingBalance: number) {
   try {
     const session = await prisma.tenantPosSession.create({
       data: { tenantId, terminalId, openedBy, openingBalance, status: 'open' }
     })
+    
+    await prisma.tenantPosCashDrawerEvent.create({
+      data: {
+        tenantId,
+        sessionId: session.id,
+        eventType: 'session_open',
+        amount: openingBalance,
+        performedBy: openedBy,
+        notes: 'Initial float'
+      }
+    })
+    
     revalidatePath('/admin/pos')
     return { success: true, session }
   } catch (error: any) {
@@ -164,19 +176,83 @@ export async function openSession(tenantId: string, terminalId: string, openedBy
   }
 }
 
-export async function closeSession(tenantId: string, sessionId: string, closedBy: string, closingBalance: number) {
+async function validateSession(tenantId: string, sessionId: string) {
+  const session = await prisma.tenantPosSession.findUnique({ where: { id: sessionId, tenantId } })
+  if (!session) throw new Error('Session not found')
+  if (session.status !== 'open') throw new Error('Session is closed')
+  return session
+}
+
+export async function openCashDrawer(tenantId: string, sessionId: string, performedBy?: string, notes?: string) {
   try {
-    const sessionToClose = await prisma.tenantPosSession.findUnique({ where: { id: sessionId, tenantId } })
-    if (!sessionToClose) throw new Error('Session not found')
+    await validateSession(tenantId, sessionId)
+    const event = await prisma.tenantPosCashDrawerEvent.create({
+      data: { tenantId, sessionId, eventType: 'manual_open', performedBy, notes }
+    })
+    revalidatePath('/admin/pos')
+    return { success: true, event }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function recordCashDrop(tenantId: string, sessionId: string, amount: number, notes?: string, performedBy?: string) {
+  try {
+    await validateSession(tenantId, sessionId)
+    if (amount <= 0) throw new Error('Amount must be greater than 0')
+    const event = await prisma.tenantPosCashDrawerEvent.create({
+      data: { tenantId, sessionId, eventType: 'cash_drop', amount, performedBy, notes }
+    })
+    revalidatePath('/admin/pos')
+    return { success: true, event }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function recordCashPayout(tenantId: string, sessionId: string, amount: number, notes?: string, performedBy?: string) {
+  try {
+    await validateSession(tenantId, sessionId)
+    if (amount <= 0) throw new Error('Amount must be greater than 0')
+    const event = await prisma.tenantPosCashDrawerEvent.create({
+      data: { tenantId, sessionId, eventType: 'cash_payout', amount, performedBy, notes }
+    })
+    revalidatePath('/admin/pos')
+    return { success: true, event }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function getCashDrawerEvents(tenantId: string, sessionId: string) {
+  try {
+    const events = await prisma.tenantPosCashDrawerEvent.findMany({
+      where: { tenantId, sessionId },
+      orderBy: { createdAt: 'desc' }
+    })
+    return { success: true, events }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function getEndOfDayReport(tenantId: string, sessionId: string, date?: string) {
+  try {
+    const session = await prisma.tenantPosSession.findUnique({ where: { id: sessionId, tenantId } })
+    if (!session) throw new Error('Session not found')
     
-    const closedAt = new Date()
+    const endBound = session.closedAt || new Date()
     
     const orders = await prisma.tenantOrder.findMany({
       where: {
         tenantId,
-        createdAt: { gte: sessionToClose.openedAt, lte: closedAt },
+        createdAt: { gte: session.openedAt, lte: endBound },
       },
       include: { payments: true }
+    })
+    
+    const events = await prisma.tenantPosCashDrawerEvent.findMany({
+      where: { tenantId, sessionId }
     })
     
     let totalRevenue = 0
@@ -191,16 +267,57 @@ export async function closeSession(tenantId: string, sessionId: string, closedBy
       })
     })
 
-    const session = await prisma.tenantPosSession.update({
-      where: { id: sessionId, tenantId },
-      data: { closedBy, closingBalance, status: 'reconciled', closedAt }
+    let cashDrops = 0
+    let cashPayouts = 0
+    let openingFloat = Number(session.openingBalance)
+    
+    events.forEach(e => {
+      if (e.eventType === 'cash_drop') cashDrops += Number(e.amount || 0)
+      if (e.eventType === 'cash_payout') cashPayouts += Number(e.amount || 0)
     })
-    revalidatePath('/admin/pos')
+    
+    const expectedDrawer = openingFloat + cashRevenue + cashDrops - cashPayouts
+    const closingBalance = session.closingBalance !== null ? Number(session.closingBalance) : null
+    const variance = closingBalance !== null ? closingBalance - expectedDrawer : null
+
     return { 
       success: true, 
-      session, 
-      summary: { totalRevenue, cashRevenue, cardRevenue, orderCount: orders.length, openingBalance: Number(sessionToClose.openingBalance), closingBalance } 
+      report: { 
+        totalRevenue, 
+        cashRevenue, 
+        cardRevenue, 
+        orderCount: orders.length, 
+        openingFloat, 
+        cashDrops,
+        cashPayouts,
+        expectedDrawer,
+        closingBalance,
+        variance,
+        events
+      } 
     }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function closeCashDrawerSession(tenantId: string, sessionId: string, closingBalance?: number, performedBy?: string, notes?: string) {
+  try {
+    await validateSession(tenantId, sessionId)
+    
+    const closedAt = new Date()
+    
+    await prisma.tenantPosCashDrawerEvent.create({
+      data: { tenantId, sessionId, eventType: 'session_close', amount: closingBalance, performedBy, notes }
+    })
+
+    const session = await prisma.tenantPosSession.update({
+      where: { id: sessionId, tenantId },
+      data: { closedBy: performedBy, closingBalance, status: 'reconciled', closedAt }
+    })
+    
+    revalidatePath('/admin/pos')
+    return { success: true, session }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

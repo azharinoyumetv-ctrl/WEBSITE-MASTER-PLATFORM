@@ -1,10 +1,10 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Monitor, ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, QrCode, Search, Wifi, WifiOff, Clock } from 'lucide-react'
+import { Monitor, ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, QrCode, Search, Wifi, Clock, FileText, ArrowDownCircle, ArrowUpCircle, Download, LayoutList } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { processPosPayment, openSession, closeSession, generateReceipt } from '@/lib/actions/pos'
+import { processPosPayment, openSession, closeCashDrawerSession, generateReceipt, openCashDrawer, recordCashDrop, recordCashPayout, getEndOfDayReport, getCashDrawerEvents } from '@/lib/actions/pos'
 
 export function PosClient({ initialTerminal, initialCatalogItems, initialSession, tenantId, userId, baseCurrency = 'USD' }: { initialTerminal: any, initialCatalogItems: any[], initialSession: any, tenantId: string, userId: string, baseCurrency?: string }) {
   const [cart, setCart] = useState<Array<{id: string; title: string; price: number; qty: number}>>([])
@@ -13,9 +13,21 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
   const [time, setTime] = useState(new Date())
   const [search, setSearch] = useState('')
   const [activeSession, setActiveSession] = useState(initialSession)
+  
+  // Shift & Drawer state
   const [shiftAmount, setShiftAmount] = useState('0')
   const [showShiftModal, setShowShiftModal] = useState(!initialSession)
+  
+  const [drawerAction, setDrawerAction] = useState<'drop' | 'payout' | null>(null)
+  const [drawerAmount, setDrawerAmount] = useState('')
+  const [drawerNotes, setDrawerNotes] = useState('')
+  
+  const [showDrawerLog, setShowDrawerLog] = useState(false)
+  const [drawerEvents, setDrawerEvents] = useState<any[]>([])
+  
+  const [showEndOfDay, setShowEndOfDay] = useState(false)
   const [shiftSummary, setShiftSummary] = useState<any>(null)
+  
   const [receiptHtml, setReceiptHtml] = useState<string | null>(null)
 
   useEffect(() => {
@@ -57,7 +69,6 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
       toast.success(`Payment of ${formatCurrency(grandTotal, baseCurrency)} processed via ${paymentMethod.toUpperCase()}`)
       setCart([])
       
-      // Generate receipt
       const receiptRes = await generateReceipt(tenantId, res.order.id)
       if (receiptRes.success) setReceiptHtml(receiptRes.receiptHtml)
     } else {
@@ -76,25 +87,91 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
     } else toast.error(res.error)
   }
 
-  const handleCloseShift = async () => {
-    if(!activeSession) return
+  const handlePrepareCloseShift = async () => {
+    if (!activeSession) return
     setIsProcessing(true)
-    const res = await closeSession(tenantId, activeSession.id, userId, parseFloat(shiftAmount) || 0)
+    const res = await getEndOfDayReport(tenantId, activeSession.id)
+    setIsProcessing(false)
+    if (res.success) {
+      setShiftSummary(res.report)
+      setShowEndOfDay(true)
+    } else {
+      toast.error(res.error)
+    }
+  }
+
+  const handleConfirmCloseShift = async () => {
+    if (!activeSession) return
+    setIsProcessing(true)
+    const res = await closeCashDrawerSession(tenantId, activeSession.id, parseFloat(shiftAmount) || 0, userId, 'End of shift')
     setIsProcessing(false)
     if (res.success) {
       setActiveSession(null)
-      setShiftSummary(res.summary)
+      setShowEndOfDay(false)
       setShowShiftModal(true)
       setShiftAmount('0')
       toast.success('Shift closed successfully')
     } else toast.error(res.error)
   }
 
-  const handleOpenCashDrawer = () => {
-    toast.success('Cash drawer opened via hardware stub.')
+  const handleOpenCashDrawer = async () => {
+    if (!activeSession) { toast.error('No active session'); return }
+    const res = await openCashDrawer(tenantId, activeSession.id, userId, 'Manual open')
+    if (res.success) toast.success('Cash drawer opened')
+    else toast.error(res.error)
   }
 
-  if (showShiftModal) {
+  const handleDrawerAction = async () => {
+    if (!activeSession || !drawerAction) return
+    const amt = parseFloat(drawerAmount)
+    if (isNaN(amt) || amt <= 0) { toast.error('Invalid amount'); return }
+    
+    setIsProcessing(true)
+    const res = drawerAction === 'drop' 
+      ? await recordCashDrop(tenantId, activeSession.id, amt, drawerNotes, userId)
+      : await recordCashPayout(tenantId, activeSession.id, amt, drawerNotes, userId)
+      
+    setIsProcessing(false)
+    if (res.success) {
+      toast.success(`Cash ${drawerAction} recorded`)
+      setDrawerAction(null)
+      setDrawerAmount('')
+      setDrawerNotes('')
+    } else toast.error(res.error)
+  }
+
+  const loadDrawerEvents = async () => {
+    if (!activeSession) return
+    const res = await getCashDrawerEvents(tenantId, activeSession.id)
+    if (res.success) {
+      setDrawerEvents(res.events)
+      setShowDrawerLog(true)
+    } else toast.error(res.error)
+  }
+  
+  const exportCsv = () => {
+    if (!shiftSummary) return
+    const csvContent = "data:text/csv;charset=utf-8," 
+      + "Metric,Amount\n"
+      + `Total Orders,${shiftSummary.orderCount}\n`
+      + `Total Revenue,${shiftSummary.totalRevenue}\n`
+      + `Cash Sales,${shiftSummary.cashRevenue}\n`
+      + `Card Sales,${shiftSummary.cardRevenue}\n`
+      + `Opening Float,${shiftSummary.openingFloat}\n`
+      + `Cash Drops,${shiftSummary.cashDrops}\n`
+      + `Cash Payouts,${shiftSummary.cashPayouts}\n`
+      + `Expected Drawer,${shiftSummary.expectedDrawer}\n`
+    
+    const encodedUri = encodeURI(csvContent)
+    const link = document.createElement("a")
+    link.setAttribute("href", encodedUri)
+    link.setAttribute("download", "end_of_day_report.csv")
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  }
+
+  if (showShiftModal && !activeSession) {
     return (
       <div className="h-screen bg-gray-950 flex flex-col items-center justify-center p-4">
         <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl">
@@ -104,14 +181,14 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
             </div>
             <div>
               <h2 className="text-xl font-bold text-white">{initialTerminal?.terminalName || 'Terminal'}</h2>
-              <p className="text-gray-400 text-sm">Status: {activeSession ? 'Closing Shift' : 'Opening Shift'}</p>
+              <p className="text-gray-400 text-sm">Status: Opening Shift</p>
             </div>
           </div>
           
           <div className="space-y-4 mb-8">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">
-                {activeSession ? 'Closing Register Balance' : 'Opening Register Balance'}
+                Opening Float (Register Balance)
               </label>
               <div className="relative">
                 <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
@@ -126,38 +203,13 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
           </div>
           
           <button 
-            onClick={activeSession ? handleCloseShift : handleOpenShift}
+            onClick={handleOpenShift}
             disabled={isProcessing}
             className="w-full btn btn-primary py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white border-0"
           >
-            {isProcessing ? 'Processing...' : activeSession ? 'Close Shift' : 'Open Shift'}
+            {isProcessing ? 'Processing...' : 'Open Shift'}
           </button>
         </div>
-        
-        {shiftSummary && !activeSession && (
-          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-8 max-w-md w-full shadow-2xl mt-4 animate-slide-up">
-            <h3 className="text-lg font-bold text-white mb-4">End of Day Summary</h3>
-            <div className="space-y-2 text-sm text-gray-300 mb-6">
-              <div className="flex justify-between"><span>Orders:</span> <span className="font-semibold text-white">{shiftSummary.orderCount}</span></div>
-              <div className="flex justify-between"><span>Total Revenue:</span> <span className="font-semibold text-white">{formatCurrency(shiftSummary.totalRevenue, baseCurrency)}</span></div>
-              <div className="border-t border-gray-800 my-2 pt-2 flex justify-between"><span>Cash Sales:</span> <span className="font-semibold text-white">{formatCurrency(shiftSummary.cashRevenue, baseCurrency)}</span></div>
-              <div className="flex justify-between"><span>Card Sales:</span> <span className="font-semibold text-white">{formatCurrency(shiftSummary.cardRevenue, baseCurrency)}</span></div>
-              <div className="border-t border-gray-800 my-2 pt-2 flex justify-between text-emerald-400"><span>Opening Balance:</span> <span>{formatCurrency(shiftSummary.openingBalance, baseCurrency)}</span></div>
-              <div className="flex justify-between text-emerald-400"><span>Expected Drawer:</span> <span>{formatCurrency(shiftSummary.openingBalance + shiftSummary.cashRevenue, baseCurrency)}</span></div>
-              <div className="flex justify-between text-emerald-400"><span>Actual Drawer:</span> <span>{formatCurrency(shiftSummary.closingBalance, baseCurrency)}</span></div>
-              {shiftSummary.closingBalance !== (shiftSummary.openingBalance + shiftSummary.cashRevenue) && (
-                <div className="flex justify-between text-amber-500 font-semibold pt-2">
-                  <span>Discrepancy:</span> 
-                  <span>{formatCurrency(shiftSummary.closingBalance - (shiftSummary.openingBalance + shiftSummary.cashRevenue), baseCurrency)}</span>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-2">
-              <button onClick={() => setShiftSummary(null)} className="flex-1 btn btn-secondary py-2">Dismiss</button>
-              <button onClick={() => toast.success('Printing summary...')} className="flex-1 btn btn-primary bg-emerald-600 hover:bg-emerald-700 py-2 border-0">Print</button>
-            </div>
-          </div>
-        )}
       </div>
     )
   }
@@ -181,8 +233,23 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
             </div>
           </div>
           <div className="flex items-center gap-4 text-gray-400 text-xs">
-            <button onClick={handleOpenCashDrawer} className="text-emerald-400 hover:text-emerald-300 font-medium">Open Drawer</button>
-            <button onClick={() => { setShiftAmount('0'); setShowShiftModal(true); }} className="text-emerald-400 hover:text-emerald-300 underline font-medium">Close Shift</button>
+            {/* Drawer Actions */}
+            <div className="flex bg-gray-800 rounded-lg overflow-hidden border border-gray-700 mr-2">
+              <button disabled={!activeSession} onClick={handleOpenCashDrawer} className="px-3 py-1.5 hover:bg-gray-700 disabled:opacity-50 border-r border-gray-700" title="Open Drawer">
+                <Monitor className="w-3.5 h-3.5 text-emerald-400" />
+              </button>
+              <button disabled={!activeSession} onClick={() => setDrawerAction('drop')} className="px-3 py-1.5 hover:bg-gray-700 disabled:opacity-50 border-r border-gray-700 flex items-center gap-1" title="Cash Drop">
+                <ArrowDownCircle className="w-3.5 h-3.5 text-blue-400" /> Drop
+              </button>
+              <button disabled={!activeSession} onClick={() => setDrawerAction('payout')} className="px-3 py-1.5 hover:bg-gray-700 disabled:opacity-50 border-r border-gray-700 flex items-center gap-1" title="Cash Payout">
+                <ArrowUpCircle className="w-3.5 h-3.5 text-amber-400" /> Payout
+              </button>
+              <button disabled={!activeSession} onClick={loadDrawerEvents} className="px-3 py-1.5 hover:bg-gray-700 disabled:opacity-50" title="Drawer Log">
+                <LayoutList className="w-3.5 h-3.5 text-gray-300" />
+              </button>
+            </div>
+            
+            <button onClick={handlePrepareCloseShift} className="text-emerald-400 hover:text-emerald-300 underline font-medium mr-2 border-r border-gray-800 pr-4">Close Shift</button>
             <div className="flex items-center gap-1.5">
               <Wifi className="w-3.5 h-3.5 text-emerald-400" />
               <span>Online</span>
@@ -237,7 +304,6 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
 
       {/* Cart Panel */}
       <div className="w-80 flex flex-col bg-gray-900 border-l border-gray-800">
-        {/* Cart header */}
         <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-gray-400" />
@@ -253,7 +319,6 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
           )}
         </div>
 
-        {/* Cart items */}
         <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
           {cart.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
@@ -287,7 +352,6 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
           )}
         </div>
 
-        {/* Totals & Payment */}
         <div className="border-t border-gray-800 p-4 space-y-3">
           <div className="space-y-1.5 text-sm">
             <div className="flex justify-between text-gray-400">
@@ -304,7 +368,6 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
             </div>
           </div>
 
-          {/* Payment method */}
           <div className="grid grid-cols-3 gap-2">
             {([
               { key: 'card' as const, icon: CreditCard, label: 'Card' },
@@ -346,17 +409,121 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
         </div>
       </div>
 
+      {/* Drawer Action Modal */}
+      {drawerAction && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-sm w-full p-6">
+            <h3 className="text-lg font-bold text-white mb-4 capitalize">Cash {drawerAction}</h3>
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Amount</label>
+                <input type="number" value={drawerAmount} onChange={e => setDrawerAmount(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white" placeholder="0.00" />
+              </div>
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Notes</label>
+                <input type="text" value={drawerNotes} onChange={e => setDrawerNotes(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-white" placeholder="Optional notes" />
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setDrawerAction(null)} className="btn btn-secondary flex-1 border-gray-700 text-gray-300">Cancel</button>
+              <button onClick={handleDrawerAction} disabled={isProcessing} className="btn btn-primary flex-1 bg-emerald-600 hover:bg-emerald-700 border-0 text-white">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Drawer Log Modal */}
+      {showDrawerLog && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-2xl w-full p-6">
+            <h3 className="text-lg font-bold text-white mb-4">Cash Drawer Log</h3>
+            <div className="max-h-96 overflow-y-auto mb-6">
+              <table className="w-full text-sm text-left text-gray-300">
+                <thead className="text-xs text-gray-400 uppercase bg-gray-800">
+                  <tr>
+                    <th className="px-4 py-2">Time</th>
+                    <th className="px-4 py-2">Event</th>
+                    <th className="px-4 py-2">Amount</th>
+                    <th className="px-4 py-2">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {drawerEvents.map(ev => (
+                    <tr key={ev.id} className="border-b border-gray-800">
+                      <td className="px-4 py-2 whitespace-nowrap">{new Date(ev.createdAt).toLocaleTimeString()}</td>
+                      <td className="px-4 py-2 font-mono text-xs">{ev.eventType}</td>
+                      <td className="px-4 py-2">{ev.amount ? formatCurrency(Number(ev.amount), baseCurrency) : '-'}</td>
+                      <td className="px-4 py-2 max-w-[200px] truncate">{ev.notes || '-'}</td>
+                    </tr>
+                  ))}
+                  {drawerEvents.length === 0 && (
+                    <tr><td colSpan={4} className="px-4 py-4 text-center text-gray-500">No events found</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <button onClick={() => setShowDrawerLog(false)} className="btn btn-secondary w-full border-gray-700 text-gray-300">Close</button>
+          </div>
+        </div>
+      )}
+
+      {/* End of Day Modal */}
+      {showEndOfDay && shiftSummary && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-xl max-w-md w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white">End of Day Report</h3>
+              <button onClick={exportCsv} className="text-gray-400 hover:text-white" title="Export CSV"><Download className="w-5 h-5" /></button>
+            </div>
+            
+            <div className="space-y-2 text-sm text-gray-300 mb-6">
+              <div className="flex justify-between"><span>Total Orders:</span> <span className="font-semibold text-white">{shiftSummary.orderCount}</span></div>
+              <div className="flex justify-between"><span>Total Revenue:</span> <span className="font-semibold text-white">{formatCurrency(shiftSummary.totalRevenue, baseCurrency)}</span></div>
+              <div className="border-t border-gray-800 my-2 pt-2 flex justify-between"><span>Card Sales:</span> <span className="font-semibold text-white">{formatCurrency(shiftSummary.cardRevenue, baseCurrency)}</span></div>
+              <div className="flex justify-between text-emerald-400"><span>Cash Sales:</span> <span>+{formatCurrency(shiftSummary.cashRevenue, baseCurrency)}</span></div>
+              
+              <div className="border-t border-gray-800 my-2 pt-2 flex justify-between"><span>Opening Float:</span> <span className="font-semibold text-white">{formatCurrency(shiftSummary.openingFloat, baseCurrency)}</span></div>
+              <div className="flex justify-between text-blue-400"><span>Cash Drops:</span> <span>-{formatCurrency(shiftSummary.cashDrops, baseCurrency)}</span></div>
+              <div className="flex justify-between text-amber-400"><span>Cash Payouts:</span> <span>-{formatCurrency(shiftSummary.cashPayouts, baseCurrency)}</span></div>
+              
+              <div className="border-t border-gray-800 my-2 pt-2 flex justify-between font-bold text-white bg-gray-800/50 p-2 rounded">
+                <span>Expected Drawer:</span> 
+                <span>{formatCurrency(shiftSummary.expectedDrawer, baseCurrency)}</span>
+              </div>
+              
+              <div className="mt-4 pt-4 border-t border-gray-800">
+                <label className="block text-xs font-medium text-gray-400 mb-2">Counted Closing Balance</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <input type="number" value={shiftAmount} onChange={e => setShiftAmount(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 pl-7 text-white" />
+                </div>
+                {parseFloat(shiftAmount || '0') !== shiftSummary.expectedDrawer && (
+                  <p className="text-xs text-amber-500 mt-2">
+                    Variance: {formatCurrency(parseFloat(shiftAmount || '0') - shiftSummary.expectedDrawer, baseCurrency)}
+                  </p>
+                )}
+              </div>
+            </div>
+            
+            <div className="flex gap-3">
+              <button onClick={() => setShowEndOfDay(false)} className="btn btn-secondary flex-1 border-gray-700 text-gray-300">Cancel</button>
+              <button onClick={handleConfirmCloseShift} disabled={isProcessing} className="btn btn-primary flex-1 bg-red-600 hover:bg-red-700 border-0 text-white">Confirm Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Receipt Modal */}
       {receiptHtml && (
         <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl max-w-sm w-full p-6 flex flex-col items-center">
             <div className="w-full max-h-[60vh] overflow-y-auto mb-6 border border-gray-200 p-2" dangerouslySetInnerHTML={{__html: receiptHtml}} />
             <div className="flex gap-3 w-full">
-              <button onClick={() => setReceiptHtml(null)} className="btn btn-secondary flex-1">Close</button>
+              <button onClick={() => setReceiptHtml(null)} className="btn btn-secondary flex-1 border-gray-300 text-gray-700">Close</button>
               <button onClick={() => {
                 const w = window.open(); 
                 if(w) { w.document.write(receiptHtml); w.print(); w.close(); }
-              }} className="btn btn-primary flex-1 bg-emerald-600 border-0 hover:bg-emerald-700">Print</button>
+              }} className="btn btn-primary flex-1 bg-emerald-600 border-0 hover:bg-emerald-700 text-white">Print</button>
             </div>
           </div>
         </div>

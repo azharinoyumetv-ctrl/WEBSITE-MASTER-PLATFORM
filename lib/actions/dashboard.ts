@@ -81,3 +81,32 @@ export async function getDashboardMetrics(tenantId: string) {
     return { success: false, error: error.message }
   }
 }
+
+export async function updateDashboardWidgets(tenantId: string, userId: string, widgets: Record<string, boolean>) {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId, tenantId },
+      include: { profile: true }
+    })
+    
+    if (!user) throw new Error("User not found")
+    
+    const existingPrefs = user.profile?.preferences ? (user.profile.preferences as any) : {}
+    const newPrefs = { ...existingPrefs, dashboardWidgets: widgets }
+    
+    await prisma.tenantUserProfile.upsert({
+      where: { userId },
+      update: { preferences: newPrefs },
+      create: { 
+        userId, 
+        tenantId, 
+        preferences: newPrefs,
+        phoneNumber: '' 
+      }
+    })
+    
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

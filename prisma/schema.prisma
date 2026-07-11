@@ -26,47 +26,48 @@ model SystemTenant {
   updatedAt    DateTime     @updatedAt @map("updated_at") @db.Timestamptz
 
   // Relations
-  users                 User[]
-  roles                 Role[]
-  website               TenantWebsite?
-  pages                 TenantPage[]
-  modules               TenantModule[]
-  auditLogs             AdminAuditLog[]
-  userProfiles          TenantUserProfile[]
-  invitations           TenantInvitation[]
-  policyRules           TenantPolicyRule[]
-  categories            TenantCategory[]
-  catalogItems          TenantCatalogItem[]
-  orders                TenantOrder[]
-  payments              TenantPayment[]
-  idempotencyKeys       PaymentIdempotencyKey[]
-  posTerminals          TenantPosTerminal[]
-  posSessions           TenantPosSession[]
-  inventoryLocations    TenantInventoryLocation[]
-  inventoryBalances     TenantInventoryBalance[]
-  crmContacts           TenantCrmContact[]
-  crmTimeline           TenantCrmTimeline[]
-  bookingResources      TenantBookingResource[]
-  bookings              TenantBooking[]
-  configSnapshots       TenantConfigSnapshot[]
-  aiConfiguration       TenantAiConfiguration?
-  aiVectors             TenantAiKnowledgeVector[]
-  notifGateways         TenantNotificationGateway[]
-  notifTemplates        TenantNotificationTemplate[]
-  analyticsEvents       TenantAnalyticsEvent[]
-  analyticsSummaries    TenantAnalyticsDailySummary[]
-  apiKeys               TenantApiKey[]
-  apiWebhooks           TenantApiWebhook[]
-  authCredentials       TenantAuthCredential[]
-  refreshTokens         TenantRefreshToken[]
-  storageFiles          TenantStorageRegistry[]
-  featureOverrides      TenantFeatureOverride[]
-  tenantOrderItems      TenantOrderItem[]
-  tenantUserRoles       TenantUserRole[]
-  notifLogs             TenantNotificationLog[]
-  incidentLogs          TenantIncidentLog[]
-  tenantPaymentLedgers  TenantPaymentLedger[]
-  tenantMonitoringRules TenantMonitoringRule[]
+  users                     User[]
+  roles                     Role[]
+  website                   TenantWebsite?
+  pages                     TenantPage[]
+  modules                   TenantModule[]
+  auditLogs                 AdminAuditLog[]
+  userProfiles              TenantUserProfile[]
+  invitations               TenantInvitation[]
+  policyRules               TenantPolicyRule[]
+  categories                TenantCategory[]
+  catalogItems              TenantCatalogItem[]
+  orders                    TenantOrder[]
+  payments                  TenantPayment[]
+  idempotencyKeys           PaymentIdempotencyKey[]
+  posTerminals              TenantPosTerminal[]
+  posSessions               TenantPosSession[]
+  inventoryLocations        TenantInventoryLocation[]
+  inventoryBalances         TenantInventoryBalance[]
+  crmContacts               TenantCrmContact[]
+  crmTimeline               TenantCrmTimeline[]
+  bookingResources          TenantBookingResource[]
+  bookings                  TenantBooking[]
+  configSnapshots           TenantConfigSnapshot[]
+  aiConfiguration           TenantAiConfiguration?
+  aiVectors                 TenantAiKnowledgeVector[]
+  notifGateways             TenantNotificationGateway[]
+  notifTemplates            TenantNotificationTemplate[]
+  analyticsEvents           TenantAnalyticsEvent[]
+  analyticsSummaries        TenantAnalyticsDailySummary[]
+  apiKeys                   TenantApiKey[]
+  apiWebhooks               TenantApiWebhook[]
+  authCredentials           TenantAuthCredential[]
+  refreshTokens             TenantRefreshToken[]
+  storageFiles              TenantStorageRegistry[]
+  featureOverrides          TenantFeatureOverride[]
+  tenantOrderItems          TenantOrderItem[]
+  tenantUserRoles           TenantUserRole[]
+  notifLogs                 TenantNotificationLog[]
+  incidentLogs              TenantIncidentLog[]
+  tenantPaymentLedgers      TenantPaymentLedger[]
+  tenantMonitoringRules     TenantMonitoringRule[]
+  tenantPosCashDrawerEvents TenantPosCashDrawerEvent[]
 
   @@map("system_tenants")
 }
@@ -536,8 +537,9 @@ model TenantPosSession {
   openedAt       DateTime      @default(now()) @map("opened_at") @db.Timestamptz
   closedAt       DateTime?     @map("closed_at") @db.Timestamptz
 
-  tenant   SystemTenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
-  terminal TenantPosTerminal @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  tenant           SystemTenant               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  terminal         TenantPosTerminal          @relation(fields: [terminalId], references: [id], onDelete: Cascade)
+  cashDrawerEvents TenantPosCashDrawerEvent[]
 
   @@map("tenant_pos_sessions")
 }
@@ -545,6 +547,24 @@ model TenantPosSession {
 enum SessionStatus {
   open
   reconciled
+}
+
+model TenantPosCashDrawerEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId    String   @map("tenant_id") @db.Uuid
+  sessionId   String   @map("session_id") @db.Uuid
+  eventType   String   @map("event_type") @db.VarChar(32)
+  amount      Decimal? @db.Decimal(12, 2)
+  notes       String?  @db.Text
+  performedBy String?  @map("performed_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant  SystemTenant     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  session TenantPosSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, sessionId])
+  @@index([tenantId, createdAt])
+  @@map("tenant_pos_cash_drawer_events")
 }
 
 // ============================================================

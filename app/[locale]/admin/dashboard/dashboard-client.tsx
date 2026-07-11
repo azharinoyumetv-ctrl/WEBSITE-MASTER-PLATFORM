@@ -10,6 +10,8 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import { DashboardChart } from './dashboard-chart'
+import { updateDashboardWidgets } from '@/lib/actions/dashboard'
+import toast from 'react-hot-toast'
 
 function StatCard({ 
   label, value, trend, trendLabel, icon: Icon, color, href 
@@ -219,13 +221,19 @@ export function DashboardClient({
   a,
   monitoringData,
   metricsError,
-  analyticsError
+  analyticsError,
+  initialWidgets,
+  tenantId,
+  userId
 }: {
   m: any,
   a: any,
   monitoringData: any,
   metricsError: any,
-  analyticsError: any
+  analyticsError: any,
+  initialWidgets?: Record<string, boolean> | null,
+  tenantId: string,
+  userId: string
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -233,7 +241,8 @@ export function DashboardClient({
   
   // Custom Widgets State
   const [showWidgetSettings, setShowWidgetSettings] = useState(false)
-  const [activeWidgets, setActiveWidgets] = useState<Record<string, boolean>>({
+  
+  const defaultWidgets = {
     kpi: true,
     revenueChart: true,
     systemHealth: true,
@@ -241,7 +250,11 @@ export function DashboardClient({
     inventoryAlerts: true,
     auditLog: true,
     moduleStatus: true
-  })
+  }
+
+  const [activeWidgets, setActiveWidgets] = useState<Record<string, boolean>>(
+    initialWidgets || defaultWidgets
+  )
 
   const handleExport = () => {
     let csv = "Metric,Value\n"
@@ -263,8 +276,18 @@ export function DashboardClient({
     link.click()
   }
 
-  const toggleWidget = (key: string) => {
-    setActiveWidgets(prev => ({ ...prev, [key]: !prev[key] }))
+  const toggleWidget = async (key: string) => {
+    const newWidgets = {
+      ...activeWidgets,
+      [key]: !activeWidgets[key]
+    }
+    setActiveWidgets(newWidgets)
+    
+    // Persist immediately in the background
+    const res = await updateDashboardWidgets(tenantId, userId, newWidgets)
+    if (!res.success) {
+      toast.error('Failed to save widget preferences')
+    }
   }
 
   return (
