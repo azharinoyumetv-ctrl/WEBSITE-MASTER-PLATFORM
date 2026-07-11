@@ -158,8 +158,9 @@ export async function recordAnalyticsEvent(
       return { success: false, error: 'tenantId and eventName are required' }
     }
 
-    // Generate a session ID if not provided (anonymous sessions)
-    const sid = sessionId || `anon-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+    // Generate a secure session ID if not provided (anonymous sessions)
+    const crypto = require('crypto')
+    const sid = sessionId || `anon-${crypto.randomUUID()}`
 
     await prisma.tenantAnalyticsEvent.create({
       data: {
