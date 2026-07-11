@@ -5,7 +5,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { requirePermission } from "@/lib/rbac"
 
-export async function generateBillingInvoice(tenantId: string) {
+export async function generateBillingInvoice(tenantId: string, planId: 'core' | 'professional' | 'enterprise') {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user) throw new Error("Unauthorized")
@@ -13,6 +13,15 @@ export async function generateBillingInvoice(tenantId: string) {
 
     const tenant = await prisma.systemTenant.findUnique({ where: { id: tenantId } })
     if (!tenant) throw new Error("Tenant not found")
+
+    let amount = 0;
+    if (planId === 'professional') amount = 500000;
+    else if (planId === 'enterprise') amount = 2000000;
+    else amount = 0; // core is free, though usually they won't invoice for free.
+    
+    if (amount === 0) {
+       return { success: true, invoiceUrl: null, message: "Plan is free, no invoice needed." }
+    }
 
     // Try Xendit first
     if (process.env.XENDIT_SECRET_KEY) {
@@ -25,8 +34,8 @@ export async function generateBillingInvoice(tenantId: string) {
         },
         body: JSON.stringify({
           external_id: `upgrade-${tenantId}-${Date.now()}`,
-          amount: 500000, // IDR 500k for upgrade placeholder
-          description: `Platform Upgrade for ${tenant.companyName}`,
+          amount,
+          description: `Platform Upgrade to ${planId.toUpperCase()} for ${tenant.companyName}`,
           customer: {
             email: session.user.email
           },
@@ -56,7 +65,7 @@ export async function generateBillingInvoice(tenantId: string) {
         body: JSON.stringify({
           transaction_details: {
             order_id: `upgrade-${tenantId}-${Date.now()}`,
-            gross_amount: 500000
+            gross_amount: amount
           },
           customer_details: {
             email: session.user.email,
@@ -71,7 +80,7 @@ export async function generateBillingInvoice(tenantId: string) {
       }
     }
 
-    throw new Error("No billing provider configured on the platform")
+    return { success: false, error: "BILLING_NOT_CONFIGURED", message: "No billing provider configured on the platform. Please set XENDIT_SECRET_KEY or MIDTRANS_SERVER_KEY." }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

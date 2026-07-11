@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { User, Mail, Phone, Save, Loader2, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { User, Mail, Phone, Save, Loader2, ShieldAlert, ShieldCheck, LogOut } from 'lucide-react'
 import { updateProfile, generateMfaSecret, verifyAndEnableMfa } from '@/lib/actions/profile'
+import { logoutEverywhere } from '@/lib/actions/auth'
 import toast from 'react-hot-toast'
 import QRCode from 'qrcode'
 
@@ -46,6 +47,19 @@ export function ProfileClient({ initialUser, tenantId }: { initialUser: any, ten
       toast.error(res.error || 'Invalid token')
     }
     setIsMfaLoading(false)
+  }
+
+  const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const handleLogoutEverywhere = async () => {
+    if (!confirm('Are you sure you want to sign out of all other devices? You will remain signed in here.')) return
+    setIsLoggingOut(true)
+    const res = await logoutEverywhere()
+    if (res.success) {
+      toast.success('Successfully signed out of all other devices.')
+    } else {
+      toast.error('Failed to sign out of other devices.')
+    }
+    setIsLoggingOut(false)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -184,6 +198,24 @@ export function ProfileClient({ initialUser, tenantId }: { initialUser: any, ten
               )}
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="max-w-2xl mt-6">
+        <div className="card p-6 border-red-100">
+          <h3 className="text-lg font-semibold flex items-center gap-2 mb-4 text-red-600">
+            <LogOut className="w-5 h-5" /> Session Management
+          </h3>
+          <p className="text-sm text-slate-500 mb-4">
+            If you notice suspicious activity on your account, you can instantly revoke all active sessions across all devices.
+          </p>
+          <button 
+            onClick={handleLogoutEverywhere} 
+            disabled={isLoggingOut} 
+            className="btn btn-secondary text-red-600 border-red-200 hover:bg-red-50 hover:border-red-300"
+          >
+            {isLoggingOut ? 'Processing...' : 'Sign Out of All Devices'}
+          </button>
         </div>
       </div>
     </div>

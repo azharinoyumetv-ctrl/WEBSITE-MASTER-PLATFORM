@@ -13,6 +13,8 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
   const [isUploading, setIsUploading] = useState(false)
   const [snapshots, setSnapshots] = useState<any[]>([])
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false)
+  const [diffSnapshot, setDiffSnapshot] = useState<any>(null)
+  const [billingSetupError, setBillingSetupError] = useState('')
   
   useEffect(() => {
     if (activeTab === 'history') {
@@ -157,12 +159,18 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
     }
   }
 
-  const handleUpgradePlan = async () => {
+  const handleUpgradePlan = async (planId: 'core' | 'professional' | 'enterprise') => {
     try {
       setIsSaving(true)
-      const res = await generateBillingInvoice(tenantId)
+      setBillingSetupError('')
+      const res = await generateBillingInvoice(tenantId, planId)
       if (res.success && res.invoiceUrl) {
         window.location.href = res.invoiceUrl
+      } else if (res.success && !res.invoiceUrl) {
+        toast.success(res.message || 'Plan is free.')
+      } else if (res.error === "BILLING_NOT_CONFIGURED") {
+        setBillingSetupError(res.message)
+        toast.error('Billing setup required.')
       } else {
         toast.error(res.error || 'Failed to generate invoice')
       }
@@ -655,17 +663,40 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
               <div className="card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-slate-400" /> Current Plan
+                    <CreditCard className="w-4 h-4 text-slate-400" /> Subscription Plans
                   </h3>
                   <span className="badge badge-success uppercase tracking-wider">{initialTenant?.plan || 'core'}</span>
                 </div>
-                <div className="mt-6 flex gap-3">
-                  <button onClick={handleUpgradePlan} disabled={isSaving} className="btn btn-secondary">
-                    {isSaving ? 'Processing...' : 'View Invoices'}
-                  </button>
-                  <button onClick={handleUpgradePlan} disabled={isSaving} className="btn btn-primary">
-                    {isSaving ? 'Processing...' : 'Upgrade Plan'}
-                  </button>
+                
+                {billingSetupError && (
+                  <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+                    <h4 className="text-amber-800 font-semibold mb-1">Billing Not Configured</h4>
+                    <p className="text-sm text-amber-700">{billingSetupError}</p>
+                    <p className="text-xs text-amber-600 mt-2">To fix this, please provide XENDIT_SECRET_KEY or MIDTRANS_SERVER_KEY in your environment variables.</p>
+                  </div>
+                )}
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+                  {['core', 'professional', 'enterprise'].map((plan) => (
+                    <div key={plan} className={cn("border rounded-xl p-6 relative flex flex-col", (initialTenant?.plan || 'core') === plan ? "border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/10" : "border-slate-200")}>
+                      {(initialTenant?.plan || 'core') === plan && (
+                         <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] uppercase font-bold px-2 py-1 rounded-bl-lg rounded-tr-xl">Current</div>
+                      )}
+                      <h4 className="text-lg font-bold capitalize mb-2">{plan}</h4>
+                      <p className="text-sm text-slate-500 mb-6 flex-1">
+                        {plan === 'core' && 'Basic features for starting out.'}
+                        {plan === 'professional' && 'Advanced features and limits.'}
+                        {plan === 'enterprise' && 'Full access, priority support.'}
+                      </p>
+                      <button 
+                        onClick={() => handleUpgradePlan(plan as any)} 
+                        disabled={isSaving || (initialTenant?.plan || 'core') === plan} 
+                        className={cn("btn w-full justify-center", plan === 'professional' ? 'btn-primary' : 'btn-secondary')}
+                      >
+                        {(initialTenant?.plan || 'core') === plan ? 'Active' : 'Upgrade to ' + plan}
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -702,8 +733,8 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                           <div className="font-medium text-slate-900">Snapshot {snapshots.length - idx}</div>
                           <div className="text-sm text-slate-500">{new Date(snap.createdAt).toLocaleString()}</div>
                         </div>
-                        <button onClick={() => handleRestoreSnapshot(snap.id)} className="btn btn-secondary text-sm">
-                          Restore
+                        <button onClick={() => setDiffSnapshot(snap)} className="btn btn-secondary text-sm">
+                          Review & Restore
                         </button>
                       </div>
                     ))}
@@ -714,6 +745,46 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
           )}
         </div>
       </div>
+
+      {/* Snapshot Diff Modal */}
+      {diffSnapshot && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="font-semibold">Review Configuration Changes</h3>
+              <button onClick={() => setDiffSnapshot(null)} className="text-slate-400 hover:text-slate-600">×</button>
+            </div>
+            <div className="p-4 flex-1 overflow-y-auto bg-slate-50">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-sm font-semibold mb-2 text-red-600">Current State</h4>
+                  <pre className="text-xs p-4 bg-white border border-slate-200 rounded-lg overflow-x-auto">
+                    {JSON.stringify(websiteData, null, 2)}
+                  </pre>
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold mb-2 text-emerald-600">Snapshot to Restore</h4>
+                  <pre className="text-xs p-4 bg-white border border-slate-200 rounded-lg overflow-x-auto">
+                    {JSON.stringify(diffSnapshot.configData, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-3">
+              <button onClick={() => setDiffSnapshot(null)} className="btn btn-secondary">Cancel</button>
+              <button 
+                onClick={() => {
+                  handleRestoreSnapshot(diffSnapshot.id)
+                  setDiffSnapshot(null)
+                }} 
+                className="btn btn-primary"
+              >
+                Confirm Restore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

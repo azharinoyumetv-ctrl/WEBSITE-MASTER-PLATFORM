@@ -185,14 +185,48 @@ export const authOptions: NextAuthOptions = {
       if (token.sessionId) {
         const dbToken = await prisma.tenantRefreshToken.findUnique({ 
           where: { tokenHash: token.sessionId as string },
-          select: { isRevoked: true }
+          select: { id: true, isRevoked: true, isUsed: true, familyId: true, tenantId: true, userId: true }
         })
         if (!dbToken || dbToken.isRevoked) {
           // Token has been revoked or deleted
           return {} as any
         }
+        
+        // Refresh token rotation on use (simulate access token expiry every 15 mins)
+        const lastRefreshed = (token.lastRefreshed as number) || Date.now();
+        if (Date.now() - lastRefreshed > 15 * 60 * 1000) {
+          if (dbToken.isUsed) {
+            // Re-use detected! Nuclear revocation
+            await prisma.tenantRefreshToken.updateMany({
+              where: { userId: dbToken.userId },
+              data: { isRevoked: true }
+            })
+            return {} as any
+          }
+          
+          // Mark old token as used
+          await prisma.tenantRefreshToken.update({
+            where: { id: dbToken.id },
+            data: { isUsed: true }
+          })
+          
+          // Create new token
+          const crypto = require('crypto')
+          const newSessionId = crypto.randomBytes(32).toString('hex')
+          await prisma.tenantRefreshToken.create({
+            data: {
+              tenantId: dbToken.tenantId,
+              userId: dbToken.userId,
+              tokenHash: newSessionId,
+              familyId: dbToken.familyId || dbToken.id,
+              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+            }
+          })
+          
+          token.sessionId = newSessionId
+          token.lastRefreshed = Date.now()
+        }
       }
-
       return token
     },
     async session({ session, token }) {

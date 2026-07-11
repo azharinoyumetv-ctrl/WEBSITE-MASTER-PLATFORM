@@ -75,9 +75,16 @@ export async function verifyAndEnableMfa(tenantId: string, userId: string, secre
     let delta = totp.validate({ token, window: 1 })
     if (delta === null) throw new Error("Invalid MFA token")
     
-    await prisma.tenantAuthCredential.update({
+    await prisma.tenantAuthCredential.upsert({
       where: { userId },
-      data: { mfaSecretEncrypted: encrypt(secret), isMfaEnabled: true }
+      update: { mfaSecretEncrypted: encrypt(secret), isMfaEnabled: true },
+      create: {
+        userId,
+        tenantId,
+        passwordHash: "",
+        mfaSecretEncrypted: encrypt(secret),
+        isMfaEnabled: true
+      }
     })
     
     revalidatePath('/admin/profile')
