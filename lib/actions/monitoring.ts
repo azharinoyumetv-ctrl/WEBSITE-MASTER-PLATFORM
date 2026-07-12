@@ -121,6 +121,10 @@ export async function getIncidentLogs(tenantId: string) {
 
 export async function getUnreadAlertCount(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'settings', 'write')
+
     const incidentCount = await prisma.tenantIncidentLog.count({
       where: { tenantId, status: 'investigating' }
     })

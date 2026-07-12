@@ -391,6 +391,12 @@ export async function generateReceipt(tenantId: string, orderId: string) {
     
     const tax = Number(order.totalAmount) * 0.1
     const subtotal = Number(order.totalAmount) - tax
+    
+    const format = (amt: number) => {
+      if (order.currency === 'EUR') return `€${amt.toFixed(2)}`
+      if (order.currency === 'GBP') return `£${amt.toFixed(2)}`
+      return `${order.currency === 'JPY' ? '¥' : '$'}${amt.toFixed(2)}`
+    }
 
     const receiptHtml = `
       <div style="font-family: 'Courier New', monospace; padding: 24px; max-width: 350px; margin: auto; background: #fff; color: #000; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
@@ -414,7 +420,7 @@ export async function generateReceipt(tenantId: string, orderId: string) {
           ${order.items.map(i => `
             <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
               <span>${i.quantity}x ${i.catalogItem?.title?.slice(0, 18) || 'Item'}</span>
-              <span>$${(Number(i.unitPrice) * i.quantity).toFixed(2)}</span>
+              <span>${format(Number(i.unitPrice) * i.quantity)}</span>
             </div>
           `).join('')}
         </div>
@@ -422,15 +428,15 @@ export async function generateReceipt(tenantId: string, orderId: string) {
         <div style="font-size: 12px; border-top: 1px dashed #000; padding-top: 8px; margin-top: 12px; space-y-2;">
           <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
             <span>Subtotal:</span>
-            <span>$${subtotal.toFixed(2)}</span>
+            <span>${format(subtotal)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
             <span>Tax (10%):</span>
-            <span>$${tax.toFixed(2)}</span>
+            <span>${format(tax)}</span>
           </div>
           <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 6px; padding-top: 6px; border-top: 1px solid #000;">
             <span>TOTAL:</span>
-            <span>$${Number(order.totalAmount).toFixed(2)}</span>
+            <span>${format(Number(order.totalAmount))}</span>
           </div>
         </div>
 
