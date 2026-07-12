@@ -193,7 +193,7 @@ export const authOptions: NextAuthOptions = {
              tenantId: user.tenantId,
              userId: user.id,
              tokenHash: sessionId,
-             expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+             expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
            }
         })
 
@@ -266,7 +266,7 @@ export const authOptions: NextAuthOptions = {
               userId: dbToken.userId,
               tokenHash: newSessionId,
               familyId: dbToken.familyId || dbToken.id,
-              expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+              expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
             }
           })
           

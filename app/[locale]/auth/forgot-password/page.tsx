@@ -17,16 +17,25 @@ export default function ForgotPasswordPage() {
     setError('')
     setIsLoading(true)
 
-    const { requestPasswordReset } = await import('@/lib/actions/auth')
-    const res = await requestPasswordReset(email)
-    
-    if (res.success) {
-      toast.success('If an account exists, a reset link has been sent.')
-      router.push('/auth/login')
-    } else {
+    try {
+      const response = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const res = await response.json()
+      
+      if (response.ok && res.success) {
+        toast.success('If an account exists, a reset link has been sent.')
+        router.push('/auth/login')
+      } else {
+        setError(res.error || 'An error occurred. Please try again.')
+      }
+    } catch (err: any) {
       setError('An error occurred. Please try again.')
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   return (
