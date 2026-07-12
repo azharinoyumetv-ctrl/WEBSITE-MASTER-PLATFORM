@@ -25,11 +25,11 @@ export async function requirePermission(userId: string, tenantId: string, module
   }
 
   // Check if they are a platform-owner for this tenant
-  const isPlatformOwner = userRoles.some(ur => ur.role.name === 'platform-owner');
+  const isPlatformOwner = userRoles.some(ur => ur.role.name === 'platform_owner');
   if (isPlatformOwner) return true;
 
   // Check if they are an admin
-  const isAdmin = userRoles.some(ur => ur.role.name === 'admin');
+  const isAdmin = userRoles.some(ur => ur.role.name === 'Admin');
   if (isAdmin) return true;
 
   // Real permission check against TenantRolePermission

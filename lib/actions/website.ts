@@ -131,6 +131,10 @@ export async function deleteAdminPage(tenantId: string, pageId: string) {
 // Admin: Get Website Config
 export async function getAdminWebsiteConfig(tenantId: string) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!session?.user) throw new Error('Unauthorized')
+    await requirePermission((session.user as any).id, tenantId, 'website', 'read')
+
     const website = await prisma.tenantWebsite.findUnique({
       where: { tenantId }
     })
