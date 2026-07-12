@@ -50,13 +50,29 @@ export async function authenticateApiRequest(req: Request, requiredScope?: strin
   }
 
   // Log usage asynchronously
-  prisma.tenantApiKey.update({
-    where: { id: apiKey.id },
-    data: { 
-      lastUsedAt: new Date(),
-      requestCount: { increment: 1 }
-    }
-  }).catch(console.error)
+  prisma.$transaction([
+    prisma.tenantApiKey.update({
+      where: { id: apiKey.id },
+      data: { 
+        lastUsedAt: new Date(),
+        requestCount: { increment: 1 }
+      }
+    }),
+    prisma.systemAuditLog.create({
+      data: {
+        tenantId: apiKey.tenantId,
+        actionType: 'api_key_usage',
+        status: 'success',
+        ipAddress: ip,
+        payload: {
+          apiKeyId: apiKey.id,
+          keyName: apiKey.keyName,
+          endpoint: req.url,
+          method: req.method
+        }
+      }
+    })
+  ]).catch(console.error)
 
   return { apiKey, tenant: apiKey.tenant }
 }

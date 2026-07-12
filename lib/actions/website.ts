@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { encrypt, decrypt } from '@/lib/crypto'
 import { requirePermission, getAuthenticatedUser } from '@/lib/rbac'
+import crypto from 'crypto'
 
 // Fetch public website config (used by public site renderer)
 export async function getPublicWebsiteConfig(tenantDomain: string) {
@@ -122,6 +123,42 @@ export async function deleteAdminPage(tenantId: string, pageId: string) {
   }
 }
 
+// Temporary Cache for Typed AI secrets (stops API Key Leak from Browser)
+const tempAiSecrets = new Map<string, { secret: string, expiresAt: number }>()
+
+export async function createTempAiSecretToken(tenantId: string, secret: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'settings', 'write')
+
+    const token = crypto.randomUUID()
+    tempAiSecrets.set(token, {
+      secret,
+      expiresAt: Date.now() + 5 * 60 * 1000 // 5 minutes validity
+    })
+    
+    // Clean expired records
+    tempAiSecrets.forEach((v, k) => {
+      if (v.expiresAt < Date.now()) tempAiSecrets.delete(k)
+    })
+
+    return { success: true, token }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export function getTempAiSecret(token: string): string | null {
+  const record = tempAiSecrets.get(token)
+  if (!record) return null
+  if (record.expiresAt < Date.now()) {
+    tempAiSecrets.delete(token)
+    return null
+  }
+  return record.secret
+}
+
 // Admin: Get Website Config
 export async function getAdminWebsiteConfig(tenantId: string) {
   try {
@@ -133,12 +170,12 @@ export async function getAdminWebsiteConfig(tenantId: string) {
     })
     
     if (website) {
-      // Don't leak the actual encrypted keys to the client, but return a placeholder if they exist
-      if (website.xenditEncryptedSecret) (website as any).xenditSecretPlaceholder = 'sk_live_****'
-      if (website.xenditEncryptedWebhookToken) (website as any).xenditWebhookPlaceholder = 'xtok_****'
-      if (website.midtransEncryptedServerKey) (website as any).midtransServerKeyPlaceholder = 'Mid-server-****'
+      // Return configured flags instead of raw placeholders
+      (website as any).isXenditSecretConfigured = !!website.xenditEncryptedSecret;
+      (website as any).isXenditWebhookTokenConfigured = !!website.xenditEncryptedWebhookToken;
+      (website as any).isMidtransServerKeyConfigured = !!website.midtransEncryptedServerKey;
       
-      // We explicitly clear these so they don't get sent to the client
+      // Explicitly clear keys so they never travel to the client
       website.xenditEncryptedSecret = null
       website.xenditEncryptedSecretIv = null
       website.xenditEncryptedWebhookToken = null
@@ -158,6 +195,7 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
   try {
     const user = await getAuthenticatedUser()
     await requirePermission(user.id, tenantId, 'website', 'write')
+
     const website = await prisma.$transaction(async (tx) => {
       const w = await tx.tenantWebsite.upsert({
         where: { tenantId },
@@ -197,15 +235,18 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
   }
 }
 
-export async function getWebsiteConfigSnapshots(tenantId: string) {
+export async function getWebsiteConfigSnapshots(tenantId: string, configType?: string) {
   try {
     const user = await getAuthenticatedUser()
     await requirePermission(user.id, tenantId, 'settings', 'read')
     
     const snapshots = await prisma.tenantConfigSnapshot.findMany({
-      where: { tenantId, configType: 'website_theme' },
+      where: { 
+        tenantId,
+        configType: configType || undefined
+      },
       orderBy: { createdAt: 'desc' },
-      take: 10
+      take: 20
     })
     return { success: true, snapshots }
   } catch (error: any) {
@@ -224,35 +265,61 @@ export async function restoreWebsiteConfigSnapshot(tenantId: string, snapshotId:
     
     if (!snapshot || snapshot.tenantId !== tenantId) throw new Error('Snapshot not found')
     
-    // Fetch current website to preserve sensitive fields (WhatsApp keys) inside themeConfig
-    const currentWebsite = await prisma.tenantWebsite.findUnique({
-      where: { tenantId }
-    })
-    const currentTheme = (currentWebsite?.themeConfig as any) || {}
     const data = snapshot.snapshot as any
 
-    const safeThemeConfig = {
-      ...data.themeConfig,
-      whatsappPaNumber: currentTheme.whatsappPaNumber,
-      whatsappPhoneId: currentTheme.whatsappPhoneId,
-      whatsappToken: currentTheme.whatsappToken,
-      whatsappTemplate: currentTheme.whatsappTemplate
-    }
-
-    const website = await prisma.tenantWebsite.update({
-      where: { tenantId },
-      data: {
-        siteTitle: data.siteTitle,
-        themeConfig: safeThemeConfig,
-        globalSeoMetadata: data.globalSeoMetadata,
-        isActive: data.isActive
-        // Gateway fields (xenditEncryptedSecret, etc) are strictly top-level and omitted here to ensure they are never overwritten by a snapshot restore.
+    if (snapshot.configType === 'website_theme') {
+      const currentWebsite = await prisma.tenantWebsite.findUnique({
+        where: { tenantId }
+      })
+      const currentTheme = (currentWebsite?.themeConfig as any) || {}
+      const safeThemeConfig = {
+        ...data.themeConfig,
+        whatsappPaNumber: currentTheme.whatsappPaNumber,
+        whatsappPhoneId: currentTheme.whatsappPhoneId,
+        whatsappToken: currentTheme.whatsappToken,
+        whatsappTemplate: currentTheme.whatsappTemplate
       }
-    })
+
+      await prisma.tenantWebsite.update({
+        where: { tenantId },
+        data: {
+          siteTitle: data.siteTitle,
+          themeConfig: safeThemeConfig,
+          globalSeoMetadata: data.globalSeoMetadata,
+          isActive: data.isActive
+        }
+      })
+    } else if (snapshot.configType === 'ai') {
+      await prisma.tenantAiConfiguration.upsert({
+        where: { tenantId },
+        create: {
+          tenantId,
+          providerKey: data.providerKey,
+          encryptedApiSecret: data.encryptedApiSecret,
+          selectedModelName: data.selectedModelName
+        },
+        update: {
+          providerKey: data.providerKey,
+          encryptedApiSecret: data.encryptedApiSecret,
+          selectedModelName: data.selectedModelName
+        }
+      })
+    } else if (snapshot.configType === 'payments') {
+      await prisma.tenantWebsite.update({
+        where: { tenantId },
+        data: {
+          xenditEnabled: data.xenditEnabled,
+          xenditEncryptedSecret: data.xenditEncryptedSecret,
+          xenditEncryptedWebhookToken: data.xenditEncryptedWebhookToken,
+          midtransEnabled: data.midtransEnabled,
+          midtransEncryptedServerKey: data.midtransEncryptedServerKey
+        }
+      })
+    }
     
     revalidatePath('/admin/settings')
     revalidatePath('/site')
-    return { success: true, website }
+    return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -295,7 +362,7 @@ export async function saveAiConfig(tenantId: string, data: { providerKey: string
       updateData.encryptedApiSecret = encryptedSecret
     }
 
-    await prisma.tenantAiConfiguration.upsert({
+    const config = await prisma.tenantAiConfiguration.upsert({
       where: { tenantId },
       create: {
         tenantId,
@@ -305,6 +372,16 @@ export async function saveAiConfig(tenantId: string, data: { providerKey: string
       },
       update: updateData
     })
+
+    await prisma.tenantConfigSnapshot.create({
+      data: {
+        tenantId,
+        configType: 'ai',
+        snapshot: config as any,
+        actorId: user.id
+      }
+    })
+
     revalidatePath('/admin/settings')
     return { success: true }
   } catch (error: any) {
@@ -327,33 +404,46 @@ export async function savePaymentConfig(tenantId: string, data: {
       midtransEnabled: data.midtransEnabled
     }
 
-    if (data.xenditSecret && data.xenditSecret.trim() !== '' && !data.xenditSecret.includes('•') && data.xenditSecret !== 'sk_live_****') {
+    // Skip saving if input matches masked string or contains •
+    if (data.xenditSecret && data.xenditSecret.trim() !== '' && !data.xenditSecret.includes('•')) {
       if (!data.xenditSecret.startsWith('xnd_') && !data.xenditSecret.startsWith('sk_')) {
         throw new Error('Invalid Xendit secret format. Must start with xnd_ or sk_')
       }
-      const encryptedStr = encrypt(data.xenditSecret)
-      updateData.xenditEncryptedSecret = encryptedStr
+      updateData.xenditEncryptedSecret = encrypt(data.xenditSecret)
       updateData.xenditEncryptedSecretIv = ''
     }
 
-    if (data.xenditWebhookToken && data.xenditWebhookToken.trim() !== '' && !data.xenditWebhookToken.includes('•') && data.xenditWebhookToken !== 'xtok_****') {
-      const encryptedStr = encrypt(data.xenditWebhookToken)
-      updateData.xenditEncryptedWebhookToken = encryptedStr
+    if (data.xenditWebhookToken && data.xenditWebhookToken.trim() !== '' && !data.xenditWebhookToken.includes('•')) {
+      updateData.xenditEncryptedWebhookToken = encrypt(data.xenditWebhookToken)
       updateData.xenditEncryptedWebhookTokenIv = ''
     }
 
-    if (data.midtransServerKey && data.midtransServerKey.trim() !== '' && !data.midtransServerKey.includes('•') && data.midtransServerKey !== 'Mid-server-****') {
+    if (data.midtransServerKey && data.midtransServerKey.trim() !== '' && !data.midtransServerKey.includes('•')) {
       if (!data.midtransServerKey.startsWith('Mid-server-') && !data.midtransServerKey.startsWith('SB-Mid-server-')) {
         throw new Error('Invalid Midtrans server key format. Must start with Mid-server- or SB-Mid-server-')
       }
-      const encryptedStr = encrypt(data.midtransServerKey)
-      updateData.midtransEncryptedServerKey = encryptedStr
+      updateData.midtransEncryptedServerKey = encrypt(data.midtransServerKey)
       updateData.midtransEncryptedServerKeyIv = ''
     }
 
-    await prisma.tenantWebsite.update({
+    const website = await prisma.tenantWebsite.update({
       where: { tenantId },
       data: updateData
+    })
+
+    await prisma.tenantConfigSnapshot.create({
+      data: {
+        tenantId,
+        configType: 'payments',
+        snapshot: {
+          xenditEnabled: website.xenditEnabled,
+          xenditEncryptedSecret: website.xenditEncryptedSecret,
+          xenditEncryptedWebhookToken: website.xenditEncryptedWebhookToken,
+          midtransEnabled: website.midtransEnabled,
+          midtransEncryptedServerKey: website.midtransEncryptedServerKey
+        } as any,
+        actorId: user.id
+      }
     })
     
     revalidatePath('/admin/settings')

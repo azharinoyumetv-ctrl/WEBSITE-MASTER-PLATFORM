@@ -7,8 +7,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig, getWebsiteConfigSnapshots, restoreWebsiteConfigSnapshot } from '@/lib/actions/website'
-import { generateBillingInvoice } from '@/lib/actions/billing'
+import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig, getWebsiteConfigSnapshots, restoreWebsiteConfigSnapshot, createTempAiSecretToken } from '@/lib/actions/website'
+import { generateBillingInvoice, getBillingInvoices } from '@/lib/actions/billing'
 
 export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig, tenantId }: { initialWebsite: any, initialTenant: any, initialAiConfig?: any, tenantId: string }) {
   const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history'>('general')
@@ -18,6 +18,9 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false)
   const [diffSnapshot, setDiffSnapshot] = useState<any>(null)
   const [billingSetupError, setBillingSetupError] = useState('')
+  const [pendingTab, setPendingTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history' | null>(null)
+  const [invoices, setInvoices] = useState<any[]>([])
+  const [isLoadingInvoices, setIsLoadingInvoices] = useState(false)
   
   useEffect(() => {
     if (activeTab === 'history') {
@@ -26,11 +29,17 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
         if (res.success) setSnapshots(res.snapshots || [])
         setIsLoadingSnapshots(false)
       })
+    } else if (activeTab === 'billing') {
+      setIsLoadingInvoices(true)
+      getBillingInvoices(tenantId).then(res => {
+        if (res.success) setInvoices(res.invoices || [])
+        setIsLoadingInvoices(false)
+      })
     }
   }, [activeTab, tenantId])
 
   const handleRestoreSnapshot = async (snapshotId: string) => {
-    if (!confirm('Are you sure you want to restore this configuration snapshot? This will overwrite your current theme settings.')) return
+    if (!confirm('Are you sure you want to restore this configuration snapshot? This will overwrite your current settings.')) return
     setIsSaving(true)
     const res = await restoreWebsiteConfigSnapshot(tenantId, snapshotId)
     setIsSaving(false)
@@ -81,20 +90,66 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
 
   const [paymentConfig, setPaymentConfig] = useState({
     xenditEnabled: initialWebsite?.xenditEnabled || false,
-    xenditSecret: initialWebsite?.xenditSecretPlaceholder || '',
-    xenditWebhookToken: initialWebsite?.xenditWebhookPlaceholder || '',
+    xenditSecret: initialWebsite?.isXenditSecretConfigured ? '••••••••' : '',
+    xenditWebhookToken: initialWebsite?.isXenditWebhookTokenConfigured ? '••••••••' : '',
     midtransEnabled: initialWebsite?.midtransEnabled || false,
-    midtransServerKey: initialWebsite?.midtransServerKeyPlaceholder || ''
+    midtransServerKey: initialWebsite?.isMidtransServerKeyConfigured ? '••••••••' : ''
   })
 
   const [aiData, setAiData] = useState({
     providerKey: initialAiConfig?.providerKey || 'platform_managed',
-    apiSecret: '', // Don't show existing secret, only allow override
+    apiSecret: initialAiConfig?.encryptedApiSecret ? '••••••••' : '',
     selectedModelName: initialAiConfig?.selectedModelName || 'gpt-4o-mini'
   })
 
   const [availableModels, setAvailableModels] = useState<string[]>([])
   const [isFetchingModels, setIsFetchingModels] = useState(false)
+
+  const isTabDirty = (tab: string) => {
+    if (tab === 'general') {
+      const xenditSecretInit = initialWebsite?.isXenditSecretConfigured ? '••••••••' : ''
+      const xenditWebhookInit = initialWebsite?.isXenditWebhookTokenConfigured ? '••••••••' : ''
+      const midtransServerKeyInit = initialWebsite?.isMidtransServerKeyConfigured ? '••••••••' : ''
+      
+      return paymentConfig.xenditEnabled !== (initialWebsite?.xenditEnabled || false) ||
+        paymentConfig.xenditSecret !== xenditSecretInit ||
+        paymentConfig.xenditWebhookToken !== xenditWebhookInit ||
+        paymentConfig.midtransEnabled !== (initialWebsite?.midtransEnabled || false) ||
+        paymentConfig.midtransServerKey !== midtransServerKeyInit;
+    }
+    if (tab === 'theme') {
+      const siteTitleInit = initialWebsite?.siteTitle || 'Website'
+      const themeConfigInit = initialWebsite?.themeConfig || {
+        colors: { primary: '#4f46e5', secondary: '#10b981' },
+        typography: { base_font: 'Inter' },
+        baseCurrency: 'USD'
+      }
+      const seoInit = initialWebsite?.globalSeoMetadata || { description: '' }
+      
+      return websiteData.siteTitle !== siteTitleInit ||
+        websiteData.isActive !== (initialWebsite?.isActive ?? true) ||
+        JSON.stringify(websiteData.themeConfig) !== JSON.stringify(themeConfigInit) ||
+        JSON.stringify(websiteData.globalSeoMetadata) !== JSON.stringify(seoInit);
+    }
+    if (tab === 'ai') {
+      const providerKeyInit = initialAiConfig?.providerKey || 'platform_managed'
+      const apiSecretInit = initialAiConfig?.encryptedApiSecret ? '••••••••' : ''
+      const modelInit = initialAiConfig?.selectedModelName || 'gpt-4o-mini'
+
+      return aiData.providerKey !== providerKeyInit ||
+        aiData.apiSecret !== apiSecretInit ||
+        aiData.selectedModelName !== modelInit;
+    }
+    return false
+  }
+
+  const handleTabChange = (tabId: typeof activeTab) => {
+    if (isTabDirty(activeTab)) {
+      setPendingTab(tabId)
+    } else {
+      setActiveTab(tabId)
+    }
+  }
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -105,12 +160,21 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
       setIsFetchingModels(true)
       try {
         const customUrlPart = aiData.selectedModelName.includes('|url:') ? aiData.selectedModelName.split('|url:')[1] : ''
+        
+        let secretToken = ''
+        if (aiData.apiSecret && !aiData.apiSecret.includes('•')) {
+          const tokenRes = await createTempAiSecretToken(tenantId, aiData.apiSecret)
+          if (tokenRes.success && tokenRes.token) {
+            secretToken = tokenRes.token
+          }
+        }
+
         const res = await fetch('/api/ai/models', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             providerKey: aiData.providerKey,
-            apiSecret: aiData.apiSecret,
+            secretToken,
             customBaseUrl: customUrlPart
           })
         })
@@ -141,24 +205,29 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
 
   const handleSave = async () => {
     setIsSaving(true)
-    const res = await saveAdminWebsiteConfig(tenantId, websiteData)
-    
-    let aiRes: any = { success: true, error: '' }
-    if (activeTab === 'ai') {
-      aiRes = await saveAiConfig(tenantId, aiData)
-    }
+    let res: any = { success: true }
+    let paymentRes: any = { success: true }
+    let aiRes: any = { success: true }
 
-    let paymentRes: any = { success: true, error: '' }
     if (activeTab === 'general') {
+      res = await saveAdminWebsiteConfig(tenantId, websiteData)
       paymentRes = await savePaymentConfig(tenantId, paymentConfig)
+    } else if (activeTab === 'theme') {
+      res = await saveAdminWebsiteConfig(tenantId, websiteData)
+    } else if (activeTab === 'ai') {
+      aiRes = await saveAiConfig(tenantId, aiData)
     }
 
     setIsSaving(false)
 
     if (res.success && aiRes.success && paymentRes.success) {
       toast.success('Settings saved successfully')
+      setTimeout(() => {
+        window.location.reload()
+      }, 500)
     } else {
-      toast.error(res.error?.toString() || aiRes.error?.toString() || paymentRes.error?.toString() || 'Failed to save settings')
+      const errMsg = res.error || aiRes.error || paymentRes.error || 'Failed to save settings'
+      toast.error(errMsg.toString())
     }
   }
 
@@ -172,7 +241,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
       } else if (res.success && !res.invoiceUrl) {
         toast.success(res.message || 'Plan is free.')
       } else if (res.error === "BILLING_NOT_CONFIGURED") {
-        setBillingSetupError(res.message)
+        setBillingSetupError(res.message || '')
         toast.error('Billing setup required.')
       } else {
         toast.error(res.error || 'Failed to generate invoice')
@@ -248,7 +317,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
           ].map(tab => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as typeof activeTab)}
+              onClick={() => handleTabChange(tab.id as typeof activeTab)}
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-all',
                 activeTab === tab.id ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'
@@ -810,6 +879,62 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                   ))}
                 </div>
               </div>
+
+              {/* Invoices List */}
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Save className="w-4 h-4 text-slate-400" /> Billing Invoice History
+                </h3>
+                {isLoadingInvoices ? (
+                  <div className="py-4 text-sm text-slate-500 flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" /> Loading invoice history...
+                  </div>
+                ) : invoices.length === 0 ? (
+                  <div className="py-4 text-sm text-slate-500">No invoices found.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="data-table">
+                      <thead>
+                        <tr>
+                          <th>Description</th>
+                          <th>Amount</th>
+                          <th>Status</th>
+                          <th>Date</th>
+                          <th className="text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {invoices.map((invoice: any) => (
+                          <tr key={invoice.id}>
+                            <td><span className="text-sm font-semibold text-slate-800">{invoice.description}</span></td>
+                            <td className="font-mono text-sm text-slate-600">{invoice.currency} {Number(invoice.amount).toFixed(2)}</td>
+                            <td>
+                              <span className={cn('badge text-[10px]', invoice.status === 'paid' ? 'badge-success' : 'badge-neutral')}>
+                                {invoice.status}
+                              </span>
+                            </td>
+                            <td className="text-xs text-slate-500">{new Date(invoice.createdAt).toLocaleDateString()}</td>
+                            <td className="text-right">
+                              {invoice.invoiceUrl ? (
+                                <a 
+                                  href={invoice.invoiceUrl} 
+                                  target="_blank" 
+                                  rel="noreferrer" 
+                                  className="btn btn-ghost btn-sm text-indigo-600 underline"
+                                >
+                                  View Invoice
+                                </a>
+                              ) : (
+                                <span className="text-xs text-slate-400">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -841,7 +966,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                     {snapshots.map((snap, idx) => (
                       <div key={snap.id} className="flex items-center justify-between p-4 border border-slate-100 rounded-lg">
                         <div>
-                          <div className="font-medium text-slate-900">Snapshot {snapshots.length - idx}</div>
+                          <div className="font-medium text-slate-900">Snapshot {snapshots.length - idx} ({snap.configType})</div>
                           <div className="text-sm text-slate-500">{new Date(snap.createdAt).toLocaleString()}</div>
                         </div>
                         <button onClick={() => setDiffSnapshot(snap)} className="btn btn-secondary text-sm">
@@ -897,6 +1022,33 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                 className="btn btn-primary"
               >
                 Confirm Restore
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Unsaved Changes Confirmation Dialog Modal */}
+      {pendingTab && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-slide-up">
+            <h3 className="text-lg font-bold mb-2">Unsaved Changes</h3>
+            <p className="text-sm text-slate-600 mb-6">You have unsaved changes in the current tab. Switching tabs will discard your modifications.</p>
+            <div className="flex justify-end gap-3">
+              <button 
+                onClick={() => setPendingTab(null)} 
+                className="btn btn-secondary text-sm"
+              >
+                Stay on Tab
+              </button>
+              <button 
+                onClick={() => {
+                  setActiveTab(pendingTab)
+                  setPendingTab(null)
+                }} 
+                className="btn bg-red-600 text-white hover:bg-red-700 text-sm font-semibold px-4 py-2 rounded-lg"
+              >
+                Discard & Switch
               </button>
             </div>
           </div>

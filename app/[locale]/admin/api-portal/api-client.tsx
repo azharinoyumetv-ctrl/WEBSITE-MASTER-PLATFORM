@@ -33,6 +33,11 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
   const [editingWebhook, setEditingWebhook] = useState<any>(null)
   const [editingKey, setEditingKey] = useState<any>(null)
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Custom Key Generator Modal States
+  const [showCreateKeyModal, setShowCreateKeyModal] = useState(false)
+  const [newKeyForm, setNewKeyForm] = useState({ keyName: '', scopes: ['catalog:read'], expiresInDays: 30 })
+  const [generatedKey, setGeneratedKey] = useState<any | null>(null)
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -40,14 +45,19 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
   }
 
   const handleCreateKey = async () => {
+    if (!newKeyForm.keyName.trim()) {
+      return toast.error('Key Name is required')
+    }
     setIsCreatingKey(true)
-    const res = await createApiKey(tenantId, 'New API Key ' + (keys.length + 1))
+    const res = await createApiKey(tenantId, newKeyForm.keyName, newKeyForm.scopes, newKeyForm.expiresInDays)
     setIsCreatingKey(false)
     if (res.success) {
       setKeys([res.key, ...keys])
+      setGeneratedKey(res.key)
+      setShowCreateKeyModal(false)
       toast.success('API Key created successfully')
     } else {
-      toast.error('Failed to create key')
+      toast.error('Failed to create key: ' + res.error)
     }
   }
 
@@ -177,8 +187,8 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
               <Key className="w-5 h-5 text-indigo-500" />
               <h3 className="text-sm font-semibold text-slate-900">API Keys</h3>
             </div>
-            <button onClick={handleCreateKey} disabled={isCreatingKey} className="btn btn-secondary btn-sm">
-              {isCreatingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} Generate Key
+            <button onClick={() => { setNewKeyForm({ keyName: '', scopes: ['catalog:read'], expiresInDays: 30 }); setShowCreateKeyModal(true) }} className="btn btn-secondary btn-sm">
+              <Plus className="w-4 h-4" /> Generate Key
             </button>
           </div>
           <div className="divide-y divide-slate-100 flex-1 overflow-y-auto max-h-[400px]">
@@ -430,6 +440,104 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
               <button onClick={() => setEditingKey(null)} className="btn btn-secondary">Cancel</button>
               <button onClick={handleSaveKey} disabled={isSaving} className="btn btn-primary">
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generate API Key Modal */}
+      {showCreateKeyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 animate-slide-up">
+            <h3 className="text-lg font-bold mb-4">Generate API Key</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="form-label">Key Name</label>
+                <input 
+                  type="text" 
+                  value={newKeyForm.keyName} 
+                  onChange={e => setNewKeyForm({...newKeyForm, keyName: e.target.value})}
+                  className="form-input" 
+                  placeholder="e.g. Production Client"
+                />
+              </div>
+              <div>
+                <label className="form-label">Expires In</label>
+                <select 
+                  value={newKeyForm.expiresInDays} 
+                  onChange={e => setNewKeyForm({...newKeyForm, expiresInDays: parseInt(e.target.value)})}
+                  className="form-select"
+                >
+                  <option value="7">7 Days</option>
+                  <option value="30">30 Days</option>
+                  <option value="90">90 Days</option>
+                  <option value="365">365 Days</option>
+                  <option value="0">Never</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label mb-2 block">Scopes</label>
+                <div className="space-y-2 max-h-40 overflow-y-auto border rounded-lg p-3 bg-slate-50">
+                  {API_SCOPES.map(scope => (
+                    <label key={scope.id} className="flex items-center gap-2 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="form-checkbox text-indigo-600 rounded"
+                        checked={newKeyForm.scopes.includes(scope.id)}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          setNewKeyForm({
+                            ...newKeyForm,
+                            scopes: isChecked 
+                              ? [...newKeyForm.scopes, scope.id]
+                              : newKeyForm.scopes.filter((id: string) => id !== scope.id)
+                          });
+                        }}
+                      />
+                      <span className="text-sm font-medium text-slate-700">{scope.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button onClick={() => setShowCreateKeyModal(false)} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleCreateKey} disabled={isCreatingKey} className="btn btn-primary">
+                {isCreatingKey ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Generate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Generated Success API Key Modal */}
+      {generatedKey && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 animate-slide-up">
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-emerald-600">
+              <CheckCircle2 className="w-6 h-6" /> Key Generated Successfully
+            </h3>
+            <p className="text-sm text-slate-600 mb-4">Make sure to copy your API key now. You won't be able to see it again!</p>
+            
+            <div className="bg-slate-900 rounded-lg p-3 flex items-center justify-between mb-6">
+              <code className="text-xs text-emerald-400 font-mono break-all select-all">
+                {generatedKey.keyPrefix}{generatedKey.rawKey}
+              </code>
+              <button 
+                onClick={() => copyToClipboard(`${generatedKey.keyPrefix}${generatedKey.rawKey}`)} 
+                className="p-1 text-slate-400 hover:text-white transition-colors"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="flex justify-end">
+              <button 
+                onClick={() => setGeneratedKey(null)} 
+                className="btn btn-primary bg-slate-900 text-white hover:bg-slate-800"
+              >
+                Close & I have copied it
               </button>
             </div>
           </div>

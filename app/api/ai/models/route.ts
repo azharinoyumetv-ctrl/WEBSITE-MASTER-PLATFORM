@@ -10,13 +10,18 @@ export async function POST(req: Request) {
     await requirePermission(user.id, tokenTenantId, 'ai', 'read')
 
     const body = await req.json()
-    const { providerKey, customBaseUrl } = body
+    const { providerKey, customBaseUrl, secretToken } = body
 
-    const config = await prisma.tenantAiConfiguration.findUnique({
-      where: { tenantId: tokenTenantId }
-    })
-
-    const apiSecret = config?.encryptedApiSecret ? decrypt(config.encryptedApiSecret) : null
+    let apiSecret: string | null = null
+    if (secretToken) {
+      const { getTempAiSecret } = await import('@/lib/actions/website')
+      apiSecret = getTempAiSecret(secretToken)
+    } else {
+      const config = await prisma.tenantAiConfiguration.findUnique({
+        where: { tenantId: tokenTenantId }
+      })
+      apiSecret = config?.encryptedApiSecret ? decrypt(config.encryptedApiSecret) : null
+    }
 
     if (!apiSecret || !providerKey) {
       return NextResponse.json({ error: 'Missing provider or API key' }, { status: 400 })

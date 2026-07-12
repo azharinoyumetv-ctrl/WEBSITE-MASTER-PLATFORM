@@ -34,7 +34,14 @@ export async function generateMetadata({ params }: { params: { slug?: string[] }
 
   const pageRes = await getPublicPage(websiteRes.tenantId!, slug)
   
+  if (pageRes.isDraft) {
+    notFound()
+  }
+
   if (!pageRes.success || !pageRes.page) {
+    if (!['shop', 'products', 'about', 'contact'].includes(slug)) {
+      notFound()
+    }
     return { title: `${pageLabels[slug] || 'Page'} | ${siteTitle}` }
   }
 

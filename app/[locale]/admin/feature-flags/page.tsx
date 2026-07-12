@@ -18,7 +18,8 @@ export default async function FeatureFlagsPage() {
   }
 
   const res = await getFeatureFlags(tenantId)
-  const initialFlags = res.success ? res.flags : []
+  const initialFlags = res.success ? (res.flags || []) : []
+  const initialAuditLogs = res.success ? (res.auditLogs || []) : []
 
-  return <FeatureFlagsClient initialFlags={initialFlags} tenantId={tenantId} />
+  return <FeatureFlagsClient initialFlags={initialFlags} initialAuditLogs={initialAuditLogs} tenantId={tenantId} />
 }

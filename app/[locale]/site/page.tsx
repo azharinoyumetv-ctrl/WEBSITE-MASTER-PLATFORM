@@ -5,6 +5,8 @@ import { getPublicWebsiteConfig, getPublicPage } from '@/lib/actions/website'
 import { getCatalogItems } from '@/lib/actions/catalog'
 import { LandingClient } from './landing-client'
 
+import { notFound } from 'next/navigation'
+
 export default async function SiteHomePage() {
   const headersList = await headers()
   const tenantDomain = headersList.get('x-tenant-id') || 'default'
@@ -23,7 +25,7 @@ export default async function SiteHomePage() {
   }
 
   if (!websiteRes.success || !websiteRes.tenantId) {
-    return <div className="p-20 text-center text-slate-500">Site Not Found</div>
+    notFound()
   }
   
   const tenantId = websiteRes.tenantId
@@ -32,7 +34,7 @@ export default async function SiteHomePage() {
   const pageRes = await getPublicPage(tenantId, '/')
   
   if (pageRes.isDraft) {
-    return <div className="p-20 text-center text-slate-500">This page is currently unpublished.</div>
+    notFound()
   }
 
   let blocks: any[] = []

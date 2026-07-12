@@ -2,9 +2,15 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
+import crypto from 'crypto'
+import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
 
 export async function getApiData(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'api', 'read')
+
     const keys = await prisma.tenantApiKey.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' }
@@ -21,20 +27,23 @@ export async function getApiData(tenantId: string) {
   }
 }
 
-import crypto from 'crypto'
-
-export async function createApiKey(tenantId: string, keyName: string, scopes: string[] = ['read', 'write']) {
+export async function createApiKey(
+  tenantId: string, 
+  keyName: string, 
+  scopes: string[] = ['catalog:read'], 
+  expiresInDays?: number
+) {
   try {
-    const user = await prisma.user.findFirst({
-      where: { tenantId }
-    })
-    
-    if (!user) {
-      return { success: false, error: 'No user found for the tenant context.' }
-    }
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'api', 'write')
 
     const rawKey = crypto.randomBytes(24).toString('hex')
     const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex')
+    
+    const expiresAt = expiresInDays && expiresInDays > 0 
+      ? new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000) 
+      : null
 
     const key = await prisma.tenantApiKey.create({
       data: {
@@ -43,7 +52,8 @@ export async function createApiKey(tenantId: string, keyName: string, scopes: st
         keyName,
         keyPrefix: 'live_',
         keyHash: keyHash,
-        scopes: scopes
+        scopes: scopes,
+        expiresAt: expiresAt
       }
     })
     
@@ -54,8 +64,83 @@ export async function createApiKey(tenantId: string, keyName: string, scopes: st
   }
 }
 
+export async function deleteApiKey(tenantId: string, id: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'api', 'write')
+
+    await prisma.tenantApiKey.deleteMany({
+      where: { id, tenantId }
+    })
+    revalidatePath('/admin/api-portal')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function rotateApiKey(tenantId: string, id: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'api', 'write')
+
+    const oldKey = await prisma.tenantApiKey.findFirst({ where: { id, tenantId } })
+    if (!oldKey) throw new Error('Key not found')
+    
+    await prisma.tenantApiKey.update({
+      where: { id },
+      data: { expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } // 7 days grace
+    })
+    
+    const rawKey = crypto.randomBytes(24).toString('hex')
+    const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex')
+    const newKey = await prisma.tenantApiKey.create({
+      data: {
+        tenantId,
+        createdBy: oldKey.createdBy,
+        keyName: oldKey.keyName + ' (Rotated)',
+        keyPrefix: oldKey.keyPrefix,
+        keyHash: keyHash,
+        scopes: (oldKey.scopes as any) || []
+      }
+    })
+    
+    revalidatePath('/admin/api-portal')
+    return { success: true, key: { ...newKey, rawKey } }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateApiKey(tenantId: string, id: string, data: { keyName?: string, scopes?: string[], expiresAt?: Date | null }) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'api', 'write')
+
+    await prisma.tenantApiKey.update({
+      where: { id, tenantId },
+      data: {
+        keyName: data.keyName,
+        scopes: data.scopes,
+        expiresAt: data.expiresAt
+      }
+    })
+    revalidatePath('/admin/api-portal')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
 export async function createWebhook(tenantId: string, targetUrl: string, events: string[]) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'api', 'write')
+
     const secretSigningToken = crypto.randomBytes(32).toString('hex')
 
     const webhook = await prisma.tenantApiWebhook.create({
@@ -75,64 +160,13 @@ export async function createWebhook(tenantId: string, targetUrl: string, events:
   }
 }
 
-export async function deleteApiKey(tenantId: string, id: string) {
-  try {
-    await prisma.tenantApiKey.deleteMany({
-      where: { id, tenantId }
-    })
-    revalidatePath('/admin/api-portal')
-    return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
-  }
-}
-
-export async function rotateApiKey(tenantId: string, id: string) {
-  try {
-    const oldKey = await prisma.tenantApiKey.findFirst({ where: { id, tenantId } })
-    if (!oldKey) throw new Error('Key not found')
-    
-    await prisma.tenantApiKey.update({
-      where: { id },
-      data: { expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) } // 7 days grace
-    })
-    
-    const rawKey = crypto.randomBytes(24).toString('hex')
-    const keyHash = crypto.createHash('sha256').update(rawKey).digest('hex')
-    const newKey = await prisma.tenantApiKey.create({
-      data: {
-        tenantId,
-        createdBy: oldKey.createdBy,
-        keyName: oldKey.keyName,
-        keyPrefix: oldKey.keyPrefix,
-        keyHash: keyHash,
-        scopes: oldKey.scopes
-      }
-    })
-    
-    revalidatePath('/admin/api-portal')
-    return { success: true, key: { ...newKey, rawKey } }
-  } catch (error: any) {
-    return { success: false, error: error.message }
-  }
-}
-
-export async function updateApiKey(tenantId: string, id: string, data: { keyName?: string, scopes?: string[] }) {
-  try {
-    const key = await prisma.tenantApiKey.updateMany({
-      where: { id, tenantId },
-      data
-    })
-    revalidatePath('/admin/api-portal')
-    return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
-  }
-}
-
 export async function updateWebhook(tenantId: string, id: string, data: { targetUrl?: string, subscribedEvents?: string[], isActive?: boolean, failureCount?: number }) {
   try {
-    const webhook = await prisma.tenantApiWebhook.updateMany({
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'api', 'write')
+
+    await prisma.tenantApiWebhook.update({
       where: { id, tenantId },
       data
     })
@@ -145,6 +179,10 @@ export async function updateWebhook(tenantId: string, id: string, data: { target
 
 export async function deleteWebhook(tenantId: string, id: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'api', 'write')
+
     await prisma.tenantApiWebhook.deleteMany({
       where: { id, tenantId }
     })
@@ -157,6 +195,10 @@ export async function deleteWebhook(tenantId: string, id: string) {
 
 export async function testWebhookDispatch(tenantId: string, webhookId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'api', 'write')
+
     const webhook = await prisma.tenantApiWebhook.findUnique({
       where: { id: webhookId, tenantId }
     })
