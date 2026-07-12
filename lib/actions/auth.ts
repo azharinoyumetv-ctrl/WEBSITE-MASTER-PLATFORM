@@ -3,6 +3,8 @@
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { getAuthenticatedUser } from "@/lib/rbac"
+import * as OTPAuth from "otpauth"
+import { encrypt, decrypt } from "@/lib/crypto"
 
 function validatePasswordPolicy(password: string): string | null {
   if (password.length < 8) return "Password must be at least 8 characters long."
@@ -49,6 +51,8 @@ export async function registerTenantAdmin(data: any) {
     }
 
     const passwordHash = await bcrypt.hash(password, 12)
+    const crypto = require('crypto')
+    const vToken = crypto.randomBytes(32).toString('hex')
 
     // Run creation in a transaction
     await prisma.$transaction(async (tx) => {
@@ -57,13 +61,10 @@ export async function registerTenantAdmin(data: any) {
         data: {
           companyName,
           subdomain,
-          status: "active",
+          status: "suspended", // Tenant is suspended until email is verified
           plan: "core"
         }
       })
-
-      const crypto = require('crypto')
-      const vToken = crypto.randomBytes(32).toString('hex')
 
       // 2. Create User (Owner)
       const user = await tx.user.create({
@@ -146,6 +147,8 @@ export async function registerTenantAdmin(data: any) {
       })
     })
 
+    console.log(`[EMAIL] Verification for ${email}: /auth/verify-email?token=${vToken}`)
+
     return { success: true, message: "Registration successful. Please check your email to verify your account." }
   } catch (error: any) {
     console.error("Registration error:", error)
@@ -203,7 +206,7 @@ export async function requestPasswordReset(email: string) {
   }
 
   // Send email (we use nodemailer with a generic transporter for now, or just log it if no config)
-  console.log(`[EMAIL] Password reset for ${email}: /auth/forgot-password/reset?token=${resetToken}`)
+  console.log(`[EMAIL] Password reset for ${email}: /auth/reset-password?token=${resetToken}`)
 
   return { success: true }
 }
@@ -222,5 +225,104 @@ export async function verifyEmailToken(token: string) {
       data: { status: "active" }
     })
   })
+  return { success: true }
+}
+
+export async function resendVerificationEmail(email: string) {
+  const user = await prisma.user.findFirst({ where: { email } })
+  if (!user || user.emailVerified || user.status !== "pending_verification") {
+    return { success: true } // Silently succeed
+  }
+
+  const crypto = require('crypto')
+  const vToken = crypto.randomBytes(32).toString('hex')
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { verificationToken: vToken }
+  })
+
+  console.log(`[EMAIL] Resend Verification for ${email}: /auth/verify-email?token=${vToken}`)
+  return { success: true }
+}
+
+export async function resetPassword(token: string, newPassword: string) {
+  const authCred = await prisma.tenantAuthCredential.findUnique({ where: { passwordResetToken: token } })
+  if (!authCred || !authCred.passwordResetExpires || authCred.passwordResetExpires < new Date()) {
+    return { success: false, error: "Invalid or expired token." }
+  }
+
+  const policyError = validatePasswordPolicy(newPassword)
+  if (policyError) return { success: false, error: policyError }
+
+  const passwordHash = await bcrypt.hash(newPassword, 12)
+  await prisma.tenantAuthCredential.update({
+    where: { id: authCred.id },
+    data: { passwordHash, passwordResetToken: null, passwordResetExpires: null }
+  })
+  return { success: true }
+}
+
+export async function generateMfaSecret() {
+  const user = await getAuthenticatedUser()
+  const secret = new OTPAuth.Secret({ size: 20 })
+  const totp = new OTPAuth.TOTP({
+    issuer: "WebsiteMasterPlatform",
+    label: user.email,
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+    secret: secret
+  })
+  
+  return { success: true, secret: secret.base32, uri: totp.toString() }
+}
+
+export async function verifyAndEnableMfa(secretBase32: string, code: string) {
+  const user = await getAuthenticatedUser()
+  const totp = new OTPAuth.TOTP({
+    issuer: "WebsiteMasterPlatform",
+    label: user.email,
+    algorithm: "SHA1",
+    digits: 6,
+    period: 30,
+    secret: OTPAuth.Secret.fromBase32(secretBase32)
+  })
+
+  const delta = totp.validate({ token: code, window: 1 })
+  if (delta === null) return { success: false, error: "Invalid code" }
+
+  const authCred = await prisma.tenantAuthCredential.findUnique({ where: { userId: user.id } })
+  if (!authCred) return { success: false, error: "Auth credential not found" }
+
+  await prisma.tenantAuthCredential.update({
+    where: { id: authCred.id },
+    data: { 
+      isMfaEnabled: true,
+      mfaSecretEncrypted: encrypt(secretBase32)
+    }
+  })
+
+  return { success: true }
+}
+
+export async function disableMfa(code: string) {
+  const user = await getAuthenticatedUser()
+  const authCred = await prisma.tenantAuthCredential.findUnique({ where: { userId: user.id } })
+  if (!authCred || !authCred.isMfaEnabled || !authCred.mfaSecretEncrypted) {
+    return { success: false, error: "MFA not enabled" }
+  }
+
+  const secretBase32 = decrypt(authCred.mfaSecretEncrypted)
+  const totp = new OTPAuth.TOTP({ secret: OTPAuth.Secret.fromBase32(secretBase32!) })
+  
+  const delta = totp.validate({ token: code, window: 1 })
+  if (delta === null) return { success: false, error: "Invalid code" }
+
+  await prisma.tenantAuthCredential.update({
+    where: { id: authCred.id },
+    data: { isMfaEnabled: false, mfaSecretEncrypted: null }
+  })
+
   return { success: true }
 }

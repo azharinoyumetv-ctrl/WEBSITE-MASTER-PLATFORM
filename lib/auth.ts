@@ -31,7 +31,7 @@ export const authOptions: NextAuthOptions = {
   adapter: PrismaAdapter(prisma),
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 2 * 60 * 60, // 2 hours
   },
   pages: {
     signIn: "/auth/login",
@@ -97,6 +97,14 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Account suspended")
         }
 
+        if (user.status === "pending_verification") {
+          throw new Error("Email not verified")
+        }
+
+        if (user.authCredential?.lockedUntil && user.authCredential.lockedUntil > new Date()) {
+          throw new Error("Account temporarily locked due to too many failed attempts")
+        }
+
         let isValidPassword = false;
 
         // In a dual-table schema, check the dedicated auth credential table first
@@ -110,8 +118,33 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (!isValidPassword) {
+          if (user.authCredential) {
+            const attempts = (user.authCredential.failedLoginAttempts || 0) + 1
+            const updateData: any = { failedLoginAttempts: attempts }
+            if (attempts >= 5) {
+              updateData.lockedUntil = new Date(Date.now() + 15 * 60 * 1000) // 15 mins lock
+            }
+            await prisma.tenantAuthCredential.update({
+              where: { id: user.authCredential.id },
+              data: updateData
+            })
+          }
           throw new Error("Invalid credentials")
         }
+
+        // Reset account failed attempts
+        if (user.authCredential && (user.authCredential.failedLoginAttempts > 0 || user.authCredential.lockedUntil)) {
+          await prisma.tenantAuthCredential.update({
+            where: { id: user.authCredential.id },
+            data: { failedLoginAttempts: 0, lockedUntil: null }
+          })
+        }
+        
+        // Reset IP rate limit on successful login
+        await prisma.systemApiRateLimit.update({
+          where: { id: rl.id },
+          data: { count: 0 }
+        })
 
         const currentHash = user.authCredential?.passwordHash || user.passwordHash;
         if (currentHash) {
