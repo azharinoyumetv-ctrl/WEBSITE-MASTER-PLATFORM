@@ -24,6 +24,10 @@ export async function getRoles(tenantId: string) {
 
 export async function createRole(tenantId: string, data: { name: string, description: string, baseRoleId?: string }) {
   try {
+    if (data.name.toLowerCase() === 'platform_owner') {
+      return { success: false, error: 'Cannot create system-reserved roles' }
+    }
+
     let initialPermissions = {}
     
     if (data.baseRoleId) {

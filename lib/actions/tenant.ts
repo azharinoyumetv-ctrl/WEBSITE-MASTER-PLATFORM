@@ -3,6 +3,8 @@
 import { PrismaClient, TenantStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import prisma from "@/lib/prisma"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 
 export async function getTenants() {
   try {
@@ -22,6 +24,11 @@ export async function getTenants() {
 
 export async function createTenant(data: { companyName: string, subdomain: string, packageKey?: string, addons?: string[] }) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!(session?.user as any)?.roles?.includes('platform_owner')) {
+      return { success: false, error: 'Unauthorized: Platform Owner role required.' }
+    }
+
     // Check if subdomain exists
     const existing = await prisma.systemTenant.findUnique({
       where: { subdomain: data.subdomain }
@@ -185,6 +192,11 @@ export async function createTenant(data: { companyName: string, subdomain: strin
 
 export async function updateTenantStatus(id: string, status: TenantStatus) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!(session?.user as any)?.roles?.includes('platform_owner')) {
+      return { success: false, error: 'Unauthorized: Platform Owner role required.' }
+    }
+
     const tenant = await prisma.systemTenant.update({
       where: { id },
       data: { status }
@@ -216,6 +228,11 @@ export async function getTenantById(tenantId: string) {
 
 export async function deleteTenant(tenantId: string) {
   try {
+    const session = await getServerSession(authOptions)
+    if (!(session?.user as any)?.roles?.includes('platform_owner')) {
+      return { success: false, error: 'Unauthorized: Platform Owner role required.' }
+    }
+
     // Delete related records first (if cascading deletes aren't fully configured)
     await prisma.tenantModule.deleteMany({ where: { tenantId } })
     

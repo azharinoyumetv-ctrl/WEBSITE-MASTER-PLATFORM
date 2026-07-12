@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import crypto from 'crypto'
 
 /**
  * POST /api/analytics/event
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     // Generate session ID for anonymous visitors if not provided by the client
     const sid = (typeof sessionId === 'string' && sessionId)
       ? sessionId
-      : `anon-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
+      : `anon-${crypto.randomUUID()}`
 
     // Separate device properties from general event payload
     const { userAgent, referrer, timestamp, ...restMeta } = (typeof metadata === 'object' && metadata) ? metadata : {}

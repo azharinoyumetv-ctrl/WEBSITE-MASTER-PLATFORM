@@ -27,6 +27,10 @@ export async function toggleTenantModule(tenantId: string, moduleKey: string, is
     if (!userId) {
       return { success: false, error: 'Unauthorized: No active user session.' }
     }
+    
+    if (!(session?.user as any)?.roles?.includes('platform_owner')) {
+      return { success: false, error: 'Unauthorized: Platform Owner role required.' }
+    }
     const record = await prisma.tenantModule.upsert({
       where: {
         tenantId_moduleKey: {

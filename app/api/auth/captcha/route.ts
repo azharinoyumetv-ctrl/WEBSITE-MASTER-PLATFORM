@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import crypto from 'crypto'
+import { encrypt } from '@/lib/crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,9 +36,7 @@ export async function GET(req: Request) {
   // then the client sends it back along with their guess.
   
   const payload = JSON.stringify({ answer, expires: Date.now() + 5 * 60 * 1000 })
-  const cipher = crypto.createCipheriv('aes-256-cbc', crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default', 'salt', 32), Buffer.alloc(16, 0))
-  let encrypted = cipher.update(payload, 'utf8', 'hex')
-  encrypted += cipher.final('hex')
+  const encrypted = encrypt(payload)
 
   return NextResponse.json({
     svg: captcha.data,

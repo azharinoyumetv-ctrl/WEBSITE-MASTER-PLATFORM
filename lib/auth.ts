@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma"
 import crypto from "crypto"
 import * as OTPAuth from "otpauth"
 import { checkRateLimit } from "@/lib/rate-limit"
+import { decrypt } from "@/lib/crypto"
 
 export const authOptions: NextAuthOptions = {
   // @ts-ignore - Adapter type mismatch in some next-auth versions, safe to ignore
@@ -46,9 +47,8 @@ export const authOptions: NextAuthOptions = {
             throw new Error("CAPTCHA_REQUIRED")
           }
           try {
-            const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default', 'salt', 32), Buffer.alloc(16, 0))
-            let decrypted = decipher.update(captchaToken, 'hex', 'utf8')
-            decrypted += decipher.final('utf8')
+            const decrypted = decrypt(captchaToken)
+            if (!decrypted) throw new Error('Decryption failed')
             const payload = JSON.parse(decrypted)
 
             if (payload.expires < Date.now()) throw new Error('Expired')
@@ -121,10 +121,8 @@ export const authOptions: NextAuthOptions = {
             throw new Error("MFA_REQUIRED")
           }
           try {
-            const decipher = crypto.createDecipheriv('aes-256-cbc', crypto.scryptSync(process.env.ENCRYPTION_KEY || 'default', 'salt', 32), Buffer.alloc(16, 0))
-            let mfaSecret = decipher.update(user.authCredential.mfaSecretEncrypted, 'hex', 'utf8')
-            mfaSecret += decipher.final('utf8')
-            
+            const mfaSecret = decrypt(user.authCredential.mfaSecretEncrypted)
+            if (!mfaSecret) throw new Error('Decryption failed')
             const totp = new OTPAuth.TOTP({
               secret: OTPAuth.Secret.fromBase32(mfaSecret)
             })
