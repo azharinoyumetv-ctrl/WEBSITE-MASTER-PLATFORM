@@ -46,6 +46,10 @@ export async function createRole(tenantId: string, data: { name: string, descrip
       }
     })
 
+    if (Object.keys(initialPermissions).length > 0) {
+      await syncRolePermissionsRegistry(role.id, initialPermissions)
+    }
+
     revalidatePath('/admin/rbac')
     return { success: true, role }
   } catch (error: any) {
@@ -60,9 +64,51 @@ export async function updateRolePermissions(tenantId: string, roleId: string, pe
       data: { permissions }
     })
 
+    // Enforce registry and relational mapping (CONFIG-3)
+    await syncRolePermissionsRegistry(roleId, permissions)
+
     revalidatePath('/admin/rbac')
     return { success: true, role }
   } catch (error: any) {
     return { success: false, error: error.message }
+  }
+}
+
+async function syncRolePermissionsRegistry(roleId: string, permissions: Record<string, string[]>) {
+  // Clear existing permissions
+  await prisma.tenantRolePermission.deleteMany({
+    where: { roleId }
+  })
+
+  if (!permissions) return
+
+  const newRolePermissions = []
+
+  for (const [moduleKey, actions] of Object.entries(permissions)) {
+    for (const actionKey of (actions as string[])) {
+      // Ensure the permission exists in the registry
+      const registryEntry = await prisma.tenantPermissionsRegistry.upsert({
+        where: {
+          moduleKey_actionKey: { moduleKey, actionKey }
+        },
+        update: {},
+        create: {
+          moduleKey,
+          actionKey,
+          description: `Permission to ${actionKey} ${moduleKey}`
+        }
+      })
+      
+      newRolePermissions.push({
+        roleId,
+        permissionId: registryEntry.id
+      })
+    }
+  }
+
+  if (newRolePermissions.length > 0) {
+    await prisma.tenantRolePermission.createMany({
+      data: newRolePermissions
+    })
   }
 }
