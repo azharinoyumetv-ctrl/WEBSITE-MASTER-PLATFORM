@@ -8,7 +8,7 @@ import {
 } from 'lucide-react'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { createCatalogItem, updateCatalogItem, deleteCatalogItem, createCategory, updateCategory, deleteCategory } from '@/lib/actions/catalog'
+import { createCatalogItem, updateCatalogItem, deleteCatalogItem, createCategory, updateCategory, deleteCategory, uploadCatalogImage } from '@/lib/actions/catalog'
 import { Trash2 } from 'lucide-react'
 
 function CategoryTree({ categories, level = 0, parentId = null, onEdit, onDelete }: {
@@ -155,16 +155,23 @@ export function CatalogClient({ initialItems, initialCategories, tenantId }: { i
     }
   }
 
-  const handleImageUpload = (e: any, isEdit: boolean) => {
+  const handleImageUpload = async (e: any, isEdit: boolean) => {
     const file = e.target.files[0]
     if(!file) return
     const reader = new FileReader()
-    reader.onload = (event) => {
-      const result = event.target?.result as string
-      if(isEdit) {
-        setEditingItem({...editingItem, imageUrls: [...(editingItem.imageUrls || []), result]})
+    reader.onload = async (event) => {
+      const base64Data = event.target?.result as string
+      const toastId = toast.loading('Uploading image...')
+      const res = await uploadCatalogImage(tenantId, file.name, file.type, base64Data)
+      if (res.success && res.publicUrl) {
+        toast.success('Image uploaded successfully', { id: toastId })
+        if(isEdit) {
+          setEditingItem({...editingItem, imageUrls: [...(editingItem.imageUrls || []), res.publicUrl]})
+        } else {
+          setNewItem({...newItem, imageUrls: [...(newItem.imageUrls || []), res.publicUrl]})
+        }
       } else {
-        setNewItem({...newItem, imageUrls: [...(newItem.imageUrls || []), result]})
+        toast.error(res.error || 'Upload failed', { id: toastId })
       }
     }
     reader.readAsDataURL(file)

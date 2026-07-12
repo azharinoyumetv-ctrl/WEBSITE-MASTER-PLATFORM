@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { Activity, Server, Database, Globe, AlertTriangle, CheckCircle2, Clock, Plus, Loader2, Trash2, Edit2, Play, Square } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getMonitoringStatus, getIncidentLogs, logIncident, getMonitoringRules, createMonitoringRule, updateMonitoringRule, deleteMonitoringRule } from '@/lib/actions/monitoring'
+import { getMonitoringStatus, getIncidentLogs, logIncident, resolveIncident, getMonitoringRules, createMonitoringRule, updateMonitoringRule, deleteMonitoringRule } from '@/lib/actions/monitoring'
 import { MetricsButton } from './metrics-button'
 import toast from 'react-hot-toast'
 
@@ -48,6 +48,16 @@ export function MonitoringClient({ tenantId, initialData, initialIncidents, init
       setIncidentForm({ title: '', description: '', serviceName: 'postgres_rls' })
       handleRefresh()
     } else toast.error(res.error)
+  }
+
+  const handleResolveIncident = async (id: string) => {
+    const res = await resolveIncident(tenantId, id)
+    if(res.success) {
+      toast.success('Incident resolved')
+      handleRefresh()
+    } else {
+      toast.error(res.error || 'Failed to resolve')
+    }
   }
 
   // Rule Form State
@@ -223,11 +233,21 @@ export function MonitoringClient({ tenantId, initialData, initialIncidents, init
                       )}>
                         {incident.status === 'investigating' ? <AlertTriangle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
                       </div>
-                      <div>
-                        <p className="text-xs font-semibold text-slate-800">{incident.title}</p>
-                        <p className="text-[10px] text-slate-500 my-0.5">{incident.description}</p>
-                        <p className="text-[10px] text-slate-400 font-mono">{incident.serviceName}</p>
-                        <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(incident.createdAt).toLocaleString()}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-xs font-semibold text-slate-800">{incident.title}</p>
+                          <p className="text-[10px] text-slate-500 my-0.5">{incident.description}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">{incident.serviceName}</p>
+                          <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(incident.createdAt).toLocaleString()}</p>
+                        </div>
+                        {incident.status === 'investigating' && (
+                          <button
+                            onClick={() => handleResolveIncident(incident.id)}
+                            className="text-[10px] font-semibold text-indigo-600 hover:text-indigo-800 border border-slate-200 rounded px-1.5 py-0.5 bg-slate-50 flex-shrink-0"
+                          >
+                            Resolve
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))

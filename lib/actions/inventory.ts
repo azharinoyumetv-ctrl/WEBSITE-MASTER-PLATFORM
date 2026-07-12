@@ -2,9 +2,14 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
+import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
 
 export async function getInventory(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'read')
+
     const locations = await prisma.tenantInventoryLocation.findMany({
       where: { tenantId }
     })
@@ -30,6 +35,10 @@ export async function getInventory(tenantId: string) {
 
 export async function createLocation(tenantId: string, locationName: string, locationType: string = 'warehouse') {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
     const loc = await prisma.tenantInventoryLocation.create({
       data: { tenantId, locationName, locationType }
     })
@@ -42,6 +51,10 @@ export async function createLocation(tenantId: string, locationName: string, loc
 
 export async function updateLocation(tenantId: string, locationId: string, data: { locationName?: string, locationType?: string, isActive?: boolean }) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
     const loc = await prisma.tenantInventoryLocation.update({
       where: { id: locationId, tenantId },
       data
@@ -55,6 +68,10 @@ export async function updateLocation(tenantId: string, locationId: string, data:
 
 export async function deleteLocation(tenantId: string, locationId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
     await prisma.tenantInventoryLocation.deleteMany({
       where: { id: locationId, tenantId }
     })
@@ -77,6 +94,10 @@ function computeStatus(qty: number, threshold: number): string {
 
 export async function adjustInventory(tenantId: string, balanceId: string, quantityAdjustment: number) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
     const balance = await prisma.tenantInventoryBalance.findUnique({
       where: { id: balanceId, tenantId }
     })
@@ -84,7 +105,7 @@ export async function adjustInventory(tenantId: string, balanceId: string, quant
     if (!balance) return { success: false, error: 'Balance not found' }
 
     const newQty = Math.max(0, balance.quantityOnHand + quantityAdjustment)
-    const newStatus = newQty <= 0 ? 'critical' : (newQty <= balance.lowStockThreshold ? 'low' : 'optimal')
+    const newStatus = computeStatus(newQty, balance.lowStockThreshold)
 
     const updated = await prisma.tenantInventoryBalance.update({
       where: { id: balanceId },
@@ -103,6 +124,10 @@ export async function adjustInventory(tenantId: string, balanceId: string, quant
 
 export async function transferStock(tenantId: string, sourceLocationId: string, targetLocationId: string, catalogItemId: string, quantity: number) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
     if (quantity <= 0) return { success: false, error: 'Quantity must be greater than zero' }
     if (sourceLocationId === targetLocationId) return { success: false, error: 'Source and target locations must be different' }
 
@@ -167,6 +192,10 @@ export async function transferStock(tenantId: string, sourceLocationId: string, 
 
 export async function addInventoryBalance(tenantId: string, locationId: string, catalogItemId: string, quantity: number, lowStockThreshold: number = 5) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
     const existing = await prisma.tenantInventoryBalance.findUnique({
       where: { locationId_catalogItemId: { locationId, catalogItemId } }
     })
@@ -196,6 +225,10 @@ export async function addInventoryBalance(tenantId: string, locationId: string, 
 
 export async function updateInventoryBalance(tenantId: string, balanceId: string, data: { quantityOnHand?: number, lowStockThreshold?: number, quantityReserved?: number }) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
     const balance = await prisma.tenantInventoryBalance.findUnique({
       where: { id: balanceId, tenantId }
     })
@@ -221,6 +254,10 @@ export async function updateInventoryBalance(tenantId: string, balanceId: string
 
 export async function deleteInventoryBalance(tenantId: string, balanceId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
     await prisma.tenantInventoryBalance.deleteMany({
       where: { id: balanceId, tenantId }
     })

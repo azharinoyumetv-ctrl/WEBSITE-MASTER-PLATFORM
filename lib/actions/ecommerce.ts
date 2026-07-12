@@ -3,11 +3,14 @@
 import { PrismaClient, OrderStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import prisma from "@/lib/prisma"
-
-
+import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
 
 export async function getOrders(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'orders', 'read')
+
     const orders = await prisma.tenantOrder.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
@@ -18,7 +21,6 @@ export async function getOrders(tenantId: string) {
       }
     })
     
-    // Map to plain objects if needed, or return raw
     return { success: true, orders }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -27,6 +29,10 @@ export async function getOrders(tenantId: string) {
 
 export async function updateOrderStatus(tenantId: string, orderId: string, status: OrderStatus, receiptUrl?: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'orders', 'write')
+
     const order = await prisma.tenantOrder.update({
       where: { id: orderId, tenantId },
       data: { 
@@ -43,6 +49,10 @@ export async function updateOrderStatus(tenantId: string, orderId: string, statu
 
 export async function bulkUpdateOrderStatus(tenantId: string, orderIds: string[], status: OrderStatus) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'orders', 'write')
+
     await prisma.tenantOrder.updateMany({
       where: { id: { in: orderIds }, tenantId },
       data: { orderStatus: status }
@@ -56,7 +66,29 @@ export async function bulkUpdateOrderStatus(tenantId: string, orderIds: string[]
 
 export async function cancelOrder(tenantId: string, orderId: string, reason?: string) {
   try {
-    const order = await prisma.tenantOrder.update({
+    const user = await getAuthenticatedUser().catch(() => null)
+    const order = await prisma.tenantOrder.findUnique({
+      where: { id: orderId, tenantId }
+    })
+    if (!order) throw new Error("Order not found")
+
+    let hasAccess = false
+    if (user) {
+      if (user.tenantId === tenantId) {
+        try {
+          await requirePermission(user.id, tenantId, 'orders', 'write')
+          hasAccess = true
+        } catch {
+          if (order.userId === user.id) hasAccess = true
+        }
+      }
+    } else {
+      if (order.orderStatus === 'pending') hasAccess = true
+    }
+
+    if (!hasAccess) throw new Error("Unauthorized order access")
+
+    const updated = await prisma.tenantOrder.update({
       where: { id: orderId, tenantId },
       data: { 
         orderStatus: 'cancelled',
@@ -64,7 +96,7 @@ export async function cancelOrder(tenantId: string, orderId: string, reason?: st
       }
     })
     revalidatePath('/admin/ecommerce')
-    return { success: true, order }
+    return { success: true, order: updated }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

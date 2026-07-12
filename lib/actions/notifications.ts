@@ -3,11 +3,15 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { encrypt, decrypt } from '@/lib/crypto'
-
-
+import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
+import nodemailer from 'nodemailer'
 
 export async function getNotificationTemplates(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'read')
+
     const templates = await prisma.tenantNotificationTemplate.findMany({
       where: { tenantId },
       orderBy: { templateKey: 'asc' }
@@ -20,6 +24,10 @@ export async function getNotificationTemplates(tenantId: string) {
 
 export async function updateNotificationTemplate(tenantId: string, templateId: string, data: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'write')
+
     const template = await prisma.tenantNotificationTemplate.update({
       where: { id: templateId, tenantId },
       data: {
@@ -36,6 +44,10 @@ export async function updateNotificationTemplate(tenantId: string, templateId: s
 
 export async function getNotificationGateway(tenantId: string, channelType: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'read')
+
     const gateway = await prisma.tenantNotificationGateway.findFirst({
       where: { tenantId, channelType }
     })
@@ -56,7 +68,10 @@ export async function getNotificationGateway(tenantId: string, channelType: stri
 
 export async function saveNotificationGateway(tenantId: string, channelType: string, providerName: string, config: any) {
   try {
-    // Encrypt password if present
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'write')
+
     const secureConfig = { ...config }
     if (secureConfig.password) {
       secureConfig.password = encrypt(secureConfig.password)
@@ -92,6 +107,10 @@ export async function saveNotificationGateway(tenantId: string, channelType: str
 
 export async function toggleNotificationGateway(tenantId: string, gatewayId: string, isActive: boolean) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'write')
+
     const gateway = await prisma.tenantNotificationGateway.update({
       where: { id: gatewayId, tenantId },
       data: { isActive }
@@ -105,6 +124,10 @@ export async function toggleNotificationGateway(tenantId: string, gatewayId: str
 
 export async function createNotificationTemplate(tenantId: string, data: { templateKey: string, channelType: string, subjectLine?: string, htmlBodyMarkup: string }) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'write')
+
     const template = await prisma.tenantNotificationTemplate.create({
       data: {
         tenantId,
@@ -121,10 +144,80 @@ export async function createNotificationTemplate(tenantId: string, data: { templ
   }
 }
 
-import nodemailer from 'nodemailer'
+// Internal Helper for Retry and Backoff Sending
+async function sendWithRetryAndLog(logId: string, maxRetries = 3) {
+  const log = await prisma.tenantNotificationLog.findUnique({
+    where: { id: logId },
+    include: { gateway: true }
+  })
+  if (!log) return false
+
+  if (!log.gateway || !log.gateway.isActive) {
+    await prisma.tenantNotificationLog.update({
+      where: { id: logId },
+      data: { status: 'failed', deliveryError: 'Missing or inactive gateway', retryCount: 3 }
+    })
+    return false
+  }
+
+  const gateway = log.gateway
+  let attempt = 0
+  let success = false
+  let lastError = ''
+
+  while (attempt < maxRetries && !success) {
+    try {
+      if (log.channelType === 'email') {
+        const config = gateway.encryptedCredentials as any
+        const password = config.password ? decrypt(config.password) : ''
+        const transporter = nodemailer.createTransport({
+          host: config.host,
+          port: parseInt(config.port, 10),
+          secure: config.encryption === 'SSL' || config.port === '465',
+          auth: {
+            user: config.username,
+            pass: password,
+          }
+        })
+        
+        await transporter.sendMail({
+          from: config.username,
+          to: log.recipient,
+          subject: 'System Notification',
+          text: 'You have a new notification.'
+        })
+      } else if (log.channelType === 'sms') {
+        console.log(`[SMS] Sending to ${log.recipient} via Twilio simulation.`)
+      }
+      success = true
+    } catch (err: any) {
+      attempt++
+      lastError = err.message
+      if (attempt < maxRetries) {
+        await new Promise(resolve => setTimeout(resolve, attempt * 1000))
+      }
+    }
+  }
+
+  await prisma.tenantNotificationLog.update({
+    where: { id: logId },
+    data: {
+      status: success ? 'delivered' : 'failed',
+      deliveryError: success ? null : `Failed after ${attempt} attempts. Last error: ${lastError}`,
+      retryCount: attempt,
+      sentAt: success ? new Date() : null
+    }
+  })
+
+  return success
+}
 
 export async function dispatchTestNotification(tenantId: string, templateId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'write')
+
     const template = await prisma.tenantNotificationTemplate.findUnique({
       where: { id: templateId, tenantId }
     })
@@ -135,40 +228,21 @@ export async function dispatchTestNotification(tenantId: string, templateId: str
     })
     if (!gateway) throw new Error('No active gateway found for this channel')
 
-    const config = gateway.encryptedCredentials as any
-    const password = config.password ? decrypt(config.password) : ''
-    
-    if (template.channelType === 'email') {
-      const transporter = nodemailer.createTransport({
-        host: config.host,
-        port: parseInt(config.port, 10),
-        secure: config.encryption === 'SSL' || config.port === '465',
-        auth: {
-          user: config.username,
-          pass: password,
-        }
-      })
-      
-      const mailOptions = {
-        from: config.username,
-        to: 'test@example.com',
-        subject: template.subjectLine || 'Test Notification',
-        html: template.htmlBodyMarkup
-      }
-
-      await transporter.sendMail(mailOptions)
-    }
-
-    await prisma.tenantNotificationLog.create({
+    const log = await prisma.tenantNotificationLog.create({
       data: {
         tenantId,
         gatewayId: gateway.id,
         recipient: 'test@example.com',
         channelType: template.channelType,
-        status: 'delivered',
-        sentAt: new Date()
+        status: 'pending'
       }
     })
+
+    const success = await sendWithRetryAndLog(log.id)
+    if (!success) {
+      const refreshedLog = await prisma.tenantNotificationLog.findUnique({ where: { id: log.id } })
+      throw new Error(refreshedLog?.deliveryError || 'Notification dispatch failed')
+    }
     
     return { success: true, message: `Test ${template.channelType.toUpperCase()} dispatched successfully.` }
   } catch (error: any) {
@@ -192,6 +266,9 @@ export async function dispatchNotification(tenantId: string, recipient: string, 
       }
     })
 
+    // Dispatch asynchronously
+    sendWithRetryAndLog(log.id).catch(err => console.error("Async notification dispatch failed", err))
+
     return { success: true, log }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -200,6 +277,10 @@ export async function dispatchNotification(tenantId: string, recipient: string, 
 
 export async function processNotificationQueue(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'write')
+
     const pendingLogs = await prisma.tenantNotificationLog.findMany({
       where: { tenantId, status: { in: ['pending', 'failed'] }, retryCount: { lt: 3 } },
       take: 10
@@ -207,60 +288,8 @@ export async function processNotificationQueue(tenantId: string) {
     
     let processed = 0
     for (const log of pendingLogs) {
-      if (!log.gatewayId) {
-        await prisma.tenantNotificationLog.update({
-          where: { id: log.id },
-          data: { status: 'failed', deliveryError: 'No gateway assigned', retryCount: 3 }
-        })
-        continue
-      }
-      
-      const gateway = await prisma.tenantNotificationGateway.findUnique({ where: { id: log.gatewayId } })
-      if (!gateway || !gateway.isActive) {
-         await prisma.tenantNotificationLog.update({
-          where: { id: log.id },
-          data: { status: 'failed', deliveryError: 'Gateway inactive or missing', retryCount: 3 }
-        })
-        continue
-      }
-      
-      try {
-        if (log.channelType === 'email') {
-          const config = gateway.encryptedCredentials as any
-          const password = config.password ? decrypt(config.password) : ''
-          const transporter = nodemailer.createTransport({
-            host: config.host,
-            port: parseInt(config.port, 10),
-            secure: config.encryption === 'SSL' || config.port === '465',
-            auth: {
-              user: config.username,
-              pass: password,
-            }
-          })
-          
-          await transporter.sendMail({
-            from: config.username,
-            to: log.recipient,
-            subject: 'System Notification',
-            text: 'You have a new notification.'
-          })
-        }
-        
-        await prisma.tenantNotificationLog.update({
-          where: { id: log.id },
-          data: { status: 'delivered', sentAt: new Date(), deliveryError: null }
-        })
-        processed++
-      } catch (err: any) {
-        await prisma.tenantNotificationLog.update({
-          where: { id: log.id },
-          data: { 
-            status: 'failed', 
-            deliveryError: err.message,
-            retryCount: log.retryCount + 1
-          }
-        })
-      }
+      const success = await sendWithRetryAndLog(log.id)
+      if (success) processed++
     }
     return { success: true, processed }
   } catch (error: any) {
@@ -270,6 +299,10 @@ export async function processNotificationQueue(tenantId: string) {
 
 export async function getNotificationLogs(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'read')
+
     const logs = await prisma.tenantNotificationLog.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
@@ -283,6 +316,10 @@ export async function getNotificationLogs(tenantId: string) {
 
 export async function deleteNotificationTemplate(tenantId: string, templateId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'write')
+
     await prisma.tenantNotificationTemplate.delete({
       where: { id: templateId, tenantId }
     })
@@ -295,18 +332,23 @@ export async function deleteNotificationTemplate(tenantId: string, templateId: s
 
 export async function retryNotificationLog(tenantId: string, logId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'notifications', 'write')
+
     const log = await prisma.tenantNotificationLog.findUnique({
       where: { id: logId, tenantId }
     })
     if (!log) throw new Error("Log not found")
     
-    // Simplistic retry mark for processNotificationQueue to pick up later
     await prisma.tenantNotificationLog.update({
       where: { id: logId },
       data: { status: 'pending', deliveryError: null, retryCount: log.retryCount + 1 }
     })
     
-    // We could immediately call processNotificationQueue(tenantId) here, but marking it pending is enough
+    // Process immediately
+    sendWithRetryAndLog(logId).catch(err => console.error("Async retry notification dispatch failed", err))
+    
     revalidatePath('/admin/notifications')
     return { success: true }
   } catch (error: any) {

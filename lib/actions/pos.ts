@@ -4,11 +4,14 @@ import { PrismaClient, OrderStatus, PaymentStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { getCatalogItems } from './catalog'
 import prisma from "@/lib/prisma"
-
-
+import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
 
 export async function getPosData(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'read')
+
     const terminals = await prisma.tenantPosTerminal.findMany({
       where: { tenantId }
     })
@@ -41,7 +44,18 @@ export async function getPosData(tenantId: string) {
 
 export async function processPosPayment(tenantId: string, terminalId: string, cart: any[], paymentMethod: string, total: number, currency: string = 'USD') {
   try {
-    // Note: In real system, we'd ensure a POS session is open
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'write')
+
+    // Verify active session (shift) is open
+    const activeSession = await prisma.tenantPosSession.findFirst({
+      where: { tenantId, terminalId, status: 'open' }
+    })
+    if (!activeSession) {
+      throw new Error("No active open shift found for this terminal. Please open a shift first.")
+    }
+
     const isCash = paymentMethod === 'cash'
     const paymentStatus = isCash ? 'succeeded' : 'initiated'
     const orderStatus = isCash ? 'completed' : 'pending'
@@ -54,6 +68,7 @@ export async function processPosPayment(tenantId: string, terminalId: string, ca
           orderStatus: orderStatus,
           totalAmount: total,
           currency: currency,
+          userId: user.id,
           items: {
             create: cart.map(item => ({
               tenantId,
@@ -74,12 +89,11 @@ export async function processPosPayment(tenantId: string, terminalId: string, ca
         }
       })
 
-      // 2. Atomic Inventory Deduction
-      // We will deduct from the primary location of the terminal if set, or just the first available balance
+      // 2. Atomic Inventory Deduction from terminal location
       const terminal = await tx.tenantPosTerminal.findUnique({ where: { id: terminalId } })
       
       for (const item of cart) {
-        // Find balance
+        // Enforce location scope
         const balanceQuery = terminal?.locationId 
           ? { tenantId, catalogItemId: item.id, locationId: terminal.locationId }
           : { tenantId, catalogItemId: item.id }
@@ -87,9 +101,9 @@ export async function processPosPayment(tenantId: string, terminalId: string, ca
         const balance = await tx.tenantInventoryBalance.findFirst({ where: balanceQuery })
 
         if (balance) {
-          const newQty = balance.quantityOnHand - item.qty
-          let status: any = 'optimal'
-          if (newQty <= 0) status = 'out_of_stock'
+          const newQty = Math.max(0, balance.quantityOnHand - item.qty)
+          let status = 'optimal'
+          if (newQty <= 0) status = 'critical'
           else if (newQty <= balance.lowStockThreshold) status = 'low'
           
           await tx.tenantInventoryBalance.update({
@@ -116,6 +130,10 @@ export async function processPosPayment(tenantId: string, terminalId: string, ca
 // Terminal CRUD
 export async function createTerminal(tenantId: string, data: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'write')
+
     const terminal = await prisma.tenantPosTerminal.create({
       data: { ...data, tenantId }
     })
@@ -128,6 +146,10 @@ export async function createTerminal(tenantId: string, data: any) {
 
 export async function updateTerminal(tenantId: string, id: string, data: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'write')
+
     const terminal = await prisma.tenantPosTerminal.update({
       where: { id, tenantId },
       data
@@ -141,6 +163,10 @@ export async function updateTerminal(tenantId: string, id: string, data: any) {
 
 export async function deleteTerminal(tenantId: string, id: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'write')
+
     await prisma.tenantPosTerminal.delete({
       where: { id, tenantId }
     })
@@ -154,6 +180,10 @@ export async function deleteTerminal(tenantId: string, id: string) {
 // Session & Cash Drawer CRUD
 export async function openSession(tenantId: string, terminalId: string, openedBy: string, openingBalance: number) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'write')
+
     const session = await prisma.tenantPosSession.create({
       data: { tenantId, terminalId, openedBy, openingBalance, status: 'open' }
     })
@@ -185,6 +215,10 @@ async function validateSession(tenantId: string, sessionId: string) {
 
 export async function openCashDrawer(tenantId: string, sessionId: string, performedBy?: string, notes?: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'write')
+
     await validateSession(tenantId, sessionId)
     const event = await prisma.tenantPosCashDrawerEvent.create({
       data: { tenantId, sessionId, eventType: 'manual_open', performedBy, notes }
@@ -198,6 +232,10 @@ export async function openCashDrawer(tenantId: string, sessionId: string, perfor
 
 export async function recordCashDrop(tenantId: string, sessionId: string, amount: number, notes?: string, performedBy?: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'write')
+
     await validateSession(tenantId, sessionId)
     if (amount <= 0) throw new Error('Amount must be greater than 0')
     const event = await prisma.tenantPosCashDrawerEvent.create({
@@ -212,6 +250,10 @@ export async function recordCashDrop(tenantId: string, sessionId: string, amount
 
 export async function recordCashPayout(tenantId: string, sessionId: string, amount: number, notes?: string, performedBy?: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'write')
+
     await validateSession(tenantId, sessionId)
     if (amount <= 0) throw new Error('Amount must be greater than 0')
     const event = await prisma.tenantPosCashDrawerEvent.create({
@@ -226,6 +268,10 @@ export async function recordCashPayout(tenantId: string, sessionId: string, amou
 
 export async function getCashDrawerEvents(tenantId: string, sessionId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'read')
+
     const events = await prisma.tenantPosCashDrawerEvent.findMany({
       where: { tenantId, sessionId },
       orderBy: { createdAt: 'desc' }
@@ -236,8 +282,12 @@ export async function getCashDrawerEvents(tenantId: string, sessionId: string) {
   }
 }
 
-export async function getEndOfDayReport(tenantId: string, sessionId: string, date?: string) {
+export async function getEndOfDayReport(tenantId: string, sessionId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'read')
+
     const session = await prisma.tenantPosSession.findUnique({ where: { id: sessionId, tenantId } })
     if (!session) throw new Error('Session not found')
     
@@ -303,6 +353,10 @@ export async function getEndOfDayReport(tenantId: string, sessionId: string, dat
 
 export async function closeCashDrawerSession(tenantId: string, sessionId: string, closingBalance?: number, performedBy?: string, notes?: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'write')
+
     await validateSession(tenantId, sessionId)
     
     const closedAt = new Date()
@@ -325,26 +379,65 @@ export async function closeCashDrawerSession(tenantId: string, sessionId: string
 
 export async function generateReceipt(tenantId: string, orderId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'read')
+
     const order = await prisma.tenantOrder.findUnique({
       where: { id: orderId, tenantId },
       include: { items: { include: { catalogItem: true } } }
     })
     if (!order) return { success: false, error: 'Order not found' }
     
+    const tax = Number(order.totalAmount) * 0.1
+    const subtotal = Number(order.totalAmount) - tax
+
     const receiptHtml = `
-      <div style="font-family: monospace; padding: 20px; max-width: 300px; margin: auto; background: white; color: black;">
-        <h2 style="text-align: center;">Store Receipt</h2>
-        <p style="text-align: center; border-bottom: 1px dashed black; padding-bottom: 10px;">Order: ${order.id.slice(0,8).toUpperCase()}<br/>Date: ${order.createdAt.toLocaleString()}</p>
-        <div style="margin: 10px 0;">
+      <div style="font-family: 'Courier New', monospace; padding: 24px; max-width: 350px; margin: auto; background: #fff; color: #000; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 1px;">STORE RECEIPT</h2>
+          <p style="margin: 4px 0 0; font-size: 11px; color: #666;">Tenant ID: ${tenantId.slice(0, 8).toUpperCase()}</p>
+        </div>
+        
+        <div style="font-size: 12px; border-bottom: 1px dashed #000; pb-10; margin-bottom: 12px; padding-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Order ID:</span>
+            <span>#${order.id.slice(0, 8).toUpperCase()}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Date:</span>
+            <span>${order.createdAt.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div style="font-size: 13px; margin: 12px 0;">
           ${order.items.map(i => `
-            <div style="display: flex; justify-content: space-between;">
-              <span>${i.quantity}x ${i.catalogItem?.title?.slice(0, 15) || 'Item'}</span>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span>${i.quantity}x ${i.catalogItem?.title?.slice(0, 18) || 'Item'}</span>
               <span>$${(Number(i.unitPrice) * i.quantity).toFixed(2)}</span>
             </div>
           `).join('')}
         </div>
-        <p style="text-align: right; border-top: 1px dashed black; padding-top: 10px;"><b>Total: $${Number(order.totalAmount).toFixed(2)}</b></p>
-        <p style="text-align: center; margin-top: 20px;">Thank you for your purchase!</p>
+
+        <div style="font-size: 12px; border-top: 1px dashed #000; padding-top: 8px; margin-top: 12px; space-y-2;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Subtotal:</span>
+            <span>$${subtotal.toFixed(2)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Tax (10%):</span>
+            <span>$${tax.toFixed(2)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 16px; font-weight: bold; margin-top: 6px; padding-top: 6px; border-top: 1px solid #000;">
+            <span>TOTAL:</span>
+            <span>$${Number(order.totalAmount).toFixed(2)}</span>
+          </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 24px; font-size: 11px; color: #666; border-top: 1px solid #eee; padding-top: 12px;">
+          <p style="margin: 0;">Thank you for your purchase!</p>
+          <p style="margin: 4px 0 0;">Please retain this receipt for your records.</p>
+        </div>
       </div>
     `
     return { success: true, receiptHtml }

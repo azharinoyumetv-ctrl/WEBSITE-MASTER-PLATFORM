@@ -2,12 +2,15 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
-
-
+import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
 
 // Categories
 export async function getCategories(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'catalog', 'read')
+
     const categories = await prisma.tenantCategory.findMany({
       where: { tenantId },
       include: {
@@ -23,6 +26,10 @@ export async function getCategories(tenantId: string) {
 
 export async function createCategory(tenantId: string, data: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'catalog', 'write')
+
     const category = await prisma.tenantCategory.create({
       data: {
         tenantId,
@@ -41,6 +48,10 @@ export async function createCategory(tenantId: string, data: any) {
 
 export async function updateCategory(tenantId: string, categoryId: string, data: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'catalog', 'write')
+
     const category = await prisma.tenantCategory.update({
       where: { id: categoryId, tenantId },
       data: {
@@ -59,6 +70,10 @@ export async function updateCategory(tenantId: string, categoryId: string, data:
 
 export async function deleteCategory(tenantId: string, categoryId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'catalog', 'write')
+
     await prisma.tenantCategory.deleteMany({
       where: { id: categoryId, tenantId }
     })
@@ -85,6 +100,10 @@ export async function getCatalogItems(tenantId: string) {
 
 export async function createCatalogItem(tenantId: string, data: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'catalog', 'write')
+
     const item = await prisma.tenantCatalogItem.create({
       data: {
         tenantId,
@@ -107,6 +126,10 @@ export async function createCatalogItem(tenantId: string, data: any) {
 
 export async function updateCatalogItem(tenantId: string, itemId: string, data: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'catalog', 'write')
+
     const item = await prisma.tenantCatalogItem.update({
       where: { id: itemId, tenantId },
       data: {
@@ -129,6 +152,10 @@ export async function updateCatalogItem(tenantId: string, itemId: string, data: 
 
 export async function deleteCatalogItem(tenantId: string, itemId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'catalog', 'write')
+
     // Delete related inventory balances first
     await prisma.tenantInventoryBalance.deleteMany({
       where: { catalogItemId: itemId, tenantId }
@@ -139,6 +166,43 @@ export async function deleteCatalogItem(tenantId: string, itemId: string) {
     })
     revalidatePath('/admin/catalog')
     return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function uploadCatalogImage(tenantId: string, fileName: string, fileType: string, base64Data: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'catalog', 'write')
+
+    const buffer = Buffer.from(base64Data.split(',')[1] || base64Data, 'base64')
+    
+    const fs = require('fs')
+    const path = require('path')
+    const uploadDir = path.join(process.cwd(), 'public', 'uploads', tenantId)
+    fs.mkdirSync(uploadDir, { recursive: true })
+    
+    const cleanName = path.basename(fileName).replace(/[^a-zA-Z0-9.-]/g, '_')
+    const storagePath = path.join(uploadDir, cleanName)
+    fs.writeFileSync(storagePath, buffer)
+    
+    const publicUrl = `/uploads/${tenantId}/${cleanName}`
+    
+    const fileRecord = await prisma.tenantStorageRegistry.create({
+      data: {
+        tenantId,
+        uploadedBy: user.id,
+        fileName: cleanName,
+        mimeType: fileType,
+        fileSizeBytes: buffer.length,
+        storageBucketPath: storagePath,
+        publicUrl
+      }
+    })
+    
+    return { success: true, publicUrl, fileId: fileRecord.id }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
