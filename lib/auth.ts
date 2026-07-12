@@ -8,7 +8,25 @@ import * as OTPAuth from "otpauth"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { decrypt } from "@/lib/crypto"
 
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith('https://') || process.env.NODE_ENV === 'production'
+const cookiePrefix = useSecureCookies ? "__Secure-" : ""
+const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN 
+  ? (process.env.NEXT_PUBLIC_BASE_DOMAIN.startsWith('.') ? process.env.NEXT_PUBLIC_BASE_DOMAIN : `.${process.env.NEXT_PUBLIC_BASE_DOMAIN}`) 
+  : undefined
+
 export const authOptions: NextAuthOptions = {
+  cookies: {
+    sessionToken: {
+      name: `${cookiePrefix}next-auth.session-token`,
+      options: {
+        httpOnly: true,
+        sameSite: 'lax',
+        path: '/',
+        secure: useSecureCookies,
+        domain: baseDomain
+      }
+    }
+  },
   // @ts-ignore - Adapter type mismatch in some next-auth versions, safe to ignore
   adapter: PrismaAdapter(prisma),
   session: {
