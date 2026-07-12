@@ -19,7 +19,14 @@ export default async function OrdersPage() {
   const websiteRes = await getPublicWebsiteConfig(tenantDomain)
 
   if (!websiteRes.success || !websiteRes.website) {
-    redirect('/404')
+    return (
+      <div className="min-h-screen bg-slate-50 py-20">
+        <div className="max-w-3xl mx-auto px-4 text-center">
+          <h1 className="text-2xl font-bold text-slate-900 mb-4">My Orders</h1>
+          <p className="text-slate-500 mb-6">This storefront is not fully configured yet. Please contact support or try again later.</p>
+        </div>
+      </div>
+    )
   }
   const tenantId = websiteRes.website.tenantId
 
@@ -32,3 +39,4 @@ export default async function OrdersPage() {
     </div>
   )
 }
+
