@@ -34,7 +34,7 @@ export async function generateBillingInvoice(tenantId: string, planId: 'core' | 
           amount,
           description: `Platform Upgrade to ${planId.toUpperCase()} for ${tenant.companyName}`,
           customer: {
-            email: session.user.email
+            email: user.email
           },
           currency: 'IDR'
         })
@@ -65,7 +65,7 @@ export async function generateBillingInvoice(tenantId: string, planId: 'core' | 
             gross_amount: amount
           },
           customer_details: {
-            email: session.user.email,
+            email: user.email,
             first_name: tenant.companyName
           }
         })

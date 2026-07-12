@@ -1,4 +1,5 @@
 import { getPublicWebsiteConfig } from '@/lib/actions/website'
+import { generateCheckoutNonce } from '@/lib/crypto'
 import { getCatalogItems } from '@/lib/actions/catalog'
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
@@ -33,12 +34,13 @@ export default async function CheckoutPage() {
   const tenantId = websiteRes.website.tenantId
   const itemsRes = await getCatalogItems(tenantId)
   const items = itemsRes.items || []
+  const checkoutNonce = generateCheckoutNonce(tenantId)
 
   return (
     <div className="min-h-screen bg-slate-50 py-12">
       <div className="max-w-4xl mx-auto px-4">
         <h1 className="text-3xl font-bold text-slate-900 mb-8">Checkout</h1>
-        <CheckoutClient tenantId={tenantId} items={items} />
+        <CheckoutClient tenantId={tenantId} items={items} checkoutNonce={checkoutNonce} />
       </div>
     </div>
   )

@@ -83,7 +83,14 @@ export default async function TenantDetailsPage({ params }: { params: { tenantId
                   </div>
                   <div className="flex-1 overflow-hidden">
                     <p className="text-sm font-medium text-slate-900 truncate">{user.firstName} {user.lastName}</p>
-                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                    <div className="group relative cursor-help" title="Hover to reveal email">
+                      <p className="text-xs text-slate-500 truncate group-hover:hidden">
+                        {user.email.charAt(0)}***@{user.email.split('@')[1] || ''}
+                      </p>
+                      <p className="text-xs text-slate-500 truncate hidden group-hover:block">
+                        {user.email}
+                      </p>
+                    </div>
                   </div>
                 </div>
               ))}

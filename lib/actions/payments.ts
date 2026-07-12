@@ -103,7 +103,7 @@ export async function refundPayment(tenantId: string, paymentId: string) {
           type: 'refund',
           amount: Number(p.amount), // negative amount usually for refunds, or just absolute? Let's use negative
           currency: p.currency,
-          gateway: p.paymentGateway,
+          gateway: p.processorKey,
           gatewayTxId: p.externalTransactionId,
           status: 'success'
         }
@@ -156,7 +156,7 @@ export async function capturePayment(tenantId: string, paymentId: string) {
           type: 'capture',
           amount: Number(p.amount),
           currency: p.currency,
-          gateway: p.paymentGateway,
+          gateway: p.processorKey,
           gatewayTxId: p.externalTransactionId,
           status: 'success'
         }
@@ -193,7 +193,7 @@ export async function manualAdjustPayment(tenantId: string, paymentId: string, a
           type: 'manual_adjustment',
           amount: adjustAmount,
           currency: p.currency,
-          gateway: p.paymentGateway,
+          gateway: p.processorKey,
           gatewayTxId: p.externalTransactionId,
           status: 'success'
         }

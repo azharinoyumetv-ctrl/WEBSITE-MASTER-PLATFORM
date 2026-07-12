@@ -11,6 +11,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Tenant ID required' }, { status: 400 })
     }
 
+    const { validateCheckoutNonce } = require('@/lib/crypto')
+    if (!body.nonce || !validateCheckoutNonce(body.nonce, tenantId)) {
+      return NextResponse.json({ error: 'Invalid or expired checkout session' }, { status: 403 })
+    }
+
     const websiteRes = await prisma.tenantWebsite.findUnique({
       where: { tenantId }
     })

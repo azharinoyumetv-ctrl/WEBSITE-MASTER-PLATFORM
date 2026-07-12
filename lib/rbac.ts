@@ -7,7 +7,7 @@ export async function getAuthenticatedUser() {
   if (!session?.user) {
     throw new Error('Unauthorized');
   }
-  return session.user as { id: string, tenantId: string, roles: string[] };
+  return session.user as { id: string, email: string, tenantId: string, roles: string[] };
 }
 
 export async function requireSuperAdmin() {

@@ -2,8 +2,6 @@
 
 import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { getAuthenticatedUser } from "@/lib/rbac"
 
 function validatePasswordPolicy(password: string): string | null {

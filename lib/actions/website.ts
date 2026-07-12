@@ -181,7 +181,7 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
           tenantId,
           configType: 'website_theme',
           snapshot: data,
-          actorId: (session.user as any).id
+          actorId: user.id
         }
       })
       

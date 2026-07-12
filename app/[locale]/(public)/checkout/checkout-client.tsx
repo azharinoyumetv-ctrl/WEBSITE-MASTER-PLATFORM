@@ -6,7 +6,7 @@ import { formatCurrency } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { createOrder } from '@/lib/actions/ecommerce'
 
-export function CheckoutClient({ tenantId, items }: { tenantId: string, items: any[] }) {
+export function CheckoutClient({ tenantId, items, checkoutNonce }: { tenantId: string, items: any[], checkoutNonce?: string }) {
   const [cart, setCart] = useState<{item: any, quantity: number}[]>([])
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
