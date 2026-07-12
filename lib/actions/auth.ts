@@ -5,12 +5,25 @@ import bcrypt from "bcryptjs"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 
+function validatePasswordPolicy(password: string): string | null {
+  if (password.length < 8) return "Password must be at least 8 characters long."
+  if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter."
+  if (!/[a-z]/.test(password)) return "Password must contain at least one lowercase letter."
+  if (!/[0-9]/.test(password)) return "Password must contain at least one number."
+  return null
+}
+
 export async function registerTenantAdmin(data: any) {
   try {
     const { firstName, lastName, email, companyName, password } = data
 
     if (!email || !password || !companyName || !firstName || !lastName) {
       return { success: false, error: "All fields are required." }
+    }
+
+    const policyError = validatePasswordPolicy(password)
+    if (policyError) {
+      return { success: false, error: policyError }
     }
 
     // Generate a simple subdomain from companyName (e.g. "Acme Corp" -> "acmecorp")

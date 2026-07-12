@@ -34,6 +34,21 @@ function getBaseUrl(request: NextRequest) {
   return process.env.NEXTAUTH_URL || request.nextUrl.origin
 }
 
+function getTenantFromHost(hostname: string): string {
+  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'
+  const hostnameWithoutPort = hostname.split(':')[0]
+  
+  if (hostname === BASE_DOMAIN || hostnameWithoutPort === 'localhost' || hostname.startsWith('www.')) {
+    return 'default'
+  } else if (hostname.endsWith(`.${BASE_DOMAIN}`)) {
+    return hostname.replace(`.${BASE_DOMAIN}`, '')
+  } else if (hostnameWithoutPort.endsWith('.localhost')) {
+    return hostnameWithoutPort.replace('.localhost', '')
+  } else {
+    return hostname
+  }
+}
+
 function applySecurityHeaders(res: NextResponse) {
   const csp = [
     "default-src 'self'",
@@ -65,7 +80,23 @@ export default async function middleware(request: NextRequest) {
       secret: process.env.NEXTAUTH_SECRET,
       secureCookie: isSecure
     })
-    if (!token) {
+    
+    let isAuthorized = false
+    
+    if (token) {
+      const hostname = request.headers.get('host') || ''
+      const targetTenantId = getTenantFromHost(hostname)
+      
+      const userRoles = (token.roles as string[]) || []
+      const hasAnyRole = userRoles.length > 0
+      const isSuperAdmin = userRoles.includes('super-admin')
+      
+      if (hasAnyRole && (token.tenantId === targetTenantId || isSuperAdmin)) {
+        isAuthorized = true
+      }
+    }
+    
+    if (!isAuthorized) {
       // Determine locale to redirect to
       const localeMatch = pathname.match(/^\/(en|id)(\/|$)/)
       const locale = localeMatch ? localeMatch[1] : getLocale(request)
@@ -73,7 +104,14 @@ export default async function middleware(request: NextRequest) {
       const redirectUrl = new URL(`/${locale}/auth/login`, origin)
       const callback = new URL(request.nextUrl.pathname + request.nextUrl.search, origin).href
       redirectUrl.searchParams.set('callbackUrl', callback)
-      return applySecurityHeaders(NextResponse.redirect(redirectUrl))
+      
+      const response = NextResponse.redirect(redirectUrl)
+      // Force clearing of the session cookie if they are logged in but unauthorized
+      if (token) {
+        const cookieName = isSecure ? '__Secure-next-auth.session-token' : 'next-auth.session-token'
+        response.cookies.delete(cookieName)
+      }
+      return applySecurityHeaders(response)
     }
   }
 
@@ -97,19 +135,7 @@ function handleRouting(request: NextRequest) {
 
   let tenantId = 'default'
   if (isPublicSite || pathname.startsWith('/api')) {
-    // Determine tenant even for API routes if they are public facing or admin
-    const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'
-    const hostnameWithoutPort = hostname.split(':')[0]
-    
-    if (hostname === BASE_DOMAIN || hostnameWithoutPort === 'localhost' || hostname.startsWith('www.')) {
-      tenantId = 'default'
-    } else if (hostname.endsWith(`.${BASE_DOMAIN}`)) {
-      tenantId = hostname.replace(`.${BASE_DOMAIN}`, '')
-    } else if (hostnameWithoutPort.endsWith('.localhost')) {
-      tenantId = hostnameWithoutPort.replace('.localhost', '')
-    } else {
-      tenantId = hostname
-    }
+    tenantId = getTenantFromHost(hostname)
   }
 
   const requestHeaders = new Headers(request.headers)

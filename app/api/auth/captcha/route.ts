@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import crypto from 'crypto'
-import { encrypt } from '@/lib/crypto'
+import { encrypt, decrypt } from '@/lib/crypto'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,4 +42,37 @@ export async function GET(req: Request) {
     svg: captcha.data,
     token: encrypted
   })
+}
+
+export async function POST(req: Request) {
+  try {
+    const { token, answer } = await req.json()
+    if (!token || !answer) {
+      return NextResponse.json({ success: false, error: 'Missing token or answer' }, { status: 400 })
+    }
+
+    const decrypted = decrypt(token)
+    if (!decrypted) {
+      return NextResponse.json({ success: false, error: 'Invalid CAPTCHA token' }, { status: 400 })
+    }
+
+    const payload = JSON.parse(decrypted)
+    if (payload.expires < Date.now()) {
+      return NextResponse.json({ success: false, error: 'CAPTCHA expired' }, { status: 400 })
+    }
+
+    if (payload.answer !== answer.toLowerCase()) {
+      return NextResponse.json({ success: false, error: 'Incorrect answer' }, { status: 400 })
+    }
+
+    // CAPTCHA solved! Return a validation token
+    const validationToken = encrypt(JSON.stringify({ 
+      verified: true, 
+      expires: Date.now() + 15 * 60 * 1000 
+    }))
+
+    return NextResponse.json({ success: true, validationToken })
+  } catch (error) {
+    return NextResponse.json({ success: false, error: 'Verification failed' }, { status: 500 })
+  }
 }
