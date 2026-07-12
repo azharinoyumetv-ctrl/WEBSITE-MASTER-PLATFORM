@@ -234,14 +234,29 @@ export async function restoreWebsiteConfigSnapshot(tenantId: string, snapshotId:
     
     if (!snapshot || snapshot.tenantId !== tenantId) throw new Error('Snapshot not found')
     
+    // Fetch current website to preserve sensitive fields (WhatsApp keys) inside themeConfig
+    const currentWebsite = await prisma.tenantWebsite.findUnique({
+      where: { tenantId }
+    })
+    const currentTheme = (currentWebsite?.themeConfig as any) || {}
     const data = snapshot.snapshot as any
+
+    const safeThemeConfig = {
+      ...data.themeConfig,
+      whatsappPaNumber: currentTheme.whatsappPaNumber,
+      whatsappPhoneId: currentTheme.whatsappPhoneId,
+      whatsappToken: currentTheme.whatsappToken,
+      whatsappTemplate: currentTheme.whatsappTemplate
+    }
+
     const website = await prisma.tenantWebsite.update({
       where: { tenantId },
       data: {
         siteTitle: data.siteTitle,
-        themeConfig: data.themeConfig,
+        themeConfig: safeThemeConfig,
         globalSeoMetadata: data.globalSeoMetadata,
         isActive: data.isActive
+        // Gateway fields (xenditEncryptedSecret, etc) are strictly top-level and omitted here to ensure they are never overwritten by a snapshot restore.
       }
     })
     
@@ -275,7 +290,15 @@ export async function saveAiConfig(tenantId: string, data: { providerKey: string
     const session = await getServerSession(authOptions)
     if (!session?.user) throw new Error('Unauthorized')
     await requirePermission((session.user as any).id, tenantId, 'settings', 'write')
-    const encryptedSecret = data.apiSecret ? encrypt(data.apiSecret) : undefined
+    
+    if (!data.providerKey || data.providerKey.trim() === '') {
+      throw new Error('Provider Key is required')
+    }
+    if (!data.selectedModelName || data.selectedModelName.trim() === '') {
+      throw new Error('Selected Model Name is required')
+    }
+
+    const encryptedSecret = data.apiSecret && !data.apiSecret.includes('•') ? encrypt(data.apiSecret) : undefined
     const updateData: any = {
       providerKey: data.providerKey,
       selectedModelName: data.selectedModelName
@@ -317,7 +340,7 @@ export async function savePaymentConfig(tenantId: string, data: {
       midtransEnabled: data.midtransEnabled
     }
 
-    if (data.xenditSecret && data.xenditSecret !== 'sk_live_****') {
+    if (data.xenditSecret && data.xenditSecret.trim() !== '' && !data.xenditSecret.includes('•') && data.xenditSecret !== 'sk_live_****') {
       if (!data.xenditSecret.startsWith('xnd_') && !data.xenditSecret.startsWith('sk_')) {
         throw new Error('Invalid Xendit secret format. Must start with xnd_ or sk_')
       }
@@ -327,14 +350,14 @@ export async function savePaymentConfig(tenantId: string, data: {
       updateData.xenditEncryptedSecretIv = iv
     }
 
-    if (data.xenditWebhookToken && data.xenditWebhookToken !== 'xtok_****') {
+    if (data.xenditWebhookToken && data.xenditWebhookToken.trim() !== '' && !data.xenditWebhookToken.includes('•') && data.xenditWebhookToken !== 'xtok_****') {
       const encryptedStr = encrypt(data.xenditWebhookToken)
       const [iv, ciphertext] = encryptedStr.split(':')
       updateData.xenditEncryptedWebhookToken = ciphertext
       updateData.xenditEncryptedWebhookTokenIv = iv
     }
 
-    if (data.midtransServerKey && data.midtransServerKey !== 'Mid-server-****') {
+    if (data.midtransServerKey && data.midtransServerKey.trim() !== '' && !data.midtransServerKey.includes('•') && data.midtransServerKey !== 'Mid-server-****') {
       if (!data.midtransServerKey.startsWith('Mid-server-') && !data.midtransServerKey.startsWith('SB-Mid-server-')) {
         throw new Error('Invalid Midtrans server key format. Must start with Mid-server- or SB-Mid-server-')
       }
