@@ -16,21 +16,14 @@ export async function getTenantModules(tenantId: string) {
   }
 }
 
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
 
 export async function toggleTenantModule(tenantId: string, moduleKey: string, isEnabled: boolean) {
   try {
-    const session = await getServerSession(authOptions)
-    const userId = (session?.user as any)?.id
+    const user = await getAuthenticatedUser()
+    const userId = user.id
 
-    if (!userId) {
-      return { success: false, error: 'Unauthorized: No active user session.' }
-    }
-    
-    if (!(session?.user as any)?.roles?.includes('platform_owner')) {
-      return { success: false, error: 'Unauthorized: Platform Owner role required.' }
-    }
+    await requirePermission(userId, tenantId, 'system', 'manage')
     const record = await prisma.tenantModule.upsert({
       where: {
         tenantId_moduleKey: {

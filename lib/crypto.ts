@@ -23,21 +23,6 @@ export function encrypt(text: string): string {
 export function decrypt(text: string): string {
   if (!text) return ''
   
-  // Legacy raw hex (no colons) from auth.ts
-  if (!text.includes(':')) {
-    try {
-      const legacyKey = crypto.scryptSync(process.env.ENCRYPTION_KEY!, 'salt', 32)
-      const legacyIv = Buffer.alloc(16, 0)
-      const decipher = crypto.createDecipheriv(ALGORITHM, legacyKey, legacyIv)
-      let decrypted = decipher.update(text, 'hex', 'utf8')
-      decrypted += decipher.final('utf8')
-      return decrypted
-    } catch (e) {
-      console.error('Legacy decryption failed', e)
-      return ''
-    }
-  }
-
   const textParts = text.split(':')
   
   try {
@@ -53,22 +38,12 @@ export function decrypt(text: string): string {
       let decrypted = decipher.update(encryptedText)
       decrypted = Buffer.concat([decrypted, decipher.final()])
       return decrypted.toString()
-    } else if (textParts.length === 2) {
-      // Intermediate legacy format: iv:ciphertext
-      const [ivStr, cipherStr] = textParts
-      const legacyKey = crypto.scryptSync(process.env.ENCRYPTION_KEY!, 'salt', 32)
-      const iv = Buffer.from(ivStr, 'hex')
-      const encryptedText = Buffer.from(cipherStr, 'hex')
-      
-      const decipher = crypto.createDecipheriv(ALGORITHM, legacyKey, iv)
-      let decrypted = decipher.update(encryptedText)
-      decrypted = Buffer.concat([decrypted, decipher.final()])
-      return decrypted.toString()
+    } else {
+      // Invalid format
+      return ''
     }
   } catch (e) {
     console.error('Decryption failed', e)
     return ''
   }
-  
-  return ''
 }

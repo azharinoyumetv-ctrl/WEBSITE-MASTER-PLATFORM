@@ -2,17 +2,20 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { requirePermission } from '@/lib/rbac'
+import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
 import { decrypt } from '@/lib/crypto'
 
 async function getXenditAuth(tenantId: string) {
   const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })
-  if (!website?.xenditEnabled || !website.xenditEncryptedSecret || !website.xenditEncryptedSecretIv) {
+  if (!website?.xenditEnabled || !website.xenditEncryptedSecret) {
     throw new Error('Xendit is not configured or enabled for this tenant');
   }
-  const secret = decrypt(`${website.xenditEncryptedSecretIv}:${website.xenditEncryptedSecret}`);
+  // If the secret doesn't have 2 colons (it's legacy iv:ciphertext), handle it or expect it was rotated
+  let encryptedData = website.xenditEncryptedSecret;
+  if (website.xenditEncryptedSecretIv && !encryptedData.includes(':')) {
+     encryptedData = `${website.xenditEncryptedSecretIv}:${website.xenditEncryptedSecret}`;
+  }
+  const secret = decrypt(encryptedData);
   if (!secret) throw new Error('Failed to decrypt Xendit secret');
   return Buffer.from(secret + ':').toString('base64');
 }
@@ -45,9 +48,8 @@ export async function createInvoice(tenantId: string, orderId: string, amount: n
 
 export async function getPayments(tenantId: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'payments', 'read')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'payments', 'read')
 
     const payments = await prisma.tenantPayment.findMany({
       where: { tenantId },
@@ -61,9 +63,8 @@ export async function getPayments(tenantId: string) {
 
 export async function refundPayment(tenantId: string, paymentId: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'payments', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'payments', 'write')
 
     const payment = await prisma.tenantPayment.findUnique({ where: { id: paymentId, tenantId } })
     if (!payment) return { success: false, error: 'Payment not found' }
@@ -119,9 +120,8 @@ export async function refundPayment(tenantId: string, paymentId: string) {
 
 export async function capturePayment(tenantId: string, paymentId: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'payments', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'payments', 'write')
 
     const payment = await prisma.tenantPayment.findUnique({ where: { id: paymentId, tenantId } })
     if (!payment) return { success: false, error: 'Payment not found' }
@@ -173,9 +173,8 @@ export async function capturePayment(tenantId: string, paymentId: string) {
 
 export async function manualAdjustPayment(tenantId: string, paymentId: string, adjustAmount: number, reason: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'payments', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'payments', 'write')
 
     const payment = await prisma.tenantPayment.findUnique({ where: { id: paymentId, tenantId } })
     if (!payment) return { success: false, error: 'Payment not found' }

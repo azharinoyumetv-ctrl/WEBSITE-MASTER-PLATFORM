@@ -13,7 +13,7 @@ export async function POST(req: Request) {
     // Auth boundary check: Ensure the requester's context matches the tenant they are modifying, 
     // or they are a super-admin.
     const tokenTenantId = req.headers.get('x-tenant-id') || (session.user as any).tenantId
-    if (tenantId !== tokenTenantId && !(session.user as any).roles.includes('super-admin')) {
+    if (tenantId !== tokenTenantId && !(session.user as any).roles.some((r: string) => r.toLowerCase() === 'super-admin')) {
       return NextResponse.json({ error: 'Tenant boundary violation' }, { status: 403 })
     }
 

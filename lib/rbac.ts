@@ -1,4 +1,33 @@
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+
+export async function getAuthenticatedUser() {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    throw new Error('Unauthorized');
+  }
+  return session.user as { id: string, tenantId: string, roles: string[] };
+}
+
+export async function requireSuperAdmin() {
+  const user = await getAuthenticatedUser();
+  const crossTenantAdmin = await prisma.user.findFirst({
+    where: { 
+      id: user.id, 
+      userRoles: { 
+        some: { 
+          role: { name: { equals: 'super-admin', mode: 'insensitive' } } 
+        } 
+      } 
+    }
+  });
+  
+  if (!crossTenantAdmin) {
+    throw new Error('Forbidden: Super-admin only');
+  }
+  return user;
+}
 
 export async function requirePermission(userId: string, tenantId: string, moduleKey: string, actionKey: string) {
   if (!userId || !tenantId) {
@@ -7,7 +36,14 @@ export async function requirePermission(userId: string, tenantId: string, module
 
   // Cross-tenant super-admin check
   const crossTenantAdmin = await prisma.user.findFirst({
-    where: { id: userId, userRoles: { some: { role: { name: 'super-admin' } } } }
+    where: { 
+      id: userId, 
+      userRoles: { 
+        some: { 
+          role: { name: { equals: 'super-admin', mode: 'insensitive' } } 
+        } 
+      } 
+    }
   });
   
   if (crossTenantAdmin) {
@@ -25,11 +61,11 @@ export async function requirePermission(userId: string, tenantId: string, module
   }
 
   // Check if they are a platform-owner for this tenant
-  const isPlatformOwner = userRoles.some(ur => ur.role.name === 'platform_owner');
+  const isPlatformOwner = userRoles.some(ur => ur.role.name.toLowerCase() === 'platform_owner' || ur.role.name.toLowerCase() === 'platform owner');
   if (isPlatformOwner) return true;
 
   // Check if they are an admin
-  const isAdmin = userRoles.some(ur => ur.role.name === 'Admin');
+  const isAdmin = userRoles.some(ur => ur.role.name.toLowerCase() === 'admin');
   if (isAdmin) return true;
 
   // Real permission check against TenantRolePermission
@@ -46,7 +82,7 @@ export async function requirePermission(userId: string, tenantId: string, module
   });
 
   if (!permission) {
-    throw new Error(`Forbidden: User lacks ${moduleKey}:${actionKey} permission for tenant ${tenantId}`);
+    throw new Error(`Forbidden: Missing permission ${moduleKey}:${actionKey}`);
   }
 
   return true;

@@ -2,12 +2,8 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
-import { encrypt } from '@/lib/crypto'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
-import { requirePermission } from '@/lib/rbac'
-
-
+import { encrypt, decrypt } from '@/lib/crypto'
+import { requirePermission, getAuthenticatedUser } from '@/lib/rbac'
 
 // Fetch public website config (used by public site renderer)
 export async function getPublicWebsiteConfig(tenantDomain: string) {
@@ -73,9 +69,8 @@ export async function getAdminPages(tenantId: string) {
 // Admin: Save Page
 export async function saveAdminPage(tenantId: string, pageId: string | undefined, data: any) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'website', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'website', 'write')
     let page;
     if (pageId) {
       page = await prisma.tenantPage.update({
@@ -111,9 +106,8 @@ export async function saveAdminPage(tenantId: string, pageId: string | undefined
 // Admin: Delete Page
 export async function deleteAdminPage(tenantId: string, pageId: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'website', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'website', 'write')
     
     // Soft delete
     await prisma.tenantPage.update({
@@ -131,9 +125,8 @@ export async function deleteAdminPage(tenantId: string, pageId: string) {
 // Admin: Get Website Config
 export async function getAdminWebsiteConfig(tenantId: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'website', 'read')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'website', 'read')
 
     const website = await prisma.tenantWebsite.findUnique({
       where: { tenantId }
@@ -163,9 +156,8 @@ export async function getAdminWebsiteConfig(tenantId: string) {
 // Admin: Save Website Config
 export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'website', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'website', 'write')
     const website = await prisma.$transaction(async (tx) => {
       const w = await tx.tenantWebsite.upsert({
         where: { tenantId },
@@ -207,9 +199,8 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
 
 export async function getWebsiteConfigSnapshots(tenantId: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'settings', 'read')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'settings', 'read')
     
     const snapshots = await prisma.tenantConfigSnapshot.findMany({
       where: { tenantId, configType: 'website_theme' },
@@ -224,9 +215,8 @@ export async function getWebsiteConfigSnapshots(tenantId: string) {
 
 export async function restoreWebsiteConfigSnapshot(tenantId: string, snapshotId: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'website', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'website', 'write')
     
     const snapshot = await prisma.tenantConfigSnapshot.findUnique({
       where: { id: snapshotId }
@@ -270,9 +260,8 @@ export async function restoreWebsiteConfigSnapshot(tenantId: string, snapshotId:
 
 export async function saveTenantLogo(tenantId: string, logoUrl: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'settings', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'settings', 'write')
     await prisma.systemTenant.update({
       where: { id: tenantId },
       data: { logoUrl }
@@ -287,9 +276,8 @@ export async function saveTenantLogo(tenantId: string, logoUrl: string) {
 
 export async function saveAiConfig(tenantId: string, data: { providerKey: string, apiSecret?: string, selectedModelName: string }) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'settings', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'settings', 'write')
     
     if (!data.providerKey || data.providerKey.trim() === '') {
       throw new Error('Provider Key is required')
@@ -332,9 +320,8 @@ export async function savePaymentConfig(tenantId: string, data: {
   midtransServerKey: string 
 }) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error('Unauthorized')
-    await requirePermission((session.user as any).id, tenantId, 'settings', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'settings', 'write')
     const updateData: any = {
       xenditEnabled: data.xenditEnabled,
       midtransEnabled: data.midtransEnabled
@@ -345,16 +332,14 @@ export async function savePaymentConfig(tenantId: string, data: {
         throw new Error('Invalid Xendit secret format. Must start with xnd_ or sk_')
       }
       const encryptedStr = encrypt(data.xenditSecret)
-      const [iv, ciphertext] = encryptedStr.split(':')
-      updateData.xenditEncryptedSecret = ciphertext
-      updateData.xenditEncryptedSecretIv = iv
+      updateData.xenditEncryptedSecret = encryptedStr
+      updateData.xenditEncryptedSecretIv = ''
     }
 
     if (data.xenditWebhookToken && data.xenditWebhookToken.trim() !== '' && !data.xenditWebhookToken.includes('•') && data.xenditWebhookToken !== 'xtok_****') {
       const encryptedStr = encrypt(data.xenditWebhookToken)
-      const [iv, ciphertext] = encryptedStr.split(':')
-      updateData.xenditEncryptedWebhookToken = ciphertext
-      updateData.xenditEncryptedWebhookTokenIv = iv
+      updateData.xenditEncryptedWebhookToken = encryptedStr
+      updateData.xenditEncryptedWebhookTokenIv = ''
     }
 
     if (data.midtransServerKey && data.midtransServerKey.trim() !== '' && !data.midtransServerKey.includes('•') && data.midtransServerKey !== 'Mid-server-****') {
@@ -362,9 +347,8 @@ export async function savePaymentConfig(tenantId: string, data: {
         throw new Error('Invalid Midtrans server key format. Must start with Mid-server- or SB-Mid-server-')
       }
       const encryptedStr = encrypt(data.midtransServerKey)
-      const [iv, ciphertext] = encryptedStr.split(':')
-      updateData.midtransEncryptedServerKey = ciphertext
-      updateData.midtransEncryptedServerKeyIv = iv
+      updateData.midtransEncryptedServerKey = encryptedStr
+      updateData.midtransEncryptedServerKeyIv = ''
     }
 
     await prisma.tenantWebsite.update({

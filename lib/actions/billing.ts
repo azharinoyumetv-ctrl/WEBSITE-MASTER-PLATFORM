@@ -1,15 +1,12 @@
 'use server'
 
 import prisma from "@/lib/prisma"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { requirePermission } from "@/lib/rbac"
+import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
 
 export async function generateBillingInvoice(tenantId: string, planId: 'core' | 'professional' | 'enterprise') {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user) throw new Error("Unauthorized")
-    await requirePermission((session.user as any).id, tenantId, 'settings', 'write')
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'settings', 'write')
 
     const tenant = await prisma.systemTenant.findUnique({ where: { id: tenantId } })
     if (!tenant) throw new Error("Tenant not found")

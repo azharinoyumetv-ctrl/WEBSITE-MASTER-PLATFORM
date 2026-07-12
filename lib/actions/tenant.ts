@@ -5,9 +5,11 @@ import { revalidatePath } from 'next/cache'
 import prisma from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { requireSuperAdmin } from "@/lib/rbac"
 
 export async function getTenants() {
   try {
+    const user = await requireSuperAdmin()
     const tenants = await prisma.systemTenant.findMany({
       orderBy: { createdAt: 'desc' },
       include: {
@@ -24,10 +26,7 @@ export async function getTenants() {
 
 export async function createTenant(data: { companyName: string, subdomain: string, packageKey?: string, addons?: string[] }) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!(session?.user as any)?.roles?.includes('platform_owner')) {
-      return { success: false, error: 'Unauthorized: Platform Owner role required.' }
-    }
+    const user = await requireSuperAdmin()
 
     // Check if subdomain exists
     const existing = await prisma.systemTenant.findUnique({
@@ -192,10 +191,7 @@ export async function createTenant(data: { companyName: string, subdomain: strin
 
 export async function updateTenantStatus(id: string, status: TenantStatus) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!(session?.user as any)?.roles?.includes('platform_owner')) {
-      return { success: false, error: 'Unauthorized: Platform Owner role required.' }
-    }
+    const user = await requireSuperAdmin()
 
     const tenant = await prisma.systemTenant.update({
       where: { id },
@@ -228,10 +224,7 @@ export async function getTenantById(tenantId: string) {
 
 export async function deleteTenant(tenantId: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!(session?.user as any)?.roles?.includes('platform_owner')) {
-      return { success: false, error: 'Unauthorized: Platform Owner role required.' }
-    }
+    const user = await requireSuperAdmin()
 
     // Delete related records first (if cascading deletes aren't fully configured)
     await prisma.tenantModule.deleteMany({ where: { tenantId } })

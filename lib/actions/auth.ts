@@ -4,6 +4,7 @@ import prisma from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { getAuthenticatedUser } from "@/lib/rbac"
 
 function validatePasswordPolicy(password: string): string | null {
   if (password.length < 8) return "Password must be at least 8 characters long."
@@ -156,8 +157,8 @@ export async function registerTenantAdmin(data: any) {
 
 export async function revokeAllSessions(userId: string) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user || (session.user as any).id !== userId) throw new Error("Unauthorized")
+    const user = await getAuthenticatedUser()
+    if (user.id !== userId) throw new Error("Unauthorized")
 
     await prisma.$transaction([
       prisma.user.update({
@@ -177,13 +178,11 @@ export async function revokeAllSessions(userId: string) {
 }
 
 export async function logoutEverywhere() {
-  const { getServerSession } = require("next-auth")
-  const { authOptions } = require("@/lib/auth")
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) return { success: false, error: 'Unauthorized' }
+  const user = await getAuthenticatedUser().catch(() => null)
+  if (!user?.id) return { success: false, error: 'Unauthorized' }
   
   await prisma.tenantRefreshToken.updateMany({
-    where: { userId: (session.user as any).id },
+    where: { userId: user.id },
     data: { isRevoked: true }
   })
   
