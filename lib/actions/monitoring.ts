@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
+import { dispatchNotification } from './notifications'
 
 export async function getMonitoringStatus(tenantId: string) {
   try {
@@ -78,6 +79,24 @@ export async function logIncident(tenantId: string, data: { title: string, descr
         status: 'investigating'
       }
     })
+
+    // Auto-create notification log for the incident alert
+    try {
+      const admins = await prisma.user.findMany({
+        where: { tenantId, status: 'active' },
+        take: 3
+      })
+      for (const admin of admins) {
+        await dispatchNotification(tenantId, admin.email, 'email', 'incident_alert', {
+          incident_title: data.title,
+          severity: 'CRITICAL',
+          time: new Date().toLocaleString()
+        })
+      }
+    } catch (e) {
+      console.error("Failed to auto-dispatch incident alert notification:", e)
+    }
+
     return { success: true, incident }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -97,6 +116,24 @@ export async function resolveIncident(tenantId: string, incidentId: string) {
         resolvedAt: new Date()
       }
     })
+
+    // Auto-create notification log for incident resolution
+    try {
+      const admins = await prisma.user.findMany({
+        where: { tenantId, status: 'active' },
+        take: 3
+      })
+      for (const admin of admins) {
+        await dispatchNotification(tenantId, admin.email, 'email', 'incident_resolved', {
+          incident_title: updated.title,
+          severity: 'RESOLVED',
+          time: new Date().toLocaleString()
+        })
+      }
+    } catch (e) {
+      console.error("Failed to auto-dispatch incident resolved notification:", e)
+    }
+
     return { success: true, incident: updated }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -169,6 +206,23 @@ export async function createMonitoringRule(tenantId: string, data: any) {
     const rule = await prisma.tenantMonitoringRule.create({
       data: { tenantId, ...data }
     })
+
+    try {
+      const admins = await prisma.user.findMany({
+        where: { tenantId, status: 'active' },
+        take: 3
+      })
+      for (const admin of admins) {
+        await dispatchNotification(tenantId, admin.email, 'email', 'monitoring_rule_update', {
+          action: 'created',
+          rule_name: data.name || 'Monitoring Rule',
+          time: new Date().toLocaleString()
+        })
+      }
+    } catch (e) {
+      console.error("Failed to auto-dispatch monitoring rule notification:", e)
+    }
+
     return { success: true, rule }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -185,6 +239,23 @@ export async function updateMonitoringRule(tenantId: string, ruleId: string, dat
       where: { id: ruleId, tenantId },
       data
     })
+
+    try {
+      const admins = await prisma.user.findMany({
+        where: { tenantId, status: 'active' },
+        take: 3
+      })
+      for (const admin of admins) {
+        await dispatchNotification(tenantId, admin.email, 'email', 'monitoring_rule_update', {
+          action: 'updated',
+          rule_name: rule.name || 'Monitoring Rule',
+          time: new Date().toLocaleString()
+        })
+      }
+    } catch (e) {
+      console.error("Failed to auto-dispatch monitoring rule notification:", e)
+    }
+
     return { success: true, rule }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -197,9 +268,30 @@ export async function deleteMonitoringRule(tenantId: string, ruleId: string) {
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'settings', 'write')
 
+    const rule = await prisma.tenantMonitoringRule.findFirst({
+      where: { id: ruleId, tenantId }
+    })
+
     await prisma.tenantMonitoringRule.deleteMany({
       where: { id: ruleId, tenantId }
     })
+
+    try {
+      const admins = await prisma.user.findMany({
+        where: { tenantId, status: 'active' },
+        take: 3
+      })
+      for (const admin of admins) {
+        await dispatchNotification(tenantId, admin.email, 'email', 'monitoring_rule_update', {
+          action: 'deleted',
+          rule_name: rule?.name || 'Monitoring Rule',
+          time: new Date().toLocaleString()
+        })
+      }
+    } catch (e) {
+      console.error("Failed to auto-dispatch monitoring rule notification:", e)
+    }
+
     return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }

@@ -180,11 +180,16 @@ async function sendWithRetryAndLog(logId: string, maxRetries = 3) {
           }
         })
         
+        const metadata = log.metadata as any
+        const subject = metadata?.subject || 'System Notification'
+        const html = metadata?.body || 'You have a new notification.'
+
         await transporter.sendMail({
           from: config.username,
           to: log.recipient,
-          subject: 'System Notification',
-          text: 'You have a new notification.'
+          subject,
+          html,
+          text: html.replace(/<[^>]*>/g, '')
         })
       } else if (log.channelType === 'sms') {
         console.log(`[SMS] Sending to ${log.recipient} via Twilio simulation.`)
@@ -250,11 +255,71 @@ export async function dispatchTestNotification(tenantId: string, templateId: str
   }
 }
 
-export async function dispatchNotification(tenantId: string, recipient: string, channelType: string) {
+export async function dispatchNotification(
+  tenantId: string,
+  recipient: string,
+  channelType: string,
+  templateKey: string,
+  variables: Record<string, string> = {}
+) {
   try {
     const gateway = await prisma.tenantNotificationGateway.findFirst({
       where: { tenantId, channelType, isActive: true }
     })
+
+    let template = await prisma.tenantNotificationTemplate.findFirst({
+      where: { tenantId, templateKey, channelType }
+    })
+
+    if (!template) {
+      let defaultSubject = 'System Notification'
+      let defaultBody = 'Hello, you have a new notification.'
+
+      if (templateKey === 'order_confirmation') {
+        defaultSubject = 'Order Confirmation - #{{order_id}}'
+        defaultBody = '<h2>Order Confirmed!</h2><p>Hello {{customer_name}},</p><p>Thank you for your order. We have successfully received your payment of Rp {{amount}}.</p><p><a href="https://store.dagangos.com/orders/{{order_id}}/receipt">View Receipt</a></p>'
+      } else if (templateKey === 'payment_failed') {
+        defaultSubject = 'Payment Failed - #{{order_id}}'
+        defaultBody = '<h2>Payment Failed</h2><p>Hello {{customer_name}},</p><p>Your payment attempt of Rp {{amount}} for order #{{order_id}} failed. Please try again.</p>'
+      } else if (templateKey === 'incident_alert') {
+        defaultSubject = 'CRITICAL ALERT: {{incident_title}}'
+        defaultBody = '<h2>Critical Incident Alert</h2><p><strong>System Alert:</strong> {{incident_title}}</p><p><strong>Severity:</strong> {{severity}}</p><p><strong>Time:</strong> {{time}}</p><p>Please log in to the dashboard to investigate.</p>'
+      } else if (templateKey === 'incident_resolved') {
+        defaultSubject = 'RESOLVED: {{incident_title}}'
+        defaultBody = '<h2>Incident Resolved</h2><p><strong>System Alert:</strong> {{incident_title}}</p><p><strong>Status:</strong> RESOLVED</p><p><strong>Time:</strong> {{time}}</p><p>The incident has been marked as resolved. System operation has returned to normal.</p>'
+      } else if (templateKey === 'monitoring_rule_update') {
+        defaultSubject = 'Alert Rule {{action}} - {{rule_name}}'
+        defaultBody = '<h2>Alert Rule Change</h2><p>An alert rule was successfully <strong>{{action}}</strong>.</p><p><strong>Rule:</strong> {{rule_name}}</p><p><strong>Time:</strong> {{time}}</p>'
+      }
+
+      try {
+        template = await prisma.tenantNotificationTemplate.create({
+          data: {
+            tenantId,
+            templateKey,
+            channelType,
+            subjectLine: defaultSubject,
+            htmlBodyMarkup: defaultBody
+          }
+        })
+      } catch {
+        // Fallback for race condition
+      }
+    }
+
+    let subject = 'System Notification'
+    let body = 'You have a new notification.'
+
+    if (template) {
+      subject = template.subjectLine || subject
+      body = template.htmlBodyMarkup
+
+      for (const [key, value] of Object.entries(variables)) {
+        const placeholder = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g')
+        subject = subject.replace(placeholder, value)
+        body = body.replace(placeholder, value)
+      }
+    }
 
     const log = await prisma.tenantNotificationLog.create({
       data: {
@@ -262,7 +327,8 @@ export async function dispatchNotification(tenantId: string, recipient: string, 
         gatewayId: gateway?.id,
         recipient,
         channelType,
-        status: 'pending'
+        status: 'pending',
+        metadata: { subject, body }
       }
     })
 

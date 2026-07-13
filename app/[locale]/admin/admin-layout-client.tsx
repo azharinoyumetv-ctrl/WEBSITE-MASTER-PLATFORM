@@ -208,7 +208,9 @@ export function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () 
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
   
   useEffect(() => {
-    if (tenant?.id) {
+    if (!tenant?.id) return
+
+    const refreshData = () => {
       getUnreadAlertCount(tenant.id).then(res => {
         if (res?.count !== undefined) {
           setUnreadCount(res.count)
@@ -221,6 +223,10 @@ export function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () 
         }
       })
     }
+
+    refreshData()
+    const interval = setInterval(refreshData, 15000)
+    return () => clearInterval(interval)
   }, [tenant?.id])
   
   // Derive page title from pathname
