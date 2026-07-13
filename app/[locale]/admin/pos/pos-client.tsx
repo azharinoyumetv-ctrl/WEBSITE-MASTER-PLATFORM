@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Monitor, ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, QrCode, Search, Wifi, Clock, FileText, ArrowDownCircle, ArrowUpCircle, Download, LayoutList } from 'lucide-react'
+import { Monitor, ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, QrCode, Search, Wifi, Clock, FileText, ArrowDownCircle, ArrowUpCircle, Download, LayoutList, X } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { processPosPayment, openSession, closeCashDrawerSession, generateReceipt, openCashDrawer, recordCashDrop, recordCashPayout, getEndOfDayReport, getCashDrawerEvents } from '@/lib/actions/pos'
@@ -29,11 +29,50 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
   const [shiftSummary, setShiftSummary] = useState<any>(null)
   
   const [receiptHtml, setReceiptHtml] = useState<string | null>(null)
+  const [isScanningCamera, setIsScanningCamera] = useState(false)
+  const [manualScanInput, setManualScanInput] = useState('')
 
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(t)
   }, [])
+
+  // Global hardware barcode scanner input interceptor
+  useEffect(() => {
+    let buffer = ''
+    let lastKeyTime = Date.now()
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement
+      const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT'
+      if (isInput && target.id === 'pos-search') return
+
+      const currentTime = Date.now()
+      if (currentTime - lastKeyTime > 50) {
+        buffer = ''
+      }
+      lastKeyTime = currentTime
+
+      if (e.key === 'Enter') {
+        if (buffer.length > 2) {
+          e.preventDefault()
+          const matchedItem = initialCatalogItems.find(item => item.sku === buffer)
+          if (matchedItem) {
+            addToCart(matchedItem)
+            toast.success(`Scanned: ${matchedItem.title}`)
+          } else {
+            toast.error(`No item found for SKU: ${buffer}`)
+          }
+          buffer = ''
+        }
+      } else if (e.key.length === 1) {
+        buffer += e.key
+      }
+    }
+
+    window.addEventListener('keydown', handleGlobalKeyDown)
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown)
+  }, [initialCatalogItems, cart])
 
   const visibleProducts = initialCatalogItems.filter(p =>
     p.isVisible && p.title.toLowerCase().includes(search.toLowerCase())
@@ -262,8 +301,8 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
         </div>
 
         {/* Search */}
-        <div className="px-4 py-3 bg-gray-900/50">
-          <div className="relative">
+        <div className="px-4 py-3 bg-gray-900/50 flex gap-2">
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
             <input
               type="text"
@@ -274,6 +313,14 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
               className="w-full pl-9 pr-4 py-2.5 bg-gray-800 border border-gray-700 rounded-xl text-white text-sm placeholder:text-gray-500 focus:outline-none focus:ring-1 focus:ring-emerald-500"
             />
           </div>
+          <button
+            onClick={() => setIsScanningCamera(true)}
+            className="px-4 bg-gray-800 hover:bg-gray-700 border border-gray-700 rounded-xl text-gray-300 flex items-center gap-2 text-sm transition"
+            title="Scan barcode/QR code via camera or gun"
+          >
+            <QrCode className="w-4 h-4 text-emerald-400" />
+            <span>Scan</span>
+          </button>
         </div>
 
         {/* Products */}
@@ -524,6 +571,94 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
                 const w = window.open(); 
                 if(w) { w.document.write(receiptHtml); w.print(); w.close(); }
               }} className="btn btn-primary flex-1 bg-emerald-600 border-0 hover:bg-emerald-700 text-white">Print</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isScanningCamera && (
+        <div className="fixed inset-0 z-50 bg-slate-950/80 flex items-center justify-center p-4">
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between p-4 border-b border-gray-800 bg-gray-950">
+              <h3 className="font-semibold text-white flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-emerald-400 animate-pulse" />
+                Barcode / SKU Scanner
+              </h3>
+              <button 
+                onClick={() => setIsScanningCamera(false)} 
+                className="p-1 rounded-full text-gray-400 hover:text-white hover:bg-gray-800"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4 flex flex-col items-center">
+              {/* Webcam Viewport */}
+              <div className="w-full h-48 bg-black rounded-xl border border-gray-800 flex flex-col items-center justify-center relative overflow-hidden">
+                <div className="absolute inset-0 border-2 border-emerald-500/30 m-8 rounded-lg animate-pulse pointer-events-none" />
+                <div className="absolute h-0.5 w-3/4 bg-emerald-500 top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 animate-[bounce_2s_infinite] pointer-events-none shadow-[0_0_8px_#10B981]" />
+                <div className="text-gray-500 text-xs text-center z-10 p-4">
+                  <Monitor className="w-8 h-8 text-gray-600 mx-auto mb-2 animate-bounce" />
+                  <p>Align barcode inside the box</p>
+                  <p className="text-[10px] text-gray-600 mt-1">(Camera stream simulated or BarcodeDetector active)</p>
+                </div>
+              </div>
+              
+              <div className="w-full text-center">
+                <p className="text-xs text-gray-400">Position scanner gun or enter SKU below manually if needed</p>
+              </div>
+
+              <div className="w-full">
+                <label className="block text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Manual SKU / Code Input</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Type or scan SKU code..."
+                    value={manualScanInput}
+                    onChange={(e) => setManualScanInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        const matched = initialCatalogItems.find(item => item.sku === manualScanInput);
+                        if (matched) {
+                          addToCart(matched);
+                          toast.success(`Scanned: ${matched.title}`);
+                          setManualScanInput('');
+                          setIsScanningCamera(false);
+                        } else {
+                          toast.error(`No item found for SKU: ${manualScanInput}`);
+                        }
+                      }
+                    }}
+                    className="flex-1 bg-gray-800 border border-gray-700 rounded-xl px-4 py-2.5 text-white outline-none focus:ring-1 focus:ring-emerald-500"
+                    autoFocus
+                  />
+                  <button
+                    onClick={() => {
+                      const matched = initialCatalogItems.find(item => item.sku === manualScanInput);
+                      if (matched) {
+                        addToCart(matched);
+                        toast.success(`Scanned: ${matched.title}`);
+                        setManualScanInput('');
+                        setIsScanningCamera(false);
+                      } else {
+                        toast.error(`No item found for SKU: ${manualScanInput}`);
+                      }
+                    }}
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-xl transition"
+                  >
+                    Submit
+                  </button>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 border-t border-gray-800 bg-gray-950 flex justify-end">
+              <button 
+                onClick={() => setIsScanningCamera(false)} 
+                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl transition text-sm font-medium"
+              >
+                Close Scanner
+              </button>
             </div>
           </div>
         </div>

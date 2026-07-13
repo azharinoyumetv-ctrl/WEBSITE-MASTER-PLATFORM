@@ -290,6 +290,9 @@ export async function dispatchNotification(
       } else if (templateKey === 'monitoring_rule_update') {
         defaultSubject = 'Alert Rule {{action}} - {{rule_name}}'
         defaultBody = '<h2>Alert Rule Change</h2><p>An alert rule was successfully <strong>{{action}}</strong>.</p><p><strong>Rule:</strong> {{rule_name}}</p><p><strong>Time:</strong> {{time}}</p>'
+      } else if (templateKey === 'inventory_alert') {
+        defaultSubject = 'LOW STOCK ALERT: {{item_name}}'
+        defaultBody = '<h2>Low Stock Warning</h2><p>The system has detected low stock levels for item: <strong>{{item_name}}</strong>.</p><p><strong>Current Quantity:</strong> {{qty}}</p><p><strong>Low Stock Threshold:</strong> {{threshold}}</p><p><strong>Status:</strong> {{status}}</p><p>Please replenish inventory levels as soon as possible.</p>'
       }
 
       try {

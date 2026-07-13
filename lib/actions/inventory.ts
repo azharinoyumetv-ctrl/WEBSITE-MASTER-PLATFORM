@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
+import { dispatchNotification } from './notifications'
 
 export async function getInventory(tenantId: string) {
   try {
@@ -112,8 +113,41 @@ export async function adjustInventory(tenantId: string, balanceId: string, quant
       data: {
         quantityOnHand: newQty,
         status: newStatus
-      }
+      },
+      include: { catalogItem: true }
     })
+
+    if (newStatus === 'low' || newStatus === 'critical') {
+      try {
+        const admins = await prisma.user.findMany({
+          where: {
+            tenantId,
+            status: 'active',
+            userRoles: {
+              some: {
+                role: {
+                  name: {
+                    in: ['platform_owner', 'platform owner', 'admin'],
+                    mode: 'insensitive'
+                  }
+                }
+              }
+            }
+          },
+          take: 3
+        })
+        for (const admin of admins) {
+          await dispatchNotification(tenantId, admin.email, 'email', 'inventory_alert', {
+            item_name: updated.catalogItem?.title || 'Inventory Item',
+            qty: String(newQty),
+            threshold: String(balance.lowStockThreshold),
+            status: newStatus.toUpperCase()
+          })
+        }
+      } catch (e) {
+        console.error("Failed to dispatch low stock alert:", e)
+      }
+    }
 
     revalidatePath('/admin/inventory')
     return { success: true, balance: updated }
@@ -244,6 +278,38 @@ export async function updateInventoryBalance(tenantId: string, balanceId: string
       data: { ...data, status },
       include: { catalogItem: true, location: true }
     })
+
+    if (status === 'low' || status === 'critical') {
+      try {
+        const admins = await prisma.user.findMany({
+          where: {
+            tenantId,
+            status: 'active',
+            userRoles: {
+              some: {
+                role: {
+                  name: {
+                    in: ['platform_owner', 'platform owner', 'admin'],
+                    mode: 'insensitive'
+                  }
+                }
+              }
+            }
+          },
+          take: 3
+        })
+        for (const admin of admins) {
+          await dispatchNotification(tenantId, admin.email, 'email', 'inventory_alert', {
+            item_name: updated.catalogItem?.title || 'Inventory Item',
+            qty: String(qty),
+            threshold: String(threshold),
+            status: status.toUpperCase()
+          })
+        }
+      } catch (e) {
+        console.error("Failed to dispatch low stock alert:", e)
+      }
+    }
 
     revalidatePath('/admin/inventory')
     return { success: true, balance: updated }

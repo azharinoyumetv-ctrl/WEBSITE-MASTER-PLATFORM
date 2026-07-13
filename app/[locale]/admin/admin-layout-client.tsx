@@ -48,6 +48,7 @@ const NAVIGATION_GROUPS: NavGroup[] = [
       { href: '/admin/ecommerce', icon: ShoppingCart, label: 'E-commerce', requiredModule: 'ecommerce_module' },
       { href: '/admin/payments', icon: CreditCard, label: 'Payments', requiredModule: 'payment_module' },
       { href: '/admin/pos', icon: Monitor, label: 'POS Terminal', requiredModule: 'pos_module' },
+      { href: '/admin/pos/shifts', icon: CalendarCheck, label: 'Shift Scheduler', requiredModule: 'pos_module' },
     ],
   },
   {
