@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Activity, Server, Database, Globe, AlertTriangle, CheckCircle2, Clock, Plus, Loader2, Trash2, Edit2, Play, Square } from 'lucide-react'
+import { Activity, Server, Database, Globe, AlertTriangle, CheckCircle2, Clock, Plus, Loader2, Trash2, Edit2, Play, Square, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getMonitoringStatus, getIncidentLogs, logIncident, resolveIncident, getMonitoringRules, createMonitoringRule, updateMonitoringRule, deleteMonitoringRule } from '@/lib/actions/monitoring'
 import { MetricsButton } from './metrics-button'
@@ -58,6 +58,27 @@ export function MonitoringClient({ tenantId, initialData, initialIncidents, init
     } else {
       toast.error(res.error || 'Failed to resolve')
     }
+  }
+
+  const handleExportCSV = () => {
+    if (incidents.length === 0) {
+      toast.error('No incidents to export')
+      return
+    }
+    const headers = ['Incident ID', 'Title', 'Description', 'Service Name', 'Status', 'Date']
+    let csvContent = headers.join(',') + '\n'
+    incidents.forEach(i => {
+      csvContent += `"${i.id}","${i.title}","${i.description}","${i.serviceName}","${i.status}","${new Date(i.createdAt).toLocaleString()}"\n`
+    })
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'incidents_export.csv')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast.success('Incident logs exported successfully')
   }
 
   // Rule Form State
@@ -220,7 +241,14 @@ export function MonitoringClient({ tenantId, initialData, initialIncidents, init
         {/* Alerts Log */}
         <div className="lg:col-span-1">
           <div className="card p-5 h-full">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">Incident Log</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-slate-900">Incident Log</h3>
+              {incidents.length > 0 && (
+                <button onClick={handleExportCSV} className="btn btn-secondary px-2 py-1 text-xs flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
+                  <Download className="w-3.5 h-3.5" /> Export CSV
+                </button>
+              )}
+            </div>
             <div className="relative">
               <div className="absolute left-3.5 top-0 bottom-0 w-px bg-slate-100" />
               <div className="space-y-4">

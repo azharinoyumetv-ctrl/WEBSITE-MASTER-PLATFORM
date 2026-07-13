@@ -1,6 +1,7 @@
 import '@/app/globals.css'
 import { generateThemeCssVars } from '@/lib/utils'
 import Link from 'next/link'
+import Image from 'next/image'
 import { headers } from 'next/headers'
 import { getPublicWebsiteConfig } from '@/lib/actions/website'
 import { getTranslations } from 'next-intl/server'
@@ -98,7 +99,7 @@ export default async function SiteLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
             {tenant.logoUrl ? (
-              <img src={tenant.logoUrl} alt={website.siteTitle} className="h-8 max-w-[150px] object-contain" />
+              <Image src={tenant.logoUrl} alt={website.siteTitle} className="h-8 max-w-[150px] object-contain" width={150} height={32} unoptimized />
             ) : (
               <span className="font-bold text-xl tracking-tight" style={{ color: primaryColor }}>
                 {website.siteTitle}

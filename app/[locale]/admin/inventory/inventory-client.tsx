@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Warehouse, AlertTriangle, CheckCircle2, TrendingDown, MapPin, Package, RefreshCw, ArrowUpDown, Search, Loader2, Plus, Edit2, Trash2 } from 'lucide-react'
+import { Warehouse, AlertTriangle, CheckCircle2, TrendingDown, MapPin, Package, RefreshCw, ArrowUpDown, Search, Loader2, Plus, Edit2, Trash2, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { adjustInventory, transferStock, addInventoryBalance, updateInventoryBalance, deleteInventoryBalance, createLocation, updateLocation, deleteLocation } from '@/lib/actions/inventory'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 const STATUS_CONFIG = {
   optimal: { label: 'Optimal', color: 'badge-success', icon: CheckCircle2 },
@@ -13,11 +14,15 @@ const STATUS_CONFIG = {
 }
 
 export function InventoryClient({ initialLocations, initialBalances, catalogItems, tenantId }: { initialLocations: any[], initialBalances: any[], catalogItems: any[], tenantId: string }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [balances, setBalances] = useState(initialBalances)
   const [locations, setLocations] = useState(initialLocations)
-  const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(searchParams.get('location') || null)
+  const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all')
   const [adjustModal, setAdjustModal] = useState<any | null>(null)
   const [adjustQty, setAdjustQty] = useState('')
   const [isAdjusting, setIsAdjusting] = useState(false)
@@ -249,6 +254,16 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
     }
   }
 
+  const updateFilters = (key: string, val: string | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (val) {
+      params.set(key, val)
+    } else {
+      params.delete(key)
+    }
+    router.replace(`${pathname}?${params.toString()}`)
+  }
+
   return (
     <div className="page-container animate-slide-up">
       <div className="section-header">
@@ -347,27 +362,51 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
           <div className="flex flex-col sm:flex-row gap-3 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input type="text" placeholder="Search inventory by item or SKU..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" />
+              <input 
+                type="text" 
+                placeholder="Search inventory by item or SKU..." 
+                value={search} 
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  updateFilters('q', e.target.value)
+                }} 
+                className="form-input pl-9 focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+              />
             </div>
-            <select className="form-select w-full sm:w-48" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <select 
+              className="form-select w-full sm:w-48 focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+              value={statusFilter} 
+              onChange={(e) => {
+                setStatusFilter(e.target.value)
+                updateFilters('status', e.target.value)
+              }}
+            >
               <option value="all">All Statuses</option>
               <option value="optimal">Optimal</option>
               <option value="low">Low Stock</option>
               <option value="critical">Critical</option>
             </select>
-            <select className="form-select w-full sm:w-48" value={selectedLocation || ''} onChange={(e) => setSelectedLocation(e.target.value || null)}>
+            <select 
+              className="form-select w-full sm:w-48 focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+              value={selectedLocation || ''} 
+              onChange={(e) => {
+                const val = e.target.value || null
+                setSelectedLocation(val)
+                updateFilters('location', val)
+              }}
+            >
               <option value="">All Locations</option>
               {locations.map(l => (
                 <option key={l.id} value={l.id}>{l.name}</option>
               ))}
             </select>
-            <button onClick={exportToCSV} className="btn btn-secondary">
-              Export CSV
+            <button onClick={exportToCSV} className="btn btn-secondary flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
+              <Download className="w-4 h-4" /> Export CSV
             </button>
-            <button onClick={() => setIsTransferModalOpen(true)} className="btn btn-secondary flex items-center gap-2">
+            <button onClick={() => setIsTransferModalOpen(true)} className="btn btn-secondary flex items-center gap-2 focus:ring-2 focus:ring-indigo-500">
               <ArrowUpDown className="w-4 h-4" /> Transfer
             </button>
-            <button onClick={() => setIsAddModalOpen(true)} className="btn btn-primary flex items-center gap-2">
+            <button onClick={() => setIsAddModalOpen(true)} className="btn btn-primary flex items-center gap-2 focus:ring-2 focus:ring-indigo-500">
               <Plus className="w-4 h-4" /> Add Stock
             </button>
           </div>

@@ -23,7 +23,21 @@ export const metadata: Metadata = {
     type: 'website',
     title: 'Website Master Platform',
     description: 'Enterprise-grade multi-tenant SaaS platform',
+    siteName: 'Website Master Platform',
   },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Website Master Platform',
+    description: 'Enterprise-grade multi-tenant SaaS platform',
+  },
+  alternates: {
+    canonical: 'https://store.dagangos.com',
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+  manifest: '/site.webmanifest',
 }
 
 export default async function RootLayout({

@@ -1,16 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { Bell, Mail, MessageSquare, Settings2, Plus, Edit2, Trash2, Eye, CheckCircle2, Search, Loader2, X } from 'lucide-react'
+import { Bell, Mail, MessageSquare, Settings2, Plus, Edit2, Trash2, Eye, CheckCircle2, Search, Loader2, X, Download } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { updateNotificationTemplate, saveNotificationGateway, createNotificationTemplate, dispatchTestNotification, toggleNotificationGateway, deleteNotificationTemplate, retryNotificationLog } from '@/lib/actions/notifications'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 export function NotificationsClient({ initialTemplates, initialLogs = [], initialGateway, tenantId }: { initialTemplates: any[], initialLogs?: any[], initialGateway?: any, tenantId: string }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [templates, setTemplates] = useState(initialTemplates)
   const [logs, setLogs] = useState(initialLogs)
   const [gateway, setGateway] = useState(initialGateway)
-  const [activeTab, setActiveTab] = useState<'templates' | 'logs' | 'settings'>('templates')
+  const [activeTab, setActiveTab] = useState<'templates' | 'logs' | 'settings'>((searchParams.get('tab') as 'templates' | 'logs' | 'settings') || 'templates')
+  const [search, setSearch] = useState(searchParams.get('q') || '')
   const [selectedTemplate, setSelectedTemplate] = useState<any | null>(null)
   
   // Edited values
@@ -147,6 +153,43 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
     }
   }
 
+  const updateFilters = (key: string, val: string | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (val) {
+      params.set(key, val)
+    } else {
+      params.delete(key)
+    }
+    router.replace(`${pathname}?${params.toString()}`)
+  }
+
+  const handleExportCSV = () => {
+    if (logs.length === 0) {
+      toast.error('No notification logs to export')
+      return
+    }
+    const headers = ['Recipient', 'Channel', 'Status', 'Retry Count', 'Error Message', 'Date']
+    let csvContent = headers.join(',') + '\n'
+    logs.forEach(l => {
+      csvContent += `"${l.recipient}","${l.channelType}","${l.status}",${l.retryCount},"${l.deliveryError || ''}","${new Date(l.createdAt).toLocaleDateString()}"\n`
+    })
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'notification_logs_export.csv')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast.success('Notification logs exported successfully')
+  }
+
+  const filteredLogs = logs.filter(l => 
+    l.recipient.toLowerCase().includes(search.toLowerCase()) || 
+    l.channelType.toLowerCase().includes(search.toLowerCase()) ||
+    l.status.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
     <div className="page-container animate-slide-up">
       <div className="section-header">
@@ -249,13 +292,25 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
           <div className="p-4 border-b border-slate-100 flex gap-3">
              <div className="relative flex-1 max-w-md">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input type="text" placeholder="Search recipient..." className="form-input pl-9" />
+              <input 
+                type="text" 
+                placeholder="Search recipient..." 
+                value={search} 
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  updateFilters('q', e.target.value)
+                }} 
+                className="form-input pl-9 focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+              />
             </div>
+            <button onClick={handleExportCSV} className="btn btn-secondary flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
           </div>
           <table className="data-table">
             <thead><tr><th>Recipient</th><th>Template</th><th>Channel</th><th>Status</th><th>Time</th><th className="text-right">Actions</th></tr></thead>
             <tbody>
-              {logs.map((log: any) => (
+              {filteredLogs.map((log: any) => (
                 <tr key={log.id}>
                   <td className="font-medium text-slate-800 text-sm">{log.recipient}</td>
                   <td className="text-xs text-slate-500 font-mono">{log.channelType}</td>
@@ -272,12 +327,12 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
                   <td className="text-xs text-slate-500">{new Date(log.createdAt).toLocaleString()}</td>
                   <td className="text-right">
                     {log.status === 'failed' && (
-                      <button onClick={() => handleRetryLog(log.id)} className="btn btn-secondary btn-sm text-xs py-1 px-2">Retry</button>
+                      <button onClick={() => handleRetryLog(log.id)} className="btn btn-secondary btn-sm text-xs py-1 px-2 focus:ring-2 focus:ring-indigo-500">Retry</button>
                     )}
                   </td>
                 </tr>
               ))}
-              {logs.length === 0 && (
+              {filteredLogs.length === 0 && (
                 <tr><td colSpan={6} className="text-center text-slate-500 py-8">No recent notification logs found.</td></tr>
               )}
             </tbody>

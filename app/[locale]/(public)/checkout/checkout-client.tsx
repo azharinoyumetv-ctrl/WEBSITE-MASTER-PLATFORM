@@ -2,8 +2,9 @@
 
 import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { ShoppingCart, CheckCircle, Package, ArrowRight, X } from 'lucide-react'
+import { ShoppingCart, CheckCircle, Package, ArrowRight, X, AlertCircle } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import Image from 'next/image'
 import toast from 'react-hot-toast'
 import { createOrder } from '@/lib/actions/ecommerce'
 import { createDokuCheckout, createInvoice, createMidtransCheckout, getPaymentStatus } from '@/lib/actions/payments'
@@ -18,7 +19,9 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
-  const [paymentVerifyStatus, setPaymentVerifyStatus] = useState<'idle' | 'checking' | 'success' | 'failed' | 'cancelled'>('idle')
+  const [paymentVerifyStatus, setPaymentVerifyStatus] = useState<'idle' | 'checking' | 'success' | 'failed' | 'cancelled' | 'timeout'>('idle')
+  const [attempts, setAttempts] = useState(0)
+  const maxAttempts = 15
 
   const searchParams = useSearchParams()
 
@@ -29,9 +32,9 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
     if (status === 'success' && invoice) {
       setStep(3)
       setPaymentVerifyStatus('checking')
+      setAttempts(0)
       
-      let attempts = 0
-      const maxAttempts = 10
+      let localAttempts = 0
       
       const checkStatus = async () => {
         try {
@@ -60,12 +63,13 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
         if (done) return
         
         const interval = setInterval(async () => {
-          attempts++
+          localAttempts++
+          setAttempts(localAttempts)
           const done = await checkStatus()
-          if (done || attempts >= maxAttempts) {
+          if (done || localAttempts >= maxAttempts) {
             clearInterval(interval)
-            if (attempts >= maxAttempts) {
-              setPaymentVerifyStatus('success')
+            if (localAttempts >= maxAttempts && !done) {
+              setPaymentVerifyStatus('timeout')
             }
           }
         }, 3000)
@@ -168,7 +172,18 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
           <>
             <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
             <h2 className="text-2xl font-bold mb-2">Verifying Payment</h2>
-            <p className="text-slate-500 mb-6">We are verifying your transaction. This will only take a moment...</p>
+            <p className="text-slate-500 mb-2">We are verifying your transaction. Attempt {attempts} of {maxAttempts}...</p>
+            <p className="text-xs text-slate-400">Please do not close or refresh this page.</p>
+          </>
+        ) : paymentVerifyStatus === 'timeout' ? (
+          <>
+            <AlertCircle className="w-16 h-16 text-amber-500 mx-auto mb-4 animate-bounce" />
+            <h2 className="text-2xl font-bold mb-2">Verification Taking Longer</h2>
+            <p className="text-slate-500 mb-6">We haven't received confirmation from the payment provider yet. Your order may still process shortly.</p>
+            <div className="space-y-3">
+              <button onClick={() => window.location.reload()} className="btn btn-primary w-full">Check Again</button>
+              <p className="text-xs text-slate-400 mt-4">Need help? Contact support at <span className="font-semibold text-slate-600">support@dagangos.com</span> with your transaction details.</p>
+            </div>
           </>
         ) : (
           <>
@@ -214,8 +229,7 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
             <div key={item.id} className="card p-4 flex flex-col">
               <div className="w-full h-40 bg-slate-100 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
                 {item.imageUrls?.length > 0 ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={item.imageUrls[0]} alt={item.title} className="w-full h-full object-cover" />
+                  <Image src={item.imageUrls[0]} alt={item.title} className="w-full h-full object-cover" width={300} height={160} unoptimized />
                 ) : (
                   <Package className="w-8 h-8 text-slate-300" />
                 )}

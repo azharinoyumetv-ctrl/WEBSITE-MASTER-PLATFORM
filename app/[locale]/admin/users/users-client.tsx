@@ -4,22 +4,60 @@ import { useState } from 'react'
 import {
   Users, Plus, Search, Filter, Mail, MoreHorizontal,
   UserCheck, UserX, Clock, Crown, Shield, Eye, Trash2,
-  RefreshCw, Send, Loader2
+  RefreshCw, Send, Loader2, Download
 } from 'lucide-react'
 import { formatDate, getStatusBadgeClass, getInitials, stringToColor, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { inviteUser, toggleUserStatus } from '@/lib/actions/user'
 import Link from 'next/link'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser }: { initialUsers: any[], initialRoles: any[], tenantId: string, currentUser: any }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [users, setUsers] = useState(initialUsers)
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || 'all')
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState(initialRoles.length > 0 ? initialRoles[0].id : '')
   const [isInviting, setIsInviting] = useState(false)
   const [selectedProfile, setSelectedProfile] = useState<any | null>(null)
+
+  const updateFilters = (key: string, val: string | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (val) {
+      params.set(key, val)
+    } else {
+      params.delete(key)
+    }
+    router.replace(`${pathname}?${params.toString()}`)
+  }
+
+  const handleExportCSV = () => {
+    if (users.length === 0) {
+      toast.error('No users to export')
+      return
+    }
+    const headers = ['Name', 'Email', 'Roles', 'Status', 'Joined']
+    let csvContent = headers.join(',') + '\n'
+    users.forEach(u => {
+      const name = `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email
+      const joinedStr = new Date(u.createdAt).toLocaleDateString()
+      csvContent += `"${name}","${u.email}","${(u.roles || []).join(';')}",${u.status},"${joinedStr}"\n`
+    })
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'users_export.csv')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast.success('Users list exported successfully')
+  }
 
   const filtered = users.filter(u => {
     const matchesSearch =
@@ -45,12 +83,11 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
 
     const res = await inviteUser(tenantId, inviteEmail, inviteRole, invitedBy)
     setIsInviting(false)
-
-    if (res.success) {
-      toast.success(`Invitation sent to ${inviteEmail}`)
+    if (res.success && res.user) {
+      toast.success('Invitation sent successfully')
+      setUsers([res.user, ...users])
       setShowInviteModal(false)
       setInviteEmail('')
-      // In a real app we might fetch the new invitation list, but for now we'll just show success
     } else {
       toast.error(res.error || 'Failed to send invite')
     }
@@ -79,7 +116,7 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
           <h2 className="section-title">User Management</h2>
           <p className="section-desc">Manage team members, roles, and access for this workspace</p>
         </div>
-        <button onClick={() => setShowInviteModal(true)} className="btn btn-primary" id="invite-user-btn">
+        <button onClick={() => setShowInviteModal(true)} className="btn btn-primary focus:ring-2 focus:ring-indigo-500" id="invite-user-btn">
           <Plus className="w-4 h-4" />
           Invite User
         </button>
@@ -89,17 +126,17 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
         {[
           { label: 'Total Users', value: stats.total, icon: Users, color: 'bg-indigo-600' },
           { label: 'Active', value: stats.active, icon: UserCheck, color: 'bg-emerald-600' },
-          { label: 'Pending', value: stats.pending, icon: Clock, color: 'bg-amber-500' },
-          { label: 'Suspended', value: stats.suspended, icon: UserX, color: 'bg-red-500' },
+          { label: 'Pending', value: stats.pending, icon: Clock, color: 'bg-amber-50' },
+          { label: 'Suspended', value: stats.suspended, icon: UserX, color: 'bg-red-50' },
         ].map((s) => (
-          <div key={s.label} className="stat-card">
-            <div className="flex items-center justify-between">
-              <p className="stat-label">{s.label}</p>
-              <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center', s.color)}>
-                <s.icon className="w-4 h-4 text-white" />
-              </div>
+          <div key={s.label} className="card p-4 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-slate-400 uppercase tracking-wider">{s.label}</p>
+              <h3 className="text-xl font-bold text-slate-800 mt-1">{s.value}</h3>
             </div>
-            <p className="stat-value">{s.value}</p>
+            <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', s.color)}>
+              <s.icon className="w-5 h-5" />
+            </div>
           </div>
         ))}
       </div>
@@ -112,15 +149,21 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
               type="text"
               placeholder="Search users..."
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => {
+                setSearch(e.target.value)
+                updateFilters('q', e.target.value)
+              }}
               id="user-search"
-              className="form-input pl-9"
+              className="form-input pl-9 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             />
           </div>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="form-select sm:w-40"
+            onChange={(e) => {
+              setFilterStatus(e.target.value)
+              updateFilters('status', e.target.value)
+            }}
+            className="form-select sm:w-40 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
             id="user-status-filter"
           >
             <option value="all">All Status</option>
@@ -128,6 +171,9 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
             <option value="pending_verification">Pending</option>
             <option value="suspended">Suspended</option>
           </select>
+          <button onClick={handleExportCSV} className="btn btn-secondary flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
+            <Download className="w-4 h-4" /> Export CSV
+          </button>
         </div>
       </div>
 

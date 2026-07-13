@@ -1,16 +1,19 @@
 'use client'
 
-import { useState } from 'react'
-import { Users2, Search, Mail, Phone, Tag, Plus, ChevronRight, Clock, ShoppingCart, MessageSquare, TrendingUp, X, Loader2, Upload, Trash2, CheckSquare } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Users2, Search, Mail, Phone, Tag, Plus, ChevronRight, Clock, ShoppingCart, MessageSquare, TrendingUp, X, Loader2, Upload, Trash2, CheckSquare, Download } from 'lucide-react'
 import { formatCurrency, formatDate, getInitials, stringToColor, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { createCrmContact, updateCrmContact, deleteCrmContact, addTimelineEvent, sendTimelineWhatsApp, bulkDeleteCrmContacts, importCrmContacts } from '@/lib/actions/crm'
-import { useRef } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tenantId: string, initialContacts: any[], initialTimeline: any[] }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
   const [contacts, setContacts] = useState(initialContacts)
   const [selected, setSelected] = useState<any | null>(initialContacts[0] || null)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(searchParams.get('q') || '')
   
   // New Contact Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -184,6 +187,38 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
+  const handleSearchChange = (val: string) => {
+    setSearch(val)
+    const params = new URLSearchParams(searchParams.toString())
+    if (val) {
+      params.set('q', val)
+    } else {
+      params.delete('q')
+    }
+    router.replace(`${pathname}?${params.toString()}`)
+  }
+
+  const handleExportCSV = () => {
+    if (contacts.length === 0) {
+      toast.error('No contacts to export')
+      return
+    }
+    const headers = ['First Name', 'Last Name', 'Email', 'Phone', 'Tags', 'Spend']
+    let csvContent = headers.join(',') + '\n'
+    contacts.forEach(c => {
+      csvContent += `"${c.firstName || ''}","${c.lastName || ''}","${c.email || ''}","${c.phoneNumber || ''}","${(c.tags || []).join(';')}",${c.totalSpend || 0}\n`
+    })
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.setAttribute('download', 'crm_contacts_export.csv')
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    toast.success('CRM contacts exported successfully')
+  }
+
   const contactTimeline = selected ? initialTimeline.filter(t => t.contactId === selected.id) : []
 
   const EVENT_ICONS: Record<string, React.ElementType> = {
@@ -202,19 +237,22 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
         <div className="flex gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input type="text" placeholder="Search contacts or tags..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" />
+              <input type="text" placeholder="Search contacts or tags..." value={search} onChange={(e) => handleSearchChange(e.target.value)} className="form-input pl-9 focus:ring-2 focus:ring-indigo-500 focus:outline-none" />
             </div>
             {selectedIds.length > 0 && (
-              <button onClick={handleBulkDelete} className="btn btn-secondary text-red-500 border-red-200 hover:bg-red-50">
+              <button onClick={handleBulkDelete} className="btn btn-secondary text-red-500 border-red-200 hover:bg-red-50 focus:ring-2 focus:ring-indigo-500">
                 <Trash2 className="w-4 h-4 mr-1" /> Delete ({selectedIds.length})
               </button>
             )}
             <input type="file" accept=".csv" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
-            <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="btn btn-secondary">
+            <button onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="btn btn-secondary focus:ring-2 focus:ring-indigo-500">
               {isImporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4 mr-1" />}
               Import CSV
             </button>
-            <button onClick={() => setIsModalOpen(true)} className="btn btn-primary flex items-center gap-2">
+            <button onClick={handleExportCSV} className="btn btn-secondary flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
+            <button onClick={() => setIsModalOpen(true)} className="btn btn-primary flex items-center gap-2 focus:ring-2 focus:ring-indigo-500">
               <Plus className="w-4 h-4" /> New Contact
             </button>
           </div>

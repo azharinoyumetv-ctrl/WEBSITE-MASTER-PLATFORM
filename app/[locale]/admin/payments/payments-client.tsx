@@ -1,17 +1,22 @@
 'use client'
 
 import { useState } from 'react'
-import { CreditCard, DollarSign, TrendingUp, RefreshCw, AlertTriangle, CheckCircle2, Clock, Search, Edit2, Loader2, ShieldAlert, FileText, UploadCloud, Check, X } from 'lucide-react'
+import { CreditCard, DollarSign, TrendingUp, RefreshCw, AlertTriangle, CheckCircle2, Clock, Search, Edit2, Loader2, ShieldAlert, FileText, UploadCloud, Check, X, Download } from 'lucide-react'
 import { formatCurrency, formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import { refundPayment, capturePayment, manualAdjustPayment, createOrUpdateDispute } from '@/lib/actions/payments'
 import toast from 'react-hot-toast'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 export function PaymentsClient({ initialPayments, initialDisputes = [], tenantId }: { initialPayments: any[], initialDisputes?: any[], tenantId: string }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [payments, setPayments] = useState(initialPayments)
   const [disputes, setDisputes] = useState<any[]>(initialDisputes)
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(searchParams.get('q') || '')
   const [isProcessing, setIsProcessing] = useState<Record<string, boolean>>({})
-  const [activeTab, setActiveTab] = useState<'transactions' | 'disputes'>('transactions')
+  const [activeTab, setActiveTab] = useState<'transactions' | 'disputes'>((searchParams.get('tab') as 'transactions' | 'disputes') || 'transactions')
   
   const [adjustingPayment, setAdjustingPayment] = useState<any>(null)
   const [adjustAmount, setAdjustAmount] = useState<string>('')
@@ -108,6 +113,58 @@ export function PaymentsClient({ initialPayments, initialDisputes = [], tenantId
     }
   }
 
+  const updateFilters = (key: string, val: string | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (val) {
+      params.set(key, val)
+    } else {
+      params.delete(key)
+    }
+    router.replace(`${pathname}?${params.toString()}`)
+  }
+
+  const handleExportCSV = () => {
+    if (activeTab === 'transactions') {
+      if (payments.length === 0) {
+        toast.error('No transactions to export')
+        return
+      }
+      const headers = ['Transaction ID', 'External ID', 'Order ID', 'Gateway', 'Amount', 'Currency', 'Status', 'Date']
+      let csvContent = headers.join(',') + '\n'
+      payments.forEach(p => {
+        csvContent += `"${p.id}","${p.externalTransactionId || ''}","${p.orderId || ''}","${p.paymentGateway || ''}",${p.amount},"${p.currency || 'USD'}","${p.paymentStatus}","${new Date(p.createdAt).toLocaleDateString()}"\n`
+      })
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'payments_export.csv')
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      toast.success('Payments list exported successfully')
+    } else {
+      if (disputes.length === 0) {
+        toast.error('No disputes to export')
+        return
+      }
+      const headers = ['Dispute ID', 'Payment ID', 'Reason', 'Status', 'Amount', 'Date']
+      let csvContent = headers.join(',') + '\n'
+      disputes.forEach(d => {
+        csvContent += `"${d.id}","${d.paymentId}","${d.reason}","${d.status}",${d.amount || 0},"${new Date(d.createdAt).toLocaleDateString()}"\n`
+      })
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', 'disputes_export.csv')
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      toast.success('Disputes list exported successfully')
+    }
+  }
+
   return (
     <div className="page-container animate-slide-up">
       <div className="section-header">
@@ -138,14 +195,20 @@ export function PaymentsClient({ initialPayments, initialDisputes = [], tenantId
 
       <div className="flex border-b border-slate-200 mb-6">
         <button 
-          onClick={() => setActiveTab('transactions')}
-          className={cn("px-4 py-2 text-sm font-semibold border-b-2 transition-all", activeTab === 'transactions' ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-600 hover:text-slate-900")}
+          onClick={() => {
+            setActiveTab('transactions')
+            updateFilters('tab', 'transactions')
+          }}
+          className={cn("px-4 py-2 text-sm font-semibold border-b-2 transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500", activeTab === 'transactions' ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-600 hover:text-slate-900")}
         >
           Transactions
         </button>
         <button 
-          onClick={() => setActiveTab('disputes')}
-          className={cn("px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5", activeTab === 'disputes' ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-600 hover:text-slate-900")}
+          onClick={() => {
+            setActiveTab('disputes')
+            updateFilters('tab', 'disputes')
+          }}
+          className={cn("px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500", activeTab === 'disputes' ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-600 hover:text-slate-900")}
         >
           <ShieldAlert className="w-4 h-4 text-amber-500" />
           Disputes & Chargebacks
@@ -162,8 +225,21 @@ export function PaymentsClient({ initialPayments, initialDisputes = [], tenantId
           <div className="flex gap-3 mb-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input type="text" placeholder="Search transactions..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" id="payment-search" />
+              <input 
+                type="text" 
+                placeholder="Search transactions..." 
+                value={search} 
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  updateFilters('q', e.target.value)
+                }} 
+                className="form-input pl-9 focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                id="payment-search" 
+              />
             </div>
+            <button onClick={handleExportCSV} className="btn btn-secondary flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
           </div>
 
           <div className="card overflow-hidden">
@@ -250,8 +326,14 @@ export function PaymentsClient({ initialPayments, initialDisputes = [], tenantId
           </div>
         </>
       ) : (
-        <div className="card overflow-hidden">
-          <table className="data-table">
+        <>
+          <div className="flex justify-end mb-4">
+            <button onClick={handleExportCSV} className="btn btn-secondary flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
+              <Download className="w-4 h-4" /> Export CSV
+            </button>
+          </div>
+          <div className="card overflow-hidden">
+            <table className="data-table">
             <thead>
               <tr>
                 <th>Dispute ID</th>
@@ -302,6 +384,7 @@ export function PaymentsClient({ initialPayments, initialDisputes = [], tenantId
             <p className="text-xs text-slate-400">Showing {disputes.length} disputes</p>
           </div>
         </div>
+      </>
       )}
 
       {adjustingPayment && (

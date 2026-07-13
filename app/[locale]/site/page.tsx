@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { formatCurrency } from '@/lib/utils'
 import { ArrowRight, ShoppingCart, Star } from 'lucide-react'
 import { headers } from 'next/headers'
@@ -118,7 +119,7 @@ export default async function SiteHomePage() {
                     <div key={item.id} className="group cursor-pointer">
                       <div className="aspect-square bg-slate-100 rounded-2xl mb-4 overflow-hidden relative">
                         {item.images && item.images.length > 0 && (
-                          <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
+                          <Image src={item.images[0]} alt={item.title} className="w-full h-full object-cover" width={300} height={300} unoptimized />
                         )}
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/5 backdrop-blur-sm z-10">
                           <button className="bg-white text-slate-900 px-6 py-3 rounded-full font-bold shadow-lg transform translate-y-4 group-hover:translate-y-0 transition-all flex items-center gap-2">

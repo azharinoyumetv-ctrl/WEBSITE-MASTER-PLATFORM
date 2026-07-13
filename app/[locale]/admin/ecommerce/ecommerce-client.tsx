@@ -6,6 +6,7 @@ import { formatCurrency, formatDate, getStatusBadgeClass, cn } from '@/lib/utils
 import toast from 'react-hot-toast'
 import { updateOrderStatus, bulkUpdateOrderStatus } from '@/lib/actions/ecommerce'
 import { OrderStatus } from '@prisma/client'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 const STATUS_ACTIONS: Record<string, OrderStatus[]> = {
   pending: ['paid', 'cancelled'],
@@ -17,13 +18,27 @@ const STATUS_ACTIONS: Record<string, OrderStatus[]> = {
 }
 
 export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' }: { initialOrders: any[], tenantId: string, baseCurrency?: string }) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+
   const [orders, setOrders] = useState(initialOrders)
-  const [search, setSearch] = useState('')
-  const [filterStatus, setFilterStatus] = useState('all')
+  const [search, setSearch] = useState(searchParams.get('q') || '')
+  const [filterStatus, setFilterStatus] = useState(searchParams.get('status') || 'all')
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null)
   const [selectedOrdersIds, setSelectedOrdersIds] = useState<string[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
   const [receiptUrlInput, setReceiptUrlInput] = useState('')
+
+  const updateFilters = (key: string, val: string | null) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (val) {
+      params.set(key, val)
+    } else {
+      params.delete(key)
+    }
+    router.replace(`${pathname}?${params.toString()}`)
+  }
 
   const handleSelectOrder = (order: any) => {
     setSelectedOrder(order)
@@ -128,9 +143,27 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
           <div className="flex gap-3 mb-4 flex-wrap">
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input type="text" placeholder="Search orders..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" id="order-search" />
+              <input 
+                type="text" 
+                placeholder="Search orders..." 
+                value={search} 
+                onChange={(e) => {
+                  setSearch(e.target.value)
+                  updateFilters('q', e.target.value)
+                }} 
+                className="form-input pl-9 focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+                id="order-search" 
+              />
             </div>
-            <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="form-select w-36" id="order-status-filter">
+            <select 
+              value={filterStatus} 
+              onChange={(e) => {
+                setFilterStatus(e.target.value)
+                updateFilters('status', e.target.value)
+              }} 
+              className="form-select w-36 focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+              id="order-status-filter"
+            >
               <option value="all">All Orders</option>
               <option value="pending">Pending</option>
               <option value="paid">Paid</option>
@@ -141,7 +174,7 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
             </select>
             {selectedOrdersIds.length > 0 && (
               <select 
-                className="form-select w-40 border-indigo-300 text-indigo-700 bg-indigo-50"
+                className="form-select w-40 border-indigo-300 text-indigo-700 bg-indigo-50 focus:ring-2 focus:ring-indigo-500 focus:outline-none"
                 onChange={(e) => {
                   if (e.target.value) handleBulkUpdate(e.target.value)
                   e.target.value = ''
@@ -157,7 +190,7 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
                 <option value="cancelled">Mark Cancelled</option>
               </select>
             )}
-            <button onClick={handleExportCSV} className="btn btn-secondary px-3 py-1.5 flex items-center gap-1.5">
+            <button onClick={handleExportCSV} className="btn btn-secondary px-3 py-1.5 flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
               <Download className="w-4 h-4" /> Export CSV
             </button>
           </div>

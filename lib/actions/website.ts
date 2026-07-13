@@ -164,7 +164,7 @@ export async function createTempAiSecretToken(tenantId: string, secret: string) 
   }
 }
 
-export function getTempAiSecret(token: string): string | null {
+export async function getTempAiSecret(token: string): Promise<string | null> {
   const record = tempAiSecrets.get(token)
   if (!record) return null
   if (record.expiresAt < Date.now()) {

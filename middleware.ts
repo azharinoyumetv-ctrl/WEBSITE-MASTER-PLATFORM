@@ -170,7 +170,11 @@ function handleRouting(request: NextRequest) {
       pathWithoutLocale === '/site' || 
       pathWithoutLocale.startsWith('/site/') ||
       pathWithoutLocale.startsWith('/checkout') ||
-      pathWithoutLocale.startsWith('/orders')
+      pathWithoutLocale.startsWith('/orders') ||
+      pathWithoutLocale === '/shop' ||
+      pathWithoutLocale === '/about' ||
+      pathWithoutLocale === '/privacy' ||
+      pathWithoutLocale === '/terms'
     ) {
       return NextResponse.next({ request: { headers: requestHeaders } })
     }

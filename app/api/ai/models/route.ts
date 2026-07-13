@@ -1,65 +1,69 @@
-import { NextResponse } from 'next/server'
-import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
-import { decrypt } from '@/lib/crypto'
-import prisma from '@/lib/prisma'
+import { NextRequest, NextResponse } from 'next/server'
+import { getTempAiSecret } from '@/lib/actions/website'
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
   try {
-    const user = await getAuthenticatedUser()
-    const tokenTenantId = req.headers.get('x-tenant-id') || user.tenantId
-    await requirePermission(user.id, tokenTenantId, 'ai', 'read')
-
-    const body = await req.json()
-    const { providerKey, customBaseUrl, secretToken } = body
-
-    let apiSecret: string | null = null
-    if (secretToken) {
-      const { getTempAiSecret } = await import('@/lib/actions/website')
-      apiSecret = getTempAiSecret(secretToken)
-    } else {
-      const config = await prisma.tenantAiConfiguration.findUnique({
-        where: { tenantId: tokenTenantId }
-      })
-      apiSecret = config?.encryptedApiSecret ? decrypt(config.encryptedApiSecret) : null
-    }
-
-    if (!apiSecret || !providerKey) {
-      return NextResponse.json({ error: 'Missing provider or API key' }, { status: 400 })
-    }
-
-    let baseUrl = ''
-    if (providerKey === 'openai') baseUrl = 'https://api.openai.com/v1'
-    else if (providerKey === 'deepseek') baseUrl = 'https://api.deepseek.com'
-    else if (providerKey === 'grok') baseUrl = 'https://api.x.ai/v1'
-    else if (providerKey === 'kimi') baseUrl = 'https://api.moonshot.cn/v1'
-    else if (providerKey === 'custom' && customBaseUrl) {
-      baseUrl = customBaseUrl.endsWith('/chat/completions') 
-        ? customBaseUrl.replace('/chat/completions', '') 
-        : customBaseUrl.replace(/\/$/, '')
-    }
-
-    if (!baseUrl) {
-      // Anthropic and Gemini don't have a standard /models endpoint in the same way,
-      // or we don't support dynamic fetching for them right now.
+    const { providerKey, secretToken, customBaseUrl } = await req.json()
+    
+    if (!secretToken) {
       return NextResponse.json({ models: [] })
     }
-
-    const res = await fetch(`${baseUrl}/models`, {
-      headers: {
-        'Authorization': `Bearer ${apiSecret}`
-      }
-    })
-
-    if (!res.ok) {
-      return NextResponse.json({ error: 'Failed to fetch models from provider' }, { status: res.status })
+    
+    const apiKey = await getTempAiSecret(secretToken)
+    if (!apiKey) {
+      return NextResponse.json({ error: 'API key token expired or invalid' }, { status: 401 })
     }
 
-    const data = await res.json()
-    const models = data.data ? data.data.map((m: any) => m.id) : []
+    let models: string[] = []
+
+    if (providerKey === 'gemini' || providerKey === 'google') {
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`)
+      if (res.ok) {
+        const data = await res.json()
+        if (data.models) {
+          models = data.models
+            .map((m: any) => m.name.replace('models/', ''))
+            .filter((name: string) => name.startsWith('gemini-'))
+        }
+      }
+    } else if (providerKey === 'openai' || customBaseUrl) {
+      const url = `${customBaseUrl || 'https://api.openai.com/v1'}/models`
+      const res = await fetch(url, {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.data) {
+          models = data.data.map((m: any) => m.id)
+        }
+      }
+    } else if (providerKey === 'claude' || providerKey === 'anthropic') {
+      const res = await fetch('https://api.anthropic.com/v1/models', {
+        headers: {
+          'x-api-key': apiKey,
+          'anthropic-version': '2023-06-01'
+        }
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (data.data) {
+          models = data.data.map((m: any) => m.id)
+        }
+      }
+      if (models.length === 0) {
+        // Fallback for Claude if endpoint has issues
+        models = [
+          'claude-3-5-sonnet-latest',
+          'claude-3-5-haiku-latest',
+          'claude-3-opus-latest'
+        ]
+      }
+    }
 
     return NextResponse.json({ models })
   } catch (error: any) {
-    console.error('Model fetch error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
