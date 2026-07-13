@@ -3,24 +3,32 @@
 import { useState, useEffect } from 'react'
 import { 
   Building2, Palette, Save, Bot, Loader2, CreditCard, 
-  MessageSquare, Globe, Lock, Shield 
+  MessageSquare, Globe, Lock, Shield, Database, FileText, Play, Plus
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig, getWebsiteConfigSnapshots, restoreWebsiteConfigSnapshot, createTempAiSecretToken } from '@/lib/actions/website'
 import { generateBillingInvoice, getBillingInvoices } from '@/lib/actions/billing'
+import { exportTenantData, importTenantData, getAuditLogsForExport, runTenantIsolationAudit } from '@/lib/actions/backup'
 
 export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig, tenantId }: { initialWebsite: any, initialTenant: any, initialAiConfig?: any, tenantId: string }) {
-  const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history'>('general')
+  const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history' | 'security'>('general')
   const [logoPreview, setLogoPreview] = useState<string | null>(initialTenant?.logoUrl || null)
   const [isUploading, setIsUploading] = useState(false)
   const [snapshots, setSnapshots] = useState<any[]>([])
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false)
   const [diffSnapshot, setDiffSnapshot] = useState<any>(null)
   const [billingSetupError, setBillingSetupError] = useState('')
-  const [pendingTab, setPendingTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history' | null>(null)
+  const [pendingTab, setPendingTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history' | 'security' | null>(null)
   const [invoices, setInvoices] = useState<any[]>([])
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false)
+
+  // Security panel states
+  const [isExportingData, setIsExportingData] = useState(false)
+  const [isRestoringData, setIsRestoringData] = useState(false)
+  const [isExportingLogs, setIsExportingLogs] = useState(false)
+  const [isAuditing, setIsAuditing] = useState(false)
+  const [auditReport, setAuditReport] = useState<any | null>(null)
   
   useEffect(() => {
     if (activeTab === 'history') {
@@ -75,6 +83,110 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
       }
     }
     reader.readAsText(file)
+  }
+
+  const handleDownloadBackup = async () => {
+    setIsExportingData(true)
+    const res = await exportTenantData(tenantId)
+    setIsExportingData(false)
+    if (res.success && res.backupPayload) {
+      const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(res.backupPayload, null, 2))
+      const downloadAnchorNode = document.createElement('a')
+      downloadAnchorNode.setAttribute("href", dataStr)
+      downloadAnchorNode.setAttribute("download", `full-backup-${tenantId}-${Date.now()}.json`)
+      document.body.appendChild(downloadAnchorNode)
+      downloadAnchorNode.click()
+      downloadAnchorNode.remove()
+      toast.success('Full database backup downloaded!')
+    } else {
+      toast.error(res.error || 'Failed to generate backup')
+    }
+  }
+
+  const handleImportBackupFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!confirm('WARNING: Restoring this backup will completely clear your current catalog, orders, POS configurations, and settings, and replace them with the backup state. This action is irreversible. Do you want to proceed?')) {
+      e.target.value = ''
+      return
+    }
+
+    setIsRestoringData(true)
+    const reader = new FileReader()
+    reader.onload = async (event) => {
+      try {
+        const backupData = JSON.parse(event.target?.result as string)
+        const res = await importTenantData(tenantId, backupData)
+        setIsRestoringData(false)
+        if (res.success) {
+          toast.success('Database backup restored successfully!')
+          window.location.reload()
+        } else {
+          toast.error(res.error || 'Failed to restore backup')
+        }
+      } catch (err) {
+        setIsRestoringData(false)
+        toast.error('Invalid backup JSON file format')
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const handleExportAuditLogs = async (format: 'csv' | 'json') => {
+    setIsExportingLogs(true)
+    const res = await getAuditLogsForExport(tenantId)
+    setIsExportingLogs(false)
+    if (res.success && res.logs) {
+      let content = ''
+      let mimeType = ''
+      let filename = ''
+
+      if (format === 'json') {
+        content = JSON.stringify(res.logs, null, 2)
+        mimeType = 'application/json'
+        filename = `audit-logs-${tenantId}-${Date.now()}.json`
+      } else {
+        const headers = ['Timestamp', 'User', 'Action', 'Target Resource', 'IP Address', 'Payload Changes']
+        const csvRows = [
+          headers.join(','),
+          ...res.logs.map((log: any) => [
+            new Date(log.createdAt).toISOString(),
+            `"${log.user ? `${log.user.firstName || ''} ${log.user.lastName || ''} (${log.user.email})` : 'System'}"`,
+            `"${log.actionPerformed}"`,
+            `"${log.targetResource}"`,
+            `"${log.ipAddress}"`,
+            `"${JSON.stringify(log.payloadChanges).replace(/"/g, '""')}"`
+          ].join(','))
+        ]
+        content = csvRows.join('\n')
+        mimeType = 'text/csv'
+        filename = `audit-logs-${tenantId}-${Date.now()}.csv`
+      }
+
+      const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` })
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', filename)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      toast.success('Audit logs downloaded!')
+    } else {
+      toast.error(res.error || 'Failed to export audit logs')
+    }
+  }
+
+  const handleRunSecurityAudit = async () => {
+    setIsAuditing(true)
+    const res = await runTenantIsolationAudit(tenantId)
+    setIsAuditing(false)
+    if (res.success && res.report) {
+      setAuditReport(res.report)
+      toast.success('Security check completed!')
+    } else {
+      toast.error(res.error || 'Failed to complete security audit')
+    }
   }
   
   const [websiteData, setWebsiteData] = useState({
@@ -354,6 +466,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
             { id: 'ai', label: 'AI & Automations', icon: Bot },
             { id: 'billing', label: 'Billing & Plan', icon: CreditCard },
             { id: 'history', label: 'History & Backups', icon: Save },
+            { id: 'security', label: 'Security & Hardening', icon: Shield },
           ].map(tab => (
             <button
               key={tab.id}
@@ -1179,6 +1292,113 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                         </button>
                       </div>
                     ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'security' && (
+            <div className="space-y-6">
+              {/* Backup & Restore Panel */}
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Database className="w-4 h-4 text-slate-400" /> Full Tenant Database Backup
+                </h3>
+                <p className="text-xs text-slate-500 mb-6">
+                  Export all tenant data (including category structures, catalog items, inventories, terminals, POS sessions, orders, and custom settings) into a single downloadable JSON backup file. You can restore this file at any time.
+                </p>
+                <div className="flex flex-wrap gap-4 items-center">
+                  <button
+                    onClick={handleDownloadBackup}
+                    disabled={isExportingData}
+                    className="btn btn-primary bg-indigo-650 hover:bg-indigo-700"
+                  >
+                    {isExportingData ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                    Download Full Backup (.json)
+                  </button>
+                  
+                  <div className="flex items-center gap-2">
+                    <label className="btn btn-secondary cursor-pointer">
+                      <Plus className="w-4 h-4 mr-2 inline" /> Upload & Restore
+                      <input 
+                        type="file" 
+                        accept=".json" 
+                        className="hidden" 
+                        onChange={handleImportBackupFile}
+                        disabled={isRestoringData}
+                      />
+                    </label>
+                    {isRestoringData && <Loader2 className="w-4 h-4 animate-spin text-slate-500" />}
+                  </div>
+                </div>
+              </div>
+
+              {/* Audit Log Export */}
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-slate-400" /> Administrative Audit Logs Export
+                </h3>
+                <p className="text-xs text-slate-500 mb-6">
+                  Download a chronological log of all administrative actions and security events performed by your tenant users in CSV or JSON formats.
+                </p>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => handleExportAuditLogs('csv')}
+                    disabled={isExportingLogs}
+                    className="btn btn-secondary border-slate-300 text-slate-700"
+                  >
+                    Export Logs to CSV
+                  </button>
+                  <button
+                    onClick={() => handleExportAuditLogs('json')}
+                    disabled={isExportingLogs}
+                    className="btn btn-secondary border-slate-300 text-slate-700"
+                  >
+                    Export Logs to JSON
+                  </button>
+                </div>
+              </div>
+
+              {/* Tenant Data Isolation Verification Report Tool */}
+              <div className="card p-6">
+                <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-slate-400" /> Tenant RLS & Data Isolation Auditor
+                </h3>
+                <p className="text-xs text-slate-500 mb-6">
+                  Run a security scan to audit database boundaries, verify RLS (Row Level Security) settings, and ensure that cross-tenant data requests are strictly blocked.
+                </p>
+                <button
+                  onClick={handleRunSecurityAudit}
+                  disabled={isAuditing}
+                  className="btn btn-secondary bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100 flex items-center gap-2"
+                >
+                  {isAuditing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  Run Isolation Security Check
+                </button>
+
+                {auditReport && (
+                  <div className="mt-4 p-4 border border-slate-200 rounded-xl bg-slate-50">
+                    <div className="flex items-center justify-between mb-4 border-b border-slate-200 pb-2">
+                      <span className="text-xs font-bold text-slate-500 uppercase">Isolation Security Audit Report</span>
+                      <span className={cn(
+                        "px-2.5 py-0.5 rounded-full text-xs font-bold uppercase",
+                        auditReport.status === 'PASSED' ? 'bg-emerald-100 text-emerald-800' : 'bg-red-100 text-red-800'
+                      )}>
+                        {auditReport.status}
+                      </span>
+                    </div>
+                    <div className="space-y-2 text-xs font-mono text-slate-700">
+                      <div><strong>Active Tenant ID:</strong> {auditReport.tenantId}</div>
+                      <div><strong>Timestamp:</strong> {auditReport.timestamp}</div>
+                      <div className="pt-2"><strong>Checks Summary:</strong></div>
+                      {Object.keys(auditReport.results).map(key => (
+                        <div key={key} className="flex justify-between pl-4">
+                          <span>{key}:</span>
+                          <span className="font-bold text-emerald-600">{auditReport.results[key]}</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
