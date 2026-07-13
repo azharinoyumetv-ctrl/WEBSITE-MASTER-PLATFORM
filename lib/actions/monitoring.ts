@@ -83,7 +83,20 @@ export async function logIncident(tenantId: string, data: { title: string, descr
     // Auto-create notification log for the incident alert
     try {
       const admins = await prisma.user.findMany({
-        where: { tenantId, status: 'active' },
+        where: {
+          tenantId,
+          status: 'active',
+          userRoles: {
+            some: {
+              role: {
+                name: {
+                  in: ['platform_owner', 'platform owner', 'admin'],
+                  mode: 'insensitive'
+                }
+              }
+            }
+          }
+        },
         take: 3
       })
       for (const admin of admins) {
@@ -120,7 +133,20 @@ export async function resolveIncident(tenantId: string, incidentId: string) {
     // Auto-create notification log for incident resolution
     try {
       const admins = await prisma.user.findMany({
-        where: { tenantId, status: 'active' },
+        where: {
+          tenantId,
+          status: 'active',
+          userRoles: {
+            some: {
+              role: {
+                name: {
+                  in: ['platform_owner', 'platform owner', 'admin'],
+                  mode: 'insensitive'
+                }
+              }
+            }
+          }
+        },
         take: 3
       })
       for (const admin of admins) {
@@ -209,7 +235,20 @@ export async function createMonitoringRule(tenantId: string, data: any) {
 
     try {
       const admins = await prisma.user.findMany({
-        where: { tenantId, status: 'active' },
+        where: {
+          tenantId,
+          status: 'active',
+          userRoles: {
+            some: {
+              role: {
+                name: {
+                  in: ['platform_owner', 'platform owner', 'admin'],
+                  mode: 'insensitive'
+                }
+              }
+            }
+          }
+        },
         take: 3
       })
       for (const admin of admins) {
@@ -242,7 +281,20 @@ export async function updateMonitoringRule(tenantId: string, ruleId: string, dat
 
     try {
       const admins = await prisma.user.findMany({
-        where: { tenantId, status: 'active' },
+        where: {
+          tenantId,
+          status: 'active',
+          userRoles: {
+            some: {
+              role: {
+                name: {
+                  in: ['platform_owner', 'platform owner', 'admin'],
+                  mode: 'insensitive'
+                }
+              }
+            }
+          }
+        },
         take: 3
       })
       for (const admin of admins) {
@@ -278,7 +330,20 @@ export async function deleteMonitoringRule(tenantId: string, ruleId: string) {
 
     try {
       const admins = await prisma.user.findMany({
-        where: { tenantId, status: 'active' },
+        where: {
+          tenantId,
+          status: 'active',
+          userRoles: {
+            some: {
+              role: {
+                name: {
+                  in: ['platform_owner', 'platform owner', 'admin'],
+                  mode: 'insensitive'
+                }
+              }
+            }
+          }
+        },
         take: 3
       })
       for (const admin of admins) {
