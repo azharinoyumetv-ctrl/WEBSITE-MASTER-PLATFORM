@@ -93,8 +93,36 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
     xenditSecret: initialWebsite?.isXenditSecretConfigured ? '••••••••' : '',
     xenditWebhookToken: initialWebsite?.isXenditWebhookTokenConfigured ? '••••••••' : '',
     midtransEnabled: initialWebsite?.midtransEnabled || false,
-    midtransServerKey: initialWebsite?.isMidtransServerKeyConfigured ? '••••••••' : ''
+    midtransServerKey: initialWebsite?.isMidtransServerKeyConfigured ? '••••••••' : '',
+    dokuEnabled: initialWebsite?.dokuEnabled || false,
+    dokuEnvironment: initialWebsite?.dokuEnvironment || 'sandbox',
+    dokuClientId: initialWebsite?.isDokuClientIdConfigured ? '••••••••' : '',
+    dokuMerchantPublicKey: initialWebsite?.isDokuMerchantPublicKeyConfigured ? '••••••••' : '',
+    dokuSnapTokenUrl: initialWebsite?.isDokuSnapTokenUrlConfigured ? '••••••••' : '',
+    dokuSharedKey: initialWebsite?.isDokuSharedKeyConfigured ? '••••••••' : '',
+    dokuPreferredChannel: initialWebsite?.dokuPreferredChannel || 'all'
   })
+
+  const [hoveredField, setHoveredField] = useState<string | null>(null)
+
+  const [activeChannels, setActiveChannels] = useState({
+    va: initialWebsite?.dokuPreferredChannel === 'va' || initialWebsite?.dokuPreferredChannel === 'all' || !initialWebsite?.dokuPreferredChannel,
+    ewallet: initialWebsite?.dokuPreferredChannel === 'ewallet' || initialWebsite?.dokuPreferredChannel === 'all' || !initialWebsite?.dokuPreferredChannel,
+    minimart: initialWebsite?.dokuPreferredChannel === 'minimart' || initialWebsite?.dokuPreferredChannel === 'all' || !initialWebsite?.dokuPreferredChannel
+  })
+
+  const handleChannelChange = (channel: 'va' | 'ewallet' | 'minimart', checked: boolean) => {
+    const updated = { ...activeChannels, [channel]: checked };
+    setActiveChannels(updated);
+    
+    let pref = 'all';
+    if (updated.va && !updated.ewallet && !updated.minimart) pref = 'va';
+    else if (!updated.va && updated.ewallet && !updated.minimart) pref = 'ewallet';
+    else if (!updated.va && !updated.ewallet && updated.minimart) pref = 'minimart';
+    else if (!updated.va && !updated.ewallet && !updated.minimart) pref = 'none';
+    
+    setPaymentConfig(prev => ({ ...prev, dokuPreferredChannel: pref }));
+  }
 
   const [aiData, setAiData] = useState({
     providerKey: initialAiConfig?.providerKey || 'platform_managed',
@@ -110,12 +138,24 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
       const xenditSecretInit = initialWebsite?.isXenditSecretConfigured ? '••••••••' : ''
       const xenditWebhookInit = initialWebsite?.isXenditWebhookTokenConfigured ? '••••••••' : ''
       const midtransServerKeyInit = initialWebsite?.isMidtransServerKeyConfigured ? '••••••••' : ''
+      const dokuClientIdInit = initialWebsite?.isDokuClientIdConfigured ? '••••••••' : ''
+      const dokuMerchantPublicKeyInit = initialWebsite?.isDokuMerchantPublicKeyConfigured ? '••••••••' : ''
+      const dokuSnapTokenUrlInit = initialWebsite?.isDokuSnapTokenUrlConfigured ? '••••••••' : ''
+      const dokuSharedKeyInit = initialWebsite?.isDokuSharedKeyConfigured ? '••••••••' : ''
       
       return paymentConfig.xenditEnabled !== (initialWebsite?.xenditEnabled || false) ||
         paymentConfig.xenditSecret !== xenditSecretInit ||
         paymentConfig.xenditWebhookToken !== xenditWebhookInit ||
         paymentConfig.midtransEnabled !== (initialWebsite?.midtransEnabled || false) ||
-        paymentConfig.midtransServerKey !== midtransServerKeyInit;
+        paymentConfig.midtransServerKey !== midtransServerKeyInit ||
+        paymentConfig.dokuEnabled !== (initialWebsite?.dokuEnabled || false) ||
+        paymentConfig.dokuEnvironment !== (initialWebsite?.dokuEnvironment || 'sandbox') ||
+        paymentConfig.dokuClientId !== dokuClientIdInit ||
+        paymentConfig.dokuMerchantPublicKey !== dokuMerchantPublicKeyInit ||
+        paymentConfig.dokuSnapTokenUrl !== dokuSnapTokenUrlInit ||
+        paymentConfig.dokuSharedKey !== dokuSharedKeyInit ||
+        paymentConfig.dokuPreferredChannel !== (initialWebsite?.dokuPreferredChannel || 'all') ||
+        websiteData.themeConfig.paymentGateway !== (initialWebsite?.themeConfig?.paymentGateway || 'unset');
     }
     if (tab === 'theme') {
       const siteTitleInit = initialWebsite?.siteTitle || 'Website'
@@ -391,18 +431,51 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                     <p className="text-xs text-slate-400 mt-1">Default currency used across the catalog and checkout.</p>
                   </div>
                   <div>
-                    <label className="form-label">Active Payment Gateway</label>
-                    <select 
-                      className="form-select max-w-sm"
-                      value={websiteData.themeConfig.paymentGateway || 'xendit'}
-                      onChange={(e) => setWebsiteData({
-                        ...websiteData,
-                        themeConfig: { ...websiteData.themeConfig, paymentGateway: e.target.value }
-                      })}
-                    >
-                      <option value="xendit">Xendit</option>
-                      <option value="midtrans">Midtrans</option>
-                    </select>
+                    <label className="form-label text-xs font-semibold text-slate-700">Primary Payment Gateway</label>
+                    <div className="flex gap-4 mt-2">
+                      <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                        <input
+                          type="radio"
+                          name="paymentGateway"
+                          value="doku"
+                          checked={(websiteData.themeConfig.paymentGateway || 'unset') === 'doku'}
+                          onChange={(e) => setWebsiteData({
+                            ...websiteData,
+                            themeConfig: { ...websiteData.themeConfig, paymentGateway: e.target.value }
+                          })}
+                          className="form-radio text-indigo-600 focus:ring-indigo-500 h-4 w-4 border-slate-350"
+                        />
+                        DOKU
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                        <input
+                          type="radio"
+                          name="paymentGateway"
+                          value="xendit"
+                          checked={websiteData.themeConfig.paymentGateway === 'xendit'}
+                          onChange={(e) => setWebsiteData({
+                            ...websiteData,
+                            themeConfig: { ...websiteData.themeConfig, paymentGateway: e.target.value }
+                          })}
+                          className="form-radio text-indigo-600 focus:ring-indigo-500 h-4 w-4 border-slate-350"
+                        />
+                        Xendit
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer text-sm font-medium text-slate-700">
+                        <input
+                          type="radio"
+                          name="paymentGateway"
+                          value="midtrans"
+                          checked={websiteData.themeConfig.paymentGateway === 'midtrans'}
+                          onChange={(e) => setWebsiteData({
+                            ...websiteData,
+                            themeConfig: { ...websiteData.themeConfig, paymentGateway: e.target.value }
+                          })}
+                          className="form-radio text-indigo-600 focus:ring-indigo-500 h-4 w-4 border-slate-350"
+                        />
+                        Midtrans
+                      </label>
+                    </div>
                     <p className="text-xs text-slate-400 mt-1">Select the payment processor for checkout. You must configure API keys for real providers.</p>
                   </div>
 
@@ -410,6 +483,138 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                     <h4 className="text-sm font-semibold text-slate-900 mb-4">Provider Configurations</h4>
                     
                     <div className="space-y-4">
+                      {/* DOKU Config */}
+                      <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
+                        <div className="flex items-center justify-between mb-4">
+                          <h5 className="text-sm font-semibold text-slate-800">DOKU</h5>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input 
+                              type="checkbox" 
+                              checked={paymentConfig.dokuEnabled} 
+                              onChange={(e) => setPaymentConfig({...paymentConfig, dokuEnabled: e.target.checked})} 
+                              className="form-checkbox text-indigo-600 rounded border-slate-350 h-4 w-4" 
+                            />
+                            <span className="text-sm text-slate-600">Enable</span>
+                          </label>
+                        </div>
+                        {paymentConfig.dokuEnabled && (
+                          <div className="space-y-4 animate-scale-in">
+                            <div>
+                              <label className="form-label text-xs font-semibold text-slate-700">Environment</label>
+                              <div className="flex gap-4 mt-1">
+                                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                                  <input 
+                                    type="radio" 
+                                    name="dokuEnvironment" 
+                                    value="sandbox"
+                                    checked={paymentConfig.dokuEnvironment === 'sandbox'} 
+                                    onChange={(e) => setPaymentConfig({...paymentConfig, dokuEnvironment: e.target.value})} 
+                                    className="form-radio text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5" 
+                                  />
+                                  Sandbox
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                                  <input 
+                                    type="radio" 
+                                    name="dokuEnvironment" 
+                                    value="production"
+                                    checked={paymentConfig.dokuEnvironment === 'production'} 
+                                    onChange={(e) => setPaymentConfig({...paymentConfig, dokuEnvironment: e.target.value})} 
+                                    className="form-radio text-indigo-600 focus:ring-indigo-500 h-3.5 w-3.5" 
+                                  />
+                                  Production
+                                </label>
+                              </div>
+                            </div>
+                            
+                            <div className="relative group/field">
+                              <label className="form-label text-xs font-semibold text-slate-700">DOKU Client ID (Public Key)</label>
+                              <input 
+                                type={hoveredField === 'dokuClientId' ? 'text' : 'password'}
+                                className="form-input text-sm pr-10" 
+                                placeholder="e.g. MCH-..."
+                                value={paymentConfig.dokuClientId}
+                                onChange={(e) => setPaymentConfig({...paymentConfig, dokuClientId: e.target.value})}
+                                onMouseEnter={() => setHoveredField('dokuClientId')}
+                                onMouseLeave={() => setHoveredField(null)}
+                              />
+                            </div>
+                            
+                            <div className="relative group/field">
+                              <label className="form-label text-xs font-semibold text-slate-700">Merchant Public Key</label>
+                              <input 
+                                type={hoveredField === 'dokuMerchantPublicKey' ? 'text' : 'password'}
+                                className="form-input text-sm pr-10" 
+                                placeholder="MC-PUB-..."
+                                value={paymentConfig.dokuMerchantPublicKey}
+                                onChange={(e) => setPaymentConfig({...paymentConfig, dokuMerchantPublicKey: e.target.value})}
+                                onMouseEnter={() => setHoveredField('dokuMerchantPublicKey')}
+                                onMouseLeave={() => setHoveredField(null)}
+                              />
+                            </div>
+                            
+                            <div className="relative group/field">
+                              <label className="form-label text-xs font-semibold text-slate-700">SNAP Token URL</label>
+                              <input 
+                                type={hoveredField === 'dokuSnapTokenUrl' ? 'text' : 'password'}
+                                className="form-input text-sm pr-10" 
+                                placeholder="e.g. https://..."
+                                value={paymentConfig.dokuSnapTokenUrl}
+                                onChange={(e) => setPaymentConfig({...paymentConfig, dokuSnapTokenUrl: e.target.value})}
+                                onMouseEnter={() => setHoveredField('dokuSnapTokenUrl')}
+                                onMouseLeave={() => setHoveredField(null)}
+                              />
+                            </div>
+                            
+                            <div className="relative group/field">
+                              <label className="form-label text-xs font-semibold text-slate-700">Shared Key (Secret Key)</label>
+                              <input 
+                                type={hoveredField === 'dokuSharedKey' ? 'text' : 'password'}
+                                className="form-input text-sm pr-10" 
+                                placeholder="Shared Key from DOKU Dashboard"
+                                value={paymentConfig.dokuSharedKey}
+                                onChange={(e) => setPaymentConfig({...paymentConfig, dokuSharedKey: e.target.value})}
+                                onMouseEnter={() => setHoveredField('dokuSharedKey')}
+                                onMouseLeave={() => setHoveredField(null)}
+                              />
+                            </div>
+                            
+                            <div>
+                              <label className="form-label text-xs font-semibold text-slate-700">Active Channels</label>
+                              <div className="flex flex-col gap-2 mt-1">
+                                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={activeChannels.va}
+                                    onChange={(e) => handleChannelChange('va', e.target.checked)}
+                                    className="form-checkbox text-indigo-600 rounded border-slate-350 h-4 w-4" 
+                                  />
+                                  Transfer Bank (BCA, Mandiri, BRI, BNI, Permata)
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={activeChannels.ewallet}
+                                    onChange={(e) => handleChannelChange('ewallet', e.target.checked)}
+                                    className="form-checkbox text-indigo-600 rounded border-slate-350 h-4 w-4" 
+                                  />
+                                  DOKU e-Wallet (ShopeePay, OVO, Dana)
+                                </label>
+                                <label className="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+                                  <input 
+                                    type="checkbox" 
+                                    checked={activeChannels.minimart}
+                                    onChange={(e) => handleChannelChange('minimart', e.target.checked)}
+                                    className="form-checkbox text-indigo-600 rounded border-slate-350 h-4 w-4" 
+                                  />
+                                  Minimart (Alfamart)
+                                </label>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Xendit Config */}
                       <div className="p-4 border border-slate-200 rounded-lg bg-slate-50">
                         <div className="flex items-center justify-between mb-4">
@@ -419,7 +624,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                               type="checkbox" 
                               checked={paymentConfig.xenditEnabled} 
                               onChange={(e) => setPaymentConfig({...paymentConfig, xenditEnabled: e.target.checked})} 
-                              className="form-checkbox text-indigo-600 rounded" 
+                              className="form-checkbox text-indigo-600 rounded border-slate-350 h-4 w-4" 
                             />
                             <span className="text-sm text-slate-600">Enable</span>
                           </label>
@@ -427,7 +632,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                         {paymentConfig.xenditEnabled && (
                           <div className="space-y-4">
                             <div>
-                              <label className="form-label text-xs">Secret Key</label>
+                              <label className="form-label text-xs font-semibold text-slate-700">Secret Key</label>
                               <input 
                                 type="password" 
                                 className="form-input text-sm" 
@@ -437,7 +642,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                               />
                             </div>
                             <div>
-                              <label className="form-label text-xs">Webhook Verification Token</label>
+                              <label className="form-label text-xs font-semibold text-slate-700">Webhook Verification Token</label>
                               <input 
                                 type="password" 
                                 className="form-input text-sm" 
@@ -459,7 +664,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                               type="checkbox" 
                               checked={paymentConfig.midtransEnabled} 
                               onChange={(e) => setPaymentConfig({...paymentConfig, midtransEnabled: e.target.checked})} 
-                              className="form-checkbox text-indigo-600 rounded" 
+                              className="form-checkbox text-indigo-600 rounded border-slate-350 h-4 w-4" 
                             />
                             <span className="text-sm text-slate-600">Enable</span>
                           </label>
@@ -467,7 +672,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                         {paymentConfig.midtransEnabled && (
                           <div className="space-y-4">
                             <div>
-                              <label className="form-label text-xs">Server Key</label>
+                              <label className="form-label text-xs font-semibold text-slate-700">Server Key</label>
                               <input 
                                 type="password" 
                                 className="form-input text-sm" 

@@ -290,6 +290,13 @@ model TenantWebsite {
   midtransEncryptedServerKey    String?  @map("midtrans_encrypted_server_key") @db.Text
   midtransEncryptedServerKeyIv  String?  @map("midtrans_encrypted_server_key_iv") @db.VarChar(64)
   midtransEnabled               Boolean  @default(false) @map("midtrans_enabled")
+  dokuEnabled                 Boolean   @default(false) @map("doku_enabled")
+  dokuEnvironment             String?   @default("sandbox") @map("doku_environment")
+  dokuClientId                String?   @map("doku_client_id") @db.Text
+  dokuMerchantPublicKey       String?   @map("doku_merchant_public_key") @db.Text
+  dokuSnapTokenUrl            String?   @map("doku_snap_token_url") @db.Text
+  dokuSharedKey               String?   @map("doku_shared_key") @db.Text
+  dokuPreferredChannel        String?   @default("all") @map("doku_preferred_channel")
   createdAt                     DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                     DateTime @updatedAt @map("updated_at") @db.Timestamptz
 

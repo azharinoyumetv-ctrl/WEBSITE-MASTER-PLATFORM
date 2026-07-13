@@ -1,16 +1,81 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ShoppingCart, CheckCircle, Package, ArrowRight, X } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { createOrder } from '@/lib/actions/ecommerce'
+import { createDokuCheckout, createInvoice, createMidtransCheckout, getPaymentStatus } from '@/lib/actions/payments'
 
-export function CheckoutClient({ tenantId, items, checkoutNonce }: { tenantId: string, items: any[], checkoutNonce?: string }) {
+function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: { 
+  tenantId: string, 
+  items: any[], 
+  checkoutNonce?: string,
+  website: any
+}) {
   const [cart, setCart] = useState<{item: any, quantity: number}[]>([])
   const [step, setStep] = useState(1)
   const [email, setEmail] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
+  const [paymentVerifyStatus, setPaymentVerifyStatus] = useState<'idle' | 'checking' | 'success' | 'failed' | 'cancelled'>('idle')
+
+  const searchParams = useSearchParams()
+
+  useEffect(() => {
+    const status = searchParams.get('status')
+    const invoice = searchParams.get('invoice') || searchParams.get('orderId')
+    
+    if (status === 'success' && invoice) {
+      setStep(3)
+      setPaymentVerifyStatus('checking')
+      
+      let attempts = 0
+      const maxAttempts = 10
+      
+      const checkStatus = async () => {
+        try {
+          const res = await getPaymentStatus(tenantId, invoice)
+          if (res.success) {
+            if (res.status === 'succeeded') {
+              setPaymentVerifyStatus('success')
+              return true
+            } else if (res.status === 'failed') {
+              setPaymentVerifyStatus('failed')
+              setStep(5)
+              return true
+            } else if (res.status === 'cancelled') {
+              setPaymentVerifyStatus('cancelled')
+              setStep(4)
+              return true
+            }
+          }
+          return false
+        } catch {
+          return false
+        }
+      }
+
+      checkStatus().then(done => {
+        if (done) return
+        
+        const interval = setInterval(async () => {
+          attempts++
+          const done = await checkStatus()
+          if (done || attempts >= maxAttempts) {
+            clearInterval(interval)
+            if (attempts >= maxAttempts) {
+              setPaymentVerifyStatus('success')
+            }
+          }
+        }, 3000)
+      })
+    } else if (status === 'cancel') {
+      setStep(4)
+    } else if (status === 'error' || status === 'failed') {
+      setStep(5)
+    }
+  }, [searchParams, tenantId])
   
   const addToCart = (item: any) => {
     setCart(prev => {
@@ -38,11 +103,60 @@ export function CheckoutClient({ tenantId, items, checkoutNonce }: { tenantId: s
       email,
       items: cart.map(c => ({ id: c.item.id, quantity: c.quantity }))
     })
-    setIsProcessing(false)
     
-    if (res.success) {
-      setStep(3) // Success
+    if (res.success && res.order) {
+      const order = res.order;
+      try {
+        const gateway = website.themeConfig?.paymentGateway || 'doku';
+        
+        if (gateway === 'doku' && website.dokuEnabled) {
+          const checkoutRes = await createDokuCheckout(tenantId, order.id, total, 'IDR', { email })
+          if (!checkoutRes.success) throw new Error(checkoutRes.error)
+          window.location.href = checkoutRes.paymentUrl!
+          return
+        }
+        if (gateway === 'xendit' && website.xenditEnabled) {
+          const checkoutRes = await createInvoice(tenantId, order.id, total, email)
+          if (!checkoutRes.success) throw new Error(checkoutRes.error)
+          window.location.href = checkoutRes.invoiceUrl!
+          return
+        }
+        if (gateway === 'midtrans' && website.midtransEnabled) {
+          const checkoutRes = await createMidtransCheckout(tenantId, order.id, total, email)
+          if (!checkoutRes.success) throw new Error(checkoutRes.error)
+          window.location.href = checkoutRes.redirectUrl!
+          return
+        }
+
+        // Fallbacks if primary is not enabled or unset
+        if (website.dokuEnabled) {
+          const checkoutRes = await createDokuCheckout(tenantId, order.id, total, 'IDR', { email })
+          if (!checkoutRes.success) throw new Error(checkoutRes.error)
+          window.location.href = checkoutRes.paymentUrl!
+          return
+        }
+        if (website.xenditEnabled) {
+          const checkoutRes = await createInvoice(tenantId, order.id, total, email)
+          if (!checkoutRes.success) throw new Error(checkoutRes.error)
+          window.location.href = checkoutRes.invoiceUrl!
+          return
+        }
+        if (website.midtransEnabled) {
+          const checkoutRes = await createMidtransCheckout(tenantId, order.id, total, email)
+          if (!checkoutRes.success) throw new Error(checkoutRes.error)
+          window.location.href = checkoutRes.redirectUrl!
+          return
+        }
+
+        // Show confirmation page if no payment gateways enabled
+        setStep(3)
+      } catch (err: any) {
+        toast.error(err.message || 'Payment redirection failed')
+      } finally {
+        setIsProcessing(false)
+      }
     } else {
+      setIsProcessing(false)
       toast.error(res.error || 'Checkout failed')
     }
   }
@@ -50,10 +164,42 @@ export function CheckoutClient({ tenantId, items, checkoutNonce }: { tenantId: s
   if (step === 3) {
     return (
       <div className="card p-12 text-center max-w-lg mx-auto">
-        <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
-        <h2 className="text-2xl font-bold mb-2">Order Confirmed!</h2>
-        <p className="text-slate-500 mb-6">We have received your order and sent a receipt to {email}.</p>
-        <button onClick={() => window.location.href = '/'} className="btn btn-primary">Return to Store</button>
+        {paymentVerifyStatus === 'checking' ? (
+          <>
+            <div className="w-16 h-16 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin mx-auto mb-6" />
+            <h2 className="text-2xl font-bold mb-2">Verifying Payment</h2>
+            <p className="text-slate-500 mb-6">We are verifying your transaction. This will only take a moment...</p>
+          </>
+        ) : (
+          <>
+            <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Order Confirmed!</h2>
+            <p className="text-slate-500 mb-6">We have received your payment and sent a receipt to {email || 'your email'}.</p>
+            <button onClick={() => window.location.href = '/'} className="btn btn-primary">Return to Store</button>
+          </>
+        )}
+      </div>
+    )
+  }
+
+  if (step === 4) {
+    return (
+      <div className="card p-12 text-center max-w-lg mx-auto">
+        <div className="w-16 h-16 bg-amber-50 border border-amber-200 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">!</div>
+        <h2 className="text-2xl font-bold mb-2">Payment Cancelled</h2>
+        <p className="text-slate-500 mb-6">You cancelled the payment process. No charges were made.</p>
+        <button onClick={() => setStep(2)} className="btn btn-primary w-full">Retry Payment</button>
+      </div>
+    )
+  }
+
+  if (step === 5) {
+    return (
+      <div className="card p-12 text-center max-w-lg mx-auto bg-white border border-slate-200">
+        <div className="w-16 h-16 bg-rose-50 border border-rose-200 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl font-bold">×</div>
+        <h2 className="text-2xl font-bold mb-2 text-rose-600">Payment Failed</h2>
+        <p className="text-slate-500 mb-6 font-medium">Your payment attempt failed. Please check your card balance or try a different channel.</p>
+        <button onClick={() => setStep(2)} className="btn btn-primary w-full">Try Again</button>
       </div>
     )
   }
@@ -150,5 +296,17 @@ export function CheckoutClient({ tenantId, items, checkoutNonce }: { tenantId: s
         </div>
       </div>
     </div>
+  )
+}
+
+export function CheckoutClient(props: { tenantId: string, items: any[], checkoutNonce?: string, website: any }) {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center p-12 bg-white border border-slate-200 rounded-lg shadow-sm">
+        <div className="text-slate-500 animate-pulse">Loading checkout...</div>
+      </div>
+    }>
+      <CheckoutClientComponent {...props} />
+    </Suspense>
   )
 }

@@ -2,6 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
+import { createDokuCheckout } from './payments'
 
 export async function generateBillingInvoice(tenantId: string, planId: 'core' | 'professional' | 'enterprise') {
   try {
@@ -20,7 +21,23 @@ export async function generateBillingInvoice(tenantId: string, planId: 'core' | 
        return { success: true, invoiceUrl: null, message: "Plan is free, no invoice needed." }
     }
 
-    // Try Xendit first
+    const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })
+    const orderId = `upgrade-${tenantId}-${Date.now()}`
+    const isProd = process.env.NODE_ENV === 'production'
+    const platformDokuClientId = isProd ? process.env.DOKU_PRODUCTION_CLIENT_ID : process.env.DOKU_SANDBOX_CLIENT_ID
+
+    // Try DOKU first
+    if (website?.dokuEnabled || platformDokuClientId) {
+      const dokuRes = await createDokuCheckout(tenantId, orderId, amount, 'IDR', {
+        email: user.email,
+        name: tenant.companyName
+      })
+      if (dokuRes.success && dokuRes.paymentUrl) {
+        return { success: true, invoiceUrl: dokuRes.paymentUrl }
+      }
+    }
+
+    // Try Xendit second
     if (process.env.XENDIT_SECRET_KEY) {
       const auth = Buffer.from(process.env.XENDIT_SECRET_KEY + ':').toString('base64')
       const xenditRes = await fetch('https://api.xendit.co/v2/invoices', {
@@ -30,7 +47,7 @@ export async function generateBillingInvoice(tenantId: string, planId: 'core' | 
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          external_id: `upgrade-${tenantId}-${Date.now()}`,
+          external_id: orderId,
           amount,
           description: `Platform Upgrade to ${planId.toUpperCase()} for ${tenant.companyName}`,
           customer: {

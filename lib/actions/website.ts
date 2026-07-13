@@ -174,6 +174,10 @@ export async function getAdminWebsiteConfig(tenantId: string) {
       (website as any).isXenditSecretConfigured = !!website.xenditEncryptedSecret;
       (website as any).isXenditWebhookTokenConfigured = !!website.xenditEncryptedWebhookToken;
       (website as any).isMidtransServerKeyConfigured = !!website.midtransEncryptedServerKey;
+      (website as any).isDokuClientIdConfigured = !!website.dokuClientId;
+      (website as any).isDokuMerchantPublicKeyConfigured = !!website.dokuMerchantPublicKey;
+      (website as any).isDokuSnapTokenUrlConfigured = !!website.dokuSnapTokenUrl;
+      (website as any).isDokuSharedKeyConfigured = !!website.dokuSharedKey;
       
       // Explicitly clear keys so they never travel to the client
       website.xenditEncryptedSecret = null
@@ -182,6 +186,10 @@ export async function getAdminWebsiteConfig(tenantId: string) {
       website.xenditEncryptedWebhookTokenIv = null
       website.midtransEncryptedServerKey = null
       website.midtransEncryptedServerKeyIv = null
+      website.dokuClientId = null
+      website.dokuMerchantPublicKey = null
+      website.dokuSnapTokenUrl = null
+      website.dokuSharedKey = null
     }
 
     return { success: true, website }
@@ -312,7 +320,14 @@ export async function restoreWebsiteConfigSnapshot(tenantId: string, snapshotId:
           xenditEncryptedSecret: data.xenditEncryptedSecret,
           xenditEncryptedWebhookToken: data.xenditEncryptedWebhookToken,
           midtransEnabled: data.midtransEnabled,
-          midtransEncryptedServerKey: data.midtransEncryptedServerKey
+          midtransEncryptedServerKey: data.midtransEncryptedServerKey,
+          dokuEnabled: data.dokuEnabled,
+          dokuEnvironment: data.dokuEnvironment,
+          dokuClientId: data.dokuClientId,
+          dokuMerchantPublicKey: data.dokuMerchantPublicKey,
+          dokuSnapTokenUrl: data.dokuSnapTokenUrl,
+          dokuSharedKey: data.dokuSharedKey,
+          dokuPreferredChannel: data.dokuPreferredChannel
         }
       })
     }
@@ -394,14 +409,42 @@ export async function savePaymentConfig(tenantId: string, data: {
   xenditSecret: string, 
   xenditWebhookToken: string, 
   midtransEnabled: boolean, 
-  midtransServerKey: string 
+  midtransServerKey: string,
+  dokuEnabled?: boolean,
+  dokuEnvironment?: string,
+  dokuClientId?: string,
+  dokuMerchantPublicKey?: string,
+  dokuSnapTokenUrl?: string,
+  dokuSharedKey?: string,
+  dokuPreferredChannel?: string
 }) {
   try {
     const user = await getAuthenticatedUser()
     await requirePermission(user.id, tenantId, 'settings', 'write')
+    
+    // Validations
+    if (data.dokuEnabled) {
+      if (!data.dokuClientId || data.dokuClientId.trim() === '' ||
+          !data.dokuMerchantPublicKey || data.dokuMerchantPublicKey.trim() === '' ||
+          !data.dokuSnapTokenUrl || data.dokuSnapTokenUrl.trim() === '' ||
+          !data.dokuSharedKey || data.dokuSharedKey.trim() === '') {
+        throw new Error('All DOKU key fields are required when DOKU is enabled');
+      }
+      
+      if (data.dokuEnvironment === 'production') {
+        const checkClientId = data.dokuClientId.includes('•') ? '' : data.dokuClientId;
+        if (checkClientId && checkClientId.startsWith('MCH-0001-')) {
+          throw new Error('DOKU Client ID must not start with sandbox prefix (MCH-0001-) in Production environment');
+        }
+      }
+    }
+
     const updateData: any = {
       xenditEnabled: data.xenditEnabled,
-      midtransEnabled: data.midtransEnabled
+      midtransEnabled: data.midtransEnabled,
+      dokuEnabled: data.dokuEnabled || false,
+      dokuEnvironment: data.dokuEnvironment || 'sandbox',
+      dokuPreferredChannel: data.dokuPreferredChannel || 'all'
     }
 
     // Skip saving if input matches masked string or contains •
@@ -426,6 +469,20 @@ export async function savePaymentConfig(tenantId: string, data: {
       updateData.midtransEncryptedServerKeyIv = ''
     }
 
+    // DOKU fields encryption
+    if (data.dokuClientId && data.dokuClientId.trim() !== '' && !data.dokuClientId.includes('•')) {
+      updateData.dokuClientId = encrypt(data.dokuClientId)
+    }
+    if (data.dokuMerchantPublicKey && data.dokuMerchantPublicKey.trim() !== '' && !data.dokuMerchantPublicKey.includes('•')) {
+      updateData.dokuMerchantPublicKey = encrypt(data.dokuMerchantPublicKey)
+    }
+    if (data.dokuSnapTokenUrl && data.dokuSnapTokenUrl.trim() !== '' && !data.dokuSnapTokenUrl.includes('•')) {
+      updateData.dokuSnapTokenUrl = encrypt(data.dokuSnapTokenUrl)
+    }
+    if (data.dokuSharedKey && data.dokuSharedKey.trim() !== '' && !data.dokuSharedKey.includes('•')) {
+      updateData.dokuSharedKey = encrypt(data.dokuSharedKey)
+    }
+
     const website = await prisma.tenantWebsite.update({
       where: { tenantId },
       data: updateData
@@ -440,7 +497,14 @@ export async function savePaymentConfig(tenantId: string, data: {
           xenditEncryptedSecret: website.xenditEncryptedSecret,
           xenditEncryptedWebhookToken: website.xenditEncryptedWebhookToken,
           midtransEnabled: website.midtransEnabled,
-          midtransEncryptedServerKey: website.midtransEncryptedServerKey
+          midtransEncryptedServerKey: website.midtransEncryptedServerKey,
+          dokuEnabled: website.dokuEnabled,
+          dokuEnvironment: website.dokuEnvironment,
+          dokuClientId: website.dokuClientId,
+          dokuMerchantPublicKey: website.dokuMerchantPublicKey,
+          dokuSnapTokenUrl: website.dokuSnapTokenUrl,
+          dokuSharedKey: website.dokuSharedKey,
+          dokuPreferredChannel: website.dokuPreferredChannel
         } as any,
         actorId: user.id
       }
