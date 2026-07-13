@@ -33,6 +33,68 @@ export async function POST(req: NextRequest) {
 
     const currency = body.currency || themeConfig.baseCurrency || 'USD'
 
+    let orderId = ''
+    let totalAmount = body.amount
+
+    if (body.items && Array.isArray(body.items) && body.items.length > 0) {
+      const catalogItems = await prisma.tenantCatalogItem.findMany({
+        where: { id: { in: body.items.map((i: any) => i.id) }, tenantId }
+      })
+      
+      let computedTotal = 0
+      const orderItemsData = body.items.map((i: any) => {
+        const catItem = catalogItems.find(c => c.id === i.id)
+        if (!catItem) throw new Error(`Item ${i.id} not found`)
+        const unitPrice = catItem.basePrice
+        const total = Number(unitPrice) * i.quantity
+        computedTotal += total
+        return {
+          tenantId,
+          catalogItemId: i.id,
+          quantity: i.quantity,
+          unitPrice: unitPrice,
+          totalPrice: total
+        }
+      })
+      
+      const order = await prisma.tenantOrder.create({
+        data: {
+          tenantId,
+          guestEmail: body.email,
+          totalAmount: computedTotal,
+          orderStatus: 'pending',
+          items: {
+            create: orderItemsData
+          }
+        }
+      })
+      orderId = order.id
+      totalAmount = computedTotal
+    } else {
+      const order = await prisma.tenantOrder.create({
+        data: {
+          tenantId,
+          guestEmail: body.email,
+          totalAmount: body.amount,
+          orderStatus: 'pending'
+        }
+      })
+      orderId = order.id
+    }
+
+    // Create initiated payment record
+    await prisma.tenantPayment.create({
+      data: {
+        tenantId,
+        orderId,
+        processorKey: paymentGateway,
+        externalTransactionId: `pending_${orderId}`,
+        amount: totalAmount,
+        currency,
+        paymentStatus: 'initiated'
+      }
+    })
+
     if (paymentGateway === 'xendit') {
       let apiKey = process.env.XENDIT_SECRET_KEY
       if (websiteRes?.xenditEncryptedSecret && websiteRes.xenditEncryptedSecretIv) {
@@ -47,10 +109,10 @@ export async function POST(req: NextRequest) {
           'Authorization': `Basic ${Buffer.from(apiKey + ':').toString('base64')}`
         },
         body: JSON.stringify({
-          external_id: `txn_${Date.now()}`,
-          amount: body.amount,
+          external_id: orderId,
+          amount: totalAmount,
           payer_email: body.email,
-          description: 'Checkout Order',
+          description: `Checkout Order ${orderId}`,
           currency: currency
         })
       })
@@ -81,8 +143,8 @@ export async function POST(req: NextRequest) {
         },
         body: JSON.stringify({
           transaction_details: {
-            order_id: `txn_${Date.now()}`,
-            gross_amount: body.amount
+            order_id: orderId,
+            gross_amount: totalAmount
           },
           customer_details: {
             email: body.email

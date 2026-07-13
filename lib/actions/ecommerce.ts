@@ -33,6 +33,28 @@ export async function updateOrderStatus(tenantId: string, orderId: string, statu
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'orders', 'write')
 
+    const currentOrder = await prisma.tenantOrder.findUnique({
+      where: { id: orderId, tenantId }
+    })
+    if (!currentOrder) throw new Error("Order not found")
+
+    const currentStatus = currentOrder.orderStatus
+    const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+      pending: ['paid', 'cancelled'],
+      paid: ['processing', 'cancelled'],
+      processing: ['shipped', 'cancelled'],
+      shipped: ['completed', 'cancelled'],
+      completed: [],
+      cancelled: []
+    }
+
+    if (currentStatus !== status) {
+      const allowed = validTransitions[currentStatus] || []
+      if (!allowed.includes(status)) {
+        throw new Error(`Invalid status transition from ${currentStatus} to ${status}`)
+      }
+    }
+
     const order = await prisma.tenantOrder.update({
       where: { id: orderId, tenantId },
       data: { 
@@ -52,6 +74,28 @@ export async function bulkUpdateOrderStatus(tenantId: string, orderIds: string[]
     const user = await getAuthenticatedUser()
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'orders', 'write')
+
+    const orders = await prisma.tenantOrder.findMany({
+      where: { id: { in: orderIds }, tenantId }
+    })
+
+    const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+      pending: ['paid', 'cancelled'],
+      paid: ['processing', 'cancelled'],
+      processing: ['shipped', 'cancelled'],
+      shipped: ['completed', 'cancelled'],
+      completed: [],
+      cancelled: []
+    }
+
+    for (const order of orders) {
+      if (order.orderStatus !== status) {
+        const allowed = validTransitions[order.orderStatus] || []
+        if (!allowed.includes(status)) {
+          throw new Error(`Invalid status transition for order ${order.id} from ${order.orderStatus} to ${status}`)
+        }
+      }
+    }
 
     await prisma.tenantOrder.updateMany({
       where: { id: { in: orderIds }, tenantId },

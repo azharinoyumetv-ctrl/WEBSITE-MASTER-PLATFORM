@@ -199,7 +199,8 @@ async function sendWithRetryAndLog(logId: string, maxRetries = 3) {
       attempt++
       lastError = err.message
       if (attempt < maxRetries) {
-        await new Promise(resolve => setTimeout(resolve, attempt * 1000))
+        // Foreground exponential backoff: 2s, 4s
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
       }
     }
   }
@@ -343,20 +344,32 @@ export async function dispatchNotification(
     return { success: false, error: error.message }
   }
 }
-
 export async function processNotificationQueue(tenantId: string) {
   try {
     const user = await getAuthenticatedUser()
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'notifications', 'write')
 
+    const now = new Date()
     const pendingLogs = await prisma.tenantNotificationLog.findMany({
       where: { tenantId, status: { in: ['pending', 'failed'] }, retryCount: { lt: 3 } },
       take: 10
     })
     
+    // Enforce background exponential backoff scheduler
+    const logsToProcess = pendingLogs.filter(log => {
+      if (log.status === 'pending' && log.retryCount === 0) return true
+      
+      const createdTime = new Date(log.createdAt).getTime()
+      const ageMs = now.getTime() - createdTime
+      
+      // Delay intervals: retry count 1 = 5 min, retry count 2 = 15 min
+      const requiredDelayMs = log.retryCount === 1 ? 5 * 60 * 1000 : 15 * 60 * 1000
+      return ageMs >= requiredDelayMs
+    })
+    
     let processed = 0
-    for (const log of pendingLogs) {
+    for (const log of logsToProcess) {
       const success = await sendWithRetryAndLog(log.id)
       if (success) processed++
     }

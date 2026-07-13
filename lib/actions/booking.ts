@@ -62,7 +62,7 @@ export async function createBooking(tenantId: string, data: any) {
         tenantId,
         resourceId: data.resourceId,
         customerId: customerId,
-        bookingStatus: 'confirmed',
+        bookingStatus: data.bookingStatus || 'confirmed',
         startTime: data.startTime,
         endTime: data.endTime,
         notes: data.notes || ''
