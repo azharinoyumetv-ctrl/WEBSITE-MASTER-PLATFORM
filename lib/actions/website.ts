@@ -5,6 +5,13 @@ import { revalidatePath } from 'next/cache'
 import { encrypt, decrypt } from '@/lib/crypto'
 import { requirePermission, getAuthenticatedUser } from '@/lib/rbac'
 import crypto from 'crypto'
+import { z } from 'zod'
+
+const layoutBlockSchema = z.array(z.object({
+  type: z.enum(['hero', 'text', 'features', 'catalog_grid', 'contact_form']),
+  config: z.any().optional(),
+  data: z.any().optional()
+}))
 
 // Fetch public website config (used by public site renderer)
 export async function getPublicWebsiteConfig(tenantDomain: string) {
@@ -72,6 +79,14 @@ export async function saveAdminPage(tenantId: string, pageId: string | undefined
   try {
     const user = await getAuthenticatedUser()
     await requirePermission(user.id, tenantId, 'website', 'write')
+    
+    if (data.layoutBlocks) {
+      const parsed = layoutBlockSchema.safeParse(data.layoutBlocks)
+      if (!parsed.success) {
+        throw new Error(`Invalid page layout configuration: ${parsed.error.message}`)
+      }
+    }
+
     let page;
     if (pageId) {
       page = await prisma.tenantPage.update({

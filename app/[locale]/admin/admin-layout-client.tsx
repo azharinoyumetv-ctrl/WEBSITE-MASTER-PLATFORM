@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
   LayoutDashboard, Globe, Users, Shield, Package, ShoppingCart,
@@ -12,6 +12,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getUnreadAlertCount, getMonitoringStatus } from '@/lib/actions/monitoring'
+import { useTranslations } from 'next-intl'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
+import { signOut } from 'next-auth/react'
 
 type NavItem = {
   href: string
@@ -82,9 +85,6 @@ const NAVIGATION_GROUPS: NavGroup[] = [
     ],
   },
 ]
-
-import { useTranslations } from 'next-intl'
-import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 
 type SidebarProps = {
   collapsed: boolean
@@ -226,27 +226,35 @@ export function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () 
     }
 
     refreshData()
-    const interval = setInterval(refreshData, 15000)
-    return () => clearInterval(interval)
-  }, [tenant?.id])
-  
-  // Derive page title from pathname
+    const int = setInterval(refreshData, 15000)
+    return () => clearInterval(int)
+  }, [tenant])
+
   const getPageTitle = () => {
-    const parts = pathname.split('/').filter(Boolean)
-    const last = parts[parts.length - 1]
-    const map: Record<string, string> = {
-      dashboard: t('dashboard'), tenants: t('tenants'), modules: t('modules'),
-      users: t('users'), rbac: t('access_control'), catalog: t('catalog'), categories: 'Categories',
-      ecommerce: t('ecommerce'), orders: 'Orders', payments: t('payments'), pos: t('pos_terminal'),
-      inventory: t('inventory'), crm: t('crm'), booking: t('booking'), ai: t('ai_assistant'),
-      notifications: t('notifications'), analytics: t('analytics'), 'api-portal': t('api_portal'),
-      monitoring: t('monitoring'), 'feature-flags': t('feature_flags'), settings: t('settings'),
-    }
-    return map[last] || 'Website Master Platform'
+    if (pathname.includes('/dashboard')) return t('dashboard')
+    if (pathname.includes('/tenants')) return t('tenants')
+    if (pathname.includes('/modules')) return t('modules')
+    if (pathname.includes('/users')) return t('users')
+    if (pathname.includes('/rbac')) return t('access_control')
+    if (pathname.includes('/catalog')) return t('catalog')
+    if (pathname.includes('/ecommerce')) return t('ecommerce')
+    if (pathname.includes('/payments')) return t('payments')
+    if (pathname.includes('/pos/shifts')) return t('shift_scheduler')
+    if (pathname.includes('/pos')) return t('pos_terminal')
+    if (pathname.includes('/inventory')) return t('inventory')
+    if (pathname.includes('/crm')) return t('crm')
+    if (pathname.includes('/booking')) return t('booking')
+    if (pathname.includes('/ai')) return t('ai_assistant')
+    if (pathname.includes('/notifications')) return t('notifications')
+    if (pathname.includes('/analytics')) return t('analytics')
+    if (pathname.includes('/api-portal')) return t('api_portal')
+    if (pathname.includes('/monitoring')) return 'System Monitoring'
+    if (pathname.includes('/settings')) return t('settings')
+    return 'Admin Console'
   }
 
   return (
-    <header className="h-16 border-b border-slate-200 bg-white flex items-center justify-between px-4 md:px-6">
+    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0">
       <div className="flex items-center gap-3">
         <button
           onClick={onMobileMenuToggle}
@@ -335,11 +343,51 @@ export function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () 
   )
 }
 
-import { signOut } from 'next-auth/react'
-
 export default function AdminLayoutClient({ children, enabledModules, user, tenant }: { children: React.ReactNode, enabledModules: string[], user?: { name: string, role: string }, tenant?: any }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
+  const router = useRouter()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  // Keyboard navigation shortcuts event listener
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        document.activeElement?.tagName === 'INPUT' ||
+        document.activeElement?.tagName === 'TEXTAREA' ||
+        document.activeElement?.getAttribute('contenteditable') === 'true'
+      ) {
+        return
+      }
+
+      if (e.altKey) {
+        switch (e.key.toLowerCase()) {
+          case 'd':
+            router.push('/admin/dashboard')
+            break
+          case 's':
+            router.push('/admin/settings')
+            break
+          case 'p':
+            router.push('/admin/pos')
+            break
+          case 'i':
+            router.push('/admin/inventory')
+            break
+          case 'b':
+            router.push('/admin/booking')
+            break
+        }
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [router])
 
   // Filter navigation groups based on enabled modules
   const filteredNavGroups = NAVIGATION_GROUPS.map(group => ({
@@ -374,9 +422,21 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopBar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} tenant={tenant} />
         <main className="flex-1 overflow-y-auto">
-          <div className="animate-fade-in">
-            {children}
-          </div>
+          {!mounted ? (
+            <div className="p-6 space-y-6 animate-pulse">
+              <div className="h-8 bg-slate-200 rounded w-1/4" />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="h-32 bg-slate-200 rounded-xl" />
+                <div className="h-32 bg-slate-200 rounded-xl" />
+                <div className="h-32 bg-slate-200 rounded-xl" />
+              </div>
+              <div className="h-64 bg-slate-200 rounded-xl" />
+            </div>
+          ) : (
+            <div className="animate-fade-in">
+              {children}
+            </div>
+          )}
         </main>
       </div>
     </div>

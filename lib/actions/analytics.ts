@@ -13,7 +13,10 @@ export async function getAnalytics(tenantId: string, rangeDays: number = 7) {
         tenantId,
         summaryDate: { gte: startDate }
       },
-      orderBy: { summaryDate: 'asc' }
+      orderBy: [
+        { summaryDate: 'asc' },
+        { id: 'asc' }
+      ]
     })
 
     let totalPageViews = 0

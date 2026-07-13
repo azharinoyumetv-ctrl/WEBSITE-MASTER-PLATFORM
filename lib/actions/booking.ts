@@ -2,9 +2,13 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
+import { getAuthenticatedUser, requirePermission } from "@/lib/rbac"
 
 export async function getBookingData(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'bookings', 'read')
     const resources = await prisma.tenantBookingResource.findMany({
       where: { tenantId }
     })
@@ -45,6 +49,10 @@ export async function getBookingData(tenantId: string) {
 
 export async function createBooking(tenantId: string, data: any) {
   try {
+    const activeUser = await getAuthenticatedUser()
+    if (activeUser.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(activeUser.id, tenantId, 'bookings', 'write')
+
     const user = await prisma.user.findFirst({
       where: { tenantId }
     })
@@ -87,6 +95,10 @@ export async function createBooking(tenantId: string, data: any) {
 
 export async function updateBookingStatus(tenantId: string, bookingId: string, status: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'bookings', 'write')
+
     const booking = await prisma.tenantBooking.update({
       where: { id: bookingId, tenantId },
       data: { bookingStatus: status }
@@ -102,6 +114,10 @@ export async function updateBookingStatus(tenantId: string, bookingId: string, s
 // Resource CRUD
 export async function createBookingResource(tenantId: string, data: { resourceName: string, resourceType: string }) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'bookings', 'write')
+
     const resource = await prisma.tenantBookingResource.create({
       data: { ...data, tenantId }
     })
@@ -114,6 +130,10 @@ export async function createBookingResource(tenantId: string, data: { resourceNa
 
 export async function updateBookingResource(tenantId: string, id: string, data: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'bookings', 'write')
+
     const resource = await prisma.tenantBookingResource.update({
       where: { id, tenantId },
       data
@@ -127,6 +147,10 @@ export async function updateBookingResource(tenantId: string, id: string, data: 
 
 export async function deleteBookingResource(tenantId: string, id: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'bookings', 'write')
+
     await prisma.tenantBookingResource.delete({
       where: { id, tenantId }
     })
@@ -140,6 +164,10 @@ export async function deleteBookingResource(tenantId: string, id: string) {
 // Calendar API
 export async function getBookingsByDateRange(tenantId: string, startDate: Date, endDate: Date) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'bookings', 'read')
+
     const bookings = await prisma.tenantBooking.findMany({
       where: {
         tenantId,
