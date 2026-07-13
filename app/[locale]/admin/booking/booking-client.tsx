@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { CalendarCheck, Clock, User, CheckCircle2, XCircle, AlertCircle, Plus, ChevronLeft, ChevronRight, Loader2, Download } from 'lucide-react'
 import { formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { createBooking, updateBookingStatus } from '@/lib/actions/booking'
+import { createBooking, updateBookingStatus, createBookingPaymentLink } from '@/lib/actions/booking'
 
 const HOURS = Array.from({ length: 10 }, (_, i) => `${i + 9}:00`)
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
@@ -14,6 +14,12 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
   const [selectedResource, setSelectedResource] = useState(initialResources[0] || null)
   const [showNewModal, setShowNewModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  
+  // Payment link modal states
+  const [paymentModalBooking, setPaymentModalBooking] = useState<any | null>(null)
+  const [paymentGateway, setPaymentGateway] = useState('xendit')
+  const [paymentAmount, setPaymentAmount] = useState('50000')
+  const [isGeneratingPayment, setIsGeneratingPayment] = useState(false)
   
   // Week View Navigation
   const [weekOffset, setWeekOffset] = useState(0)
@@ -248,6 +254,18 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
                           <span className="text-sm font-medium text-slate-800">{b.customerName}</span>
                         </div>
                         {b.notes && <span className="text-xs text-slate-500 italic max-w-xs truncate">{b.notes}</span>}
+                        {b.metadata && (b.metadata as any).paymentUrl && (
+                          <div className="mt-1">
+                            <a 
+                              href={(b.metadata as any).paymentUrl} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="text-xs font-semibold text-indigo-600 hover:underline flex items-center gap-1"
+                            >
+                              Open Invoice (Rp {Number((b.metadata as any).paymentAmount || 0).toLocaleString('id-ID')})
+                            </a>
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="text-sm text-slate-600">{b.resourceName}</td>
@@ -257,15 +275,45 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
                     </td>
                     <td><span className={`badge ${getStatusBadgeClass(b.bookingStatus)}`}>{b.bookingStatus.replace('_', ' ')}</span></td>
                     <td>
-                      {b.bookingStatus !== 'completed' && b.bookingStatus !== 'cancelled' && (
-                        <button
-                          onClick={() => handleCancelBooking(b.id)}
-                          className="btn btn-ghost btn-sm text-red-500 hover:text-red-700"
-                        >
-                          <XCircle className="w-3.5 h-3.5" />
-                          Cancel
-                        </button>
-                      )}
+                      <div className="flex items-center gap-2">
+                        {b.bookingStatus === 'pending_payment' && (
+                          <>
+                            <button
+                              onClick={() => {
+                                setPaymentModalBooking(b)
+                                setPaymentAmount('50000')
+                                setPaymentGateway('xendit')
+                              }}
+                              className="btn btn-primary btn-sm text-xs py-1"
+                            >
+                              Collect Payment
+                            </button>
+                            <button
+                              onClick={async () => {
+                                const res = await updateBookingStatus(tenantId, b.id, 'confirmed')
+                                if (res.success) {
+                                  setBookings(prev => prev.map(bk => bk.id === b.id ? { ...bk, bookingStatus: 'confirmed' } : bk))
+                                  toast.success('Booking confirmed manually')
+                                } else {
+                                  toast.error(res.error || 'Failed to confirm booking')
+                                }
+                              }}
+                              className="btn btn-secondary btn-sm text-xs py-1"
+                            >
+                              Confirm Manually
+                            </button>
+                          </>
+                        )}
+                        {b.bookingStatus !== 'completed' && b.bookingStatus !== 'cancelled' && (
+                          <button
+                            onClick={() => handleCancelBooking(b.id)}
+                            className="btn btn-ghost btn-sm text-red-500 hover:text-red-700"
+                          >
+                            <XCircle className="w-3.5 h-3.5" />
+                            Cancel
+                          </button>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -308,6 +356,78 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
               <button onClick={handleCreateBooking} disabled={isSaving} className="btn btn-primary" id="confirm-booking-btn">
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {isSaving ? 'Creating...' : 'Create Booking'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Payment Link Generation Modal */}
+      {paymentModalBooking && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-modal w-full max-w-md animate-scale-in">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-semibold">Generate Booking Invoice Link</h3>
+              <p className="text-sm text-slate-500">For booking: {paymentModalBooking.customerName}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="form-label">Payment Gateway</label>
+                <select 
+                  value={paymentGateway} 
+                  onChange={e => setPaymentGateway(e.target.value)} 
+                  className="form-select"
+                >
+                  <option value="xendit">Xendit Invoice</option>
+                  <option value="midtrans">Midtrans Snap</option>
+                  <option value="doku">DOKU Checkout</option>
+                </select>
+              </div>
+              <div>
+                <label className="form-label">Amount (IDR / USD)</label>
+                <input 
+                  type="number" 
+                  value={paymentAmount} 
+                  onChange={e => setPaymentAmount(e.target.value)} 
+                  className="form-input" 
+                  placeholder="50000" 
+                />
+              </div>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+              <button onClick={() => setPaymentModalBooking(null)} className="btn btn-secondary">Cancel</button>
+              <button 
+                onClick={async () => {
+                  const amt = parseFloat(paymentAmount)
+                  if (isNaN(amt) || amt <= 0) {
+                    toast.error('Invalid amount')
+                    return
+                  }
+                  setIsGeneratingPayment(true)
+                  const res = await createBookingPaymentLink(tenantId, paymentModalBooking.id, amt, paymentGateway)
+                  setIsGeneratingPayment(false)
+
+                  if (res.success) {
+                    toast.success('Payment Link Generated!')
+                    setBookings(prev => prev.map(bk => bk.id === paymentModalBooking.id ? { 
+                      ...bk, 
+                      metadata: { 
+                        ...((bk.metadata as any) || {}), 
+                        paymentUrl: res.paymentUrl, 
+                        paymentAmount: amt, 
+                        paymentGateway 
+                      } 
+                    } : bk))
+                    setPaymentModalBooking(null)
+                  } else {
+                    toast.error(res.error || 'Failed to generate link')
+                  }
+                }} 
+                disabled={isGeneratingPayment} 
+                className="btn btn-primary"
+              >
+                {isGeneratingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                {isGeneratingPayment ? 'Generating...' : 'Generate Link'}
               </button>
             </div>
           </div>

@@ -201,3 +201,73 @@ export async function getBookingsByDateRange(tenantId: string, startDate: Date, 
     return { success: false, error: error.message }
   }
 }
+
+export async function createBookingPaymentLink(tenantId: string, bookingId: string, amount: number, gateway: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'bookings', 'write')
+
+    const booking = await prisma.tenantBooking.findUnique({
+      where: { id: bookingId, tenantId },
+      include: { resource: true }
+    })
+    if (!booking) throw new Error('Booking not found')
+
+    // Find customer email
+    let customerEmail = 'customer@example.com'
+    const customerUser = await prisma.user.findUnique({ where: { id: booking.customerId } })
+    if (customerUser) {
+      customerEmail = customerUser.email
+    } else {
+      const contact = await prisma.tenantCrmContact.findUnique({ where: { id: booking.customerId } })
+      if (contact) {
+        customerEmail = contact.email
+      }
+    }
+
+    let paymentUrl = ''
+    let invoiceId = ''
+
+    if (gateway === 'xendit') {
+      const { createInvoice } = await import('./payments')
+      const res = await createInvoice(tenantId, bookingId, amount, customerEmail)
+      if (!res.success) throw new Error(res.error)
+      paymentUrl = res.invoiceUrl || ''
+      invoiceId = res.invoiceId || ''
+    } else if (gateway === 'midtrans') {
+      const { createMidtransCheckout } = await import('./payments')
+      const res = await createMidtransCheckout(tenantId, bookingId, amount, customerEmail)
+      if (!res.success) throw new Error(res.error)
+      paymentUrl = (res as any).paymentUrl || (res as any).invoiceId || ''
+      invoiceId = bookingId
+    } else if (gateway === 'doku') {
+      const { createDokuCheckout } = await import('./payments')
+      const res = await createDokuCheckout(tenantId, bookingId, amount, customerEmail)
+      if (!res.success) throw new Error(res.error)
+      paymentUrl = res.paymentUrl || ''
+      invoiceId = res.invoiceId || ''
+    } else {
+      throw new Error('Unsupported payment gateway')
+    }
+
+    const meta = typeof booking.metadata === 'object' && booking.metadata ? (booking.metadata as any) : {}
+    await prisma.tenantBooking.update({
+      where: { id: bookingId },
+      data: {
+        paymentIntentId: invoiceId,
+        metadata: {
+          ...meta,
+          paymentUrl,
+          paymentAmount: amount,
+          paymentGateway: gateway
+        }
+      }
+    })
+
+    revalidatePath('/admin/booking')
+    return { success: true, paymentUrl }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

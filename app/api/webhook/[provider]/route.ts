@@ -171,43 +171,92 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
       return NextResponse.json({ error: 'Unknown provider' }, { status: 400 })
     }
 
-    if (orderId && status === 'succeeded') {
-      // Update payment and order in database
-      await prisma.tenantPayment.updateMany({
-        where: { id: orderId },
-        data: { paymentStatus: status }
-      })
-      await prisma.tenantOrder.updateMany({
-        where: { id: orderId },
-        data: { 
-          orderStatus: 'processing',
-          receiptUrl: `/orders/${orderId}/receipt`
+    // Resolve orderId / bookingId and idempotency
+    const idempotencyKey = body.id || body.transaction_id || body.uuid || body.invoice_id || body.order_id;
+    if (idempotencyKey) {
+      const existingKey = await prisma.paymentIdempotencyKey.findUnique({
+        where: { idempotencyKey }
+      });
+      if (existingKey) {
+        return NextResponse.json({ success: true, message: 'Already processed' });
+      }
+    }
+
+    let tenantId: string | null = null;
+    let isBooking = false;
+
+    if (orderId) {
+      const order = await prisma.tenantOrder.findUnique({ where: { id: orderId } });
+      if (order) {
+        tenantId = order.tenantId;
+      } else {
+        const booking = await prisma.tenantBooking.findUnique({ where: { id: orderId } });
+        if (booking) {
+          tenantId = booking.tenantId;
+          isBooking = true;
         }
-      })
-      
-      const order = await prisma.tenantOrder.findFirst({
-        where: { id: orderId }
-      })
+      }
+    }
 
-      if (order?.tenantId) {
-        // Send confirmation email asynchronously
-        const customerEmail = order.guestEmail || body.payer_email || 'customer@example.com';
-        sendOrderConfirmationEmail(order.tenantId, order.id, customerEmail)
-          .catch(err => console.error("Failed to send async generic order confirmation email", err));
+    if (idempotencyKey && tenantId) {
+      await prisma.paymentIdempotencyKey.create({
+        data: {
+          tenantId,
+          idempotencyKey,
+          responsePayload: body,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        }
+      }).catch(err => console.error("Idempotency log failed", err));
+    }
 
-        const website = await prisma.tenantWebsite.findUnique({
-          where: { tenantId: order.tenantId }
+    if (orderId && status === 'succeeded') {
+      if (isBooking) {
+        await prisma.tenantBooking.update({
+          where: { id: orderId },
+          data: { bookingStatus: 'confirmed', paymentIntentId: idempotencyKey }
+        });
+        await prisma.tenantPayment.updateMany({
+          where: { orderId: orderId },
+          data: { paymentStatus: 'succeeded' }
+        });
+      } else {
+        // Update payment and order in database
+        await prisma.tenantPayment.updateMany({
+          where: { orderId: orderId },
+          data: { paymentStatus: 'succeeded' }
         })
-        const themeConfig = website?.themeConfig as any
-        if (themeConfig) {
-          const { whatsappPaNumber, whatsappPhoneId, whatsappToken, whatsappTemplate } = themeConfig
-          if (whatsappPaNumber && whatsappPhoneId && whatsappToken && whatsappTemplate) {
-            await sendWhatsAppTemplate({
-              to: whatsappPaNumber,
-              templateName: whatsappTemplate,
-              parameters: [order.id, String(order.totalAmount)],
-              credentials: { token: whatsappToken, phoneNumberId: whatsappPhoneId }
-            }).catch(e => console.error("Failed to send WhatsApp notification on webhook", e))
+        await prisma.tenantOrder.updateMany({
+          where: { id: orderId },
+          data: { 
+            orderStatus: 'processing',
+            receiptUrl: `/orders/${orderId}/receipt`
+          }
+        })
+        
+        const order = await prisma.tenantOrder.findFirst({
+          where: { id: orderId }
+        })
+
+        if (order?.tenantId) {
+          // Send confirmation email asynchronously
+          const customerEmail = order.guestEmail || body.payer_email || 'customer@example.com';
+          sendOrderConfirmationEmail(order.tenantId, order.id, customerEmail)
+            .catch(err => console.error("Failed to send async generic order confirmation email", err));
+
+          const website = await prisma.tenantWebsite.findUnique({
+            where: { tenantId: order.tenantId }
+          })
+          const themeConfig = website?.themeConfig as any
+          if (themeConfig) {
+            const { whatsappPaNumber, whatsappPhoneId, whatsappToken, whatsappTemplate } = themeConfig
+            if (whatsappPaNumber && whatsappPhoneId && whatsappToken && whatsappTemplate) {
+              await sendWhatsAppTemplate({
+                to: whatsappPaNumber,
+                templateName: whatsappTemplate,
+                parameters: [order.id, String(order.totalAmount)],
+                credentials: { token: whatsappToken, phoneNumberId: whatsappPhoneId }
+              }).catch(e => console.error("Failed to send WhatsApp notification on webhook", e))
+            }
           }
         }
       }
@@ -237,33 +286,44 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
         }
       }
     } else if (orderId && (status === 'failed' || status === 'refunded')) {
-      await prisma.tenantPayment.updateMany({
-        where: { orderId },
-        data: { paymentStatus: status }
-      })
-      await prisma.tenantOrder.updateMany({
-        where: { id: orderId },
-        data: { orderStatus: 'cancelled' }
-      })
-
-      const order = await prisma.tenantOrder.findFirst({
-        where: { id: orderId }
-      })
-      if (order?.tenantId) {
-        await prisma.tenantPaymentLedger.create({
-          data: {
-            tenantId: order.tenantId,
-            paymentId: orderId,
-            orderId: order.id,
-            type: 'reversal',
-            amount: order.totalAmount,
-            currency: order.currency || 'USD',
-            gateway: provider,
-            gatewayTxId: body.id || body.transaction_id || 'unknown',
-            status: 'failed',
-            metadata: body
-          }
+      if (isBooking) {
+        await prisma.tenantBooking.update({
+          where: { id: orderId },
+          data: { bookingStatus: 'cancelled' }
+        });
+        await prisma.tenantPayment.updateMany({
+          where: { orderId },
+          data: { paymentStatus: status }
+        });
+      } else {
+        await prisma.tenantPayment.updateMany({
+          where: { orderId },
+          data: { paymentStatus: status }
         })
+        await prisma.tenantOrder.updateMany({
+          where: { id: orderId },
+          data: { orderStatus: 'cancelled' }
+        })
+
+        const order = await prisma.tenantOrder.findFirst({
+          where: { id: orderId }
+        })
+        if (order?.tenantId) {
+          await prisma.tenantPaymentLedger.create({
+            data: {
+              tenantId: order.tenantId,
+              paymentId: orderId,
+              orderId: order.id,
+              type: 'reversal',
+              amount: order.totalAmount,
+              currency: order.currency || 'USD',
+              gateway: provider,
+              gatewayTxId: body.id || body.transaction_id || 'unknown',
+              status: 'failed',
+              metadata: body
+            }
+          })
+        }
       }
     }
 

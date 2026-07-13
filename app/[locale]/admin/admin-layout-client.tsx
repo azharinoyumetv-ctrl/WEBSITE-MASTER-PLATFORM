@@ -8,7 +8,7 @@ import {
   CreditCard, Monitor, Warehouse, Users2, CalendarCheck, Sparkles,
   Bell, BarChart3, Code2, Settings, ChevronLeft, ChevronRight,
   LogOut, Building2, Menu, X, AlertCircle, ToggleLeft,
-  Activity, FileText, Zap,
+  Activity, FileText, Zap, Sun, Moon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getUnreadAlertCount, getMonitoringStatus } from '@/lib/actions/monitoring'
@@ -200,7 +200,7 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
   )
 }
 
-export function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () => void, tenant?: any }) {
+export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onMobileMenuToggle: () => void, tenant?: any, theme: string, toggleTheme: () => void }) {
   const pathname = usePathname()
   const t = useTranslations('AdminSidebar')
   const [unreadCount, setUnreadCount] = useState(0)
@@ -270,6 +270,14 @@ export function TopBar({ onMobileMenuToggle, tenant }: { onMobileMenuToggle: () 
       
       <div className="flex items-center gap-3">
         <LanguageSwitcher />
+
+        <button
+          onClick={toggleTheme}
+          className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          aria-label="Toggle Theme"
+        >
+          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+        </button>
 
         {/* Status indicator */}
         <div className={cn(
@@ -349,6 +357,26 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
+  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark'
+    if (savedTheme) {
+      setTheme(savedTheme)
+      document.documentElement.classList.toggle('dark', savedTheme === 'dark')
+    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      setTheme('dark')
+      document.documentElement.classList.add('dark')
+    }
+  }, [])
+
+  const toggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light'
+    setTheme(newTheme)
+    localStorage.setItem('theme', newTheme)
+    document.documentElement.classList.toggle('dark', newTheme === 'dark')
+  }
+
   useEffect(() => {
     setMounted(true)
   }, [])
@@ -396,7 +424,14 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
   })).filter(group => group.items.length > 0)
 
   return (
-    <div className="flex h-screen bg-slate-50 overflow-hidden">
+    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 overflow-hidden">
+      <a 
+        href="#main-content" 
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-white dark:focus:bg-slate-800 focus:text-indigo-600 dark:focus:text-indigo-400 focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+      >
+        Skip to main content
+      </a>
+
       {/* Desktop sidebar */}
       <div className="hidden md:block flex-shrink-0">
         <Sidebar collapsed={collapsed} onToggle={() => setCollapsed(!collapsed)} navGroups={filteredNavGroups} user={user} />
@@ -420,17 +455,17 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} tenant={tenant} />
-        <main className="flex-1 overflow-y-auto">
+        <TopBar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} tenant={tenant} theme={theme} toggleTheme={toggleTheme} />
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none bg-slate-50 dark:bg-slate-900">
           {!mounted ? (
             <div className="p-6 space-y-6 animate-pulse">
-              <div className="h-8 bg-slate-200 rounded w-1/4" />
+              <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-1/4" />
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="h-32 bg-slate-200 rounded-xl" />
-                <div className="h-32 bg-slate-200 rounded-xl" />
-                <div className="h-32 bg-slate-200 rounded-xl" />
+                <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-xl" />
+                <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-xl" />
+                <div className="h-32 bg-slate-200 dark:bg-slate-800 rounded-xl" />
               </div>
-              <div className="h-64 bg-slate-200 rounded-xl" />
+              <div className="h-64 bg-slate-200 dark:bg-slate-800 rounded-xl" />
             </div>
           ) : (
             <div className="animate-fade-in">

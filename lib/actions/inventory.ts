@@ -333,3 +333,97 @@ export async function deleteInventoryBalance(tenantId: string, balanceId: string
     return { success: false, error: error.message }
   }
 }
+
+export async function bulkAdjustInventory(
+  tenantId: string,
+  balanceIds: string[],
+  quantityAdjustment: number,
+  lowStockThreshold?: number
+) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
+    if (balanceIds.length === 0) return { success: true, balances: [] }
+
+    const results = []
+    for (const balanceId of balanceIds) {
+      const balance = await prisma.tenantInventoryBalance.findUnique({
+        where: { id: balanceId, tenantId }
+      })
+      if (!balance) continue
+
+      const newQty = Math.max(0, balance.quantityOnHand + quantityAdjustment)
+      const threshold = lowStockThreshold !== undefined ? lowStockThreshold : balance.lowStockThreshold
+      const newStatus = computeStatus(newQty, threshold)
+
+      const updated = await prisma.tenantInventoryBalance.update({
+        where: { id: balanceId },
+        data: {
+          quantityOnHand: newQty,
+          lowStockThreshold: threshold,
+          status: newStatus
+        },
+        include: { catalogItem: true }
+      })
+
+      if (newStatus === 'low' || newStatus === 'critical') {
+        try {
+          const admins = await prisma.user.findMany({
+            where: {
+              tenantId,
+              status: 'active',
+              userRoles: {
+                some: {
+                  role: {
+                    name: { in: ['admin', 'platform_owner', 'platform owner'], mode: 'insensitive' }
+                  }
+                }
+              }
+            },
+            take: 3
+          })
+          for (const admin of admins) {
+            dispatchNotification(tenantId, admin.email, 'email', 'inventory_alert', {
+              item_name: updated.catalogItem?.title || 'Inventory Item',
+              qty: String(newQty),
+              threshold: String(threshold),
+              status: newStatus.toUpperCase()
+            }).catch(e => console.error("Failed to send bulk adjust low stock notification", e))
+          }
+        } catch (e) {
+          console.error("Failed to fetch admin users for notification", e)
+        }
+      }
+      results.push(updated)
+    }
+
+    revalidatePath('/admin/inventory')
+    return { success: true, balances: results }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function bulkDeleteInventoryBalances(tenantId: string, balanceIds: string[]) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
+    if (balanceIds.length === 0) return { success: true }
+
+    await prisma.tenantInventoryBalance.deleteMany({
+      where: {
+        id: { in: balanceIds },
+        tenantId
+      }
+    })
+
+    revalidatePath('/admin/inventory')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

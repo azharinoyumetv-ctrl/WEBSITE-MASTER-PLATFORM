@@ -42,6 +42,77 @@ export async function updateNotificationTemplate(tenantId: string, templateId: s
   }
 }
 
+export async function getActiveGatewayWithRouting(tenantId: string, channelType: string) {
+  const gateways = await prisma.tenantNotificationGateway.findMany({
+    where: { tenantId, channelType, isActive: true }
+  })
+
+  if (gateways.length === 0) return null
+
+  const mapped = gateways.map(gw => {
+    let priority = 0
+    let businessHours = null
+    
+    try {
+      const config = typeof gw.encryptedCredentials === 'string' 
+        ? JSON.parse(gw.encryptedCredentials) 
+        : gw.encryptedCredentials
+      
+      if (config) {
+        priority = typeof config.priority === 'number' ? config.priority : (parseInt(config.priority, 10) || 0)
+        if (config.businessHoursStart && config.businessHoursEnd) {
+          businessHours = {
+            start: config.businessHoursStart,
+            end: config.businessHoursEnd,
+            timezone: config.timezone || 'UTC'
+          }
+        }
+      }
+    } catch (e) {
+      // Ignore config parse errors
+    }
+
+    return { gateway: gw, priority, businessHours }
+  })
+
+  mapped.sort((a, b) => b.priority - a.priority)
+
+  const now = new Date()
+
+  for (const item of mapped) {
+    if (item.businessHours) {
+      try {
+        const [sh, sm] = item.businessHours.start.split(':').map(Number)
+        const [eh, em] = item.businessHours.end.split(':').map(Number)
+        
+        const tzTime = new Date(now.toLocaleString('en-US', { timeZone: item.businessHours.timezone }))
+        const tzHour = tzTime.getHours()
+        const tzMin = tzTime.getMinutes()
+        
+        const currentMins = tzHour * 60 + tzMin
+        const startMins = sh * 60 + sm
+        const endMins = eh * 60 + em
+
+        if (startMins <= endMins) {
+          if (currentMins < startMins || currentMins > endMins) {
+            continue
+          }
+        } else {
+          if (currentMins < startMins && currentMins > endMins) {
+            continue
+          }
+        }
+      } catch (err) {
+        console.error("Failed to parse business hours for gateway routing", err)
+      }
+    }
+
+    return item.gateway
+  }
+
+  return mapped[0]?.gateway || null
+}
+
 export async function getNotificationGateway(tenantId: string, channelType: string) {
   try {
     const user = await getAuthenticatedUser()
@@ -153,6 +224,15 @@ async function sendWithRetryAndLog(logId: string, maxRetries = 3) {
   if (!log) return false
 
   if (!log.gateway || !log.gateway.isActive) {
+    const fallbackGateway = await getActiveGatewayWithRouting(log.tenantId, log.channelType)
+    if (fallbackGateway && fallbackGateway.id !== log.gatewayId) {
+      await prisma.tenantNotificationLog.update({
+        where: { id: logId },
+        data: { gatewayId: fallbackGateway.id }
+      })
+      return sendWithRetryAndLog(logId, maxRetries)
+    }
+
     await prisma.tenantNotificationLog.update({
       where: { id: logId },
       data: { status: 'failed', deliveryError: 'Missing or inactive gateway', retryCount: 3 }
@@ -228,9 +308,19 @@ async function sendWithRetryAndLog(logId: string, maxRetries = 3) {
       attempt++
       lastError = err.message
       if (attempt < maxRetries) {
-        // Foreground exponential backoff: 2s, 4s
         await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
       }
+    }
+  }
+
+  if (!success) {
+    const fallbackGateway = await getActiveGatewayWithRouting(log.tenantId, log.channelType)
+    if (fallbackGateway && fallbackGateway.id !== log.gatewayId) {
+      await prisma.tenantNotificationLog.update({
+        where: { id: logId },
+        data: { gatewayId: fallbackGateway.id, retryCount: 0 }
+      })
+      return sendWithRetryAndLog(logId, maxRetries)
     }
   }
 
@@ -258,9 +348,7 @@ export async function dispatchTestNotification(tenantId: string, templateId: str
     })
     if (!template) throw new Error('Template not found')
     
-    const gateway = await prisma.tenantNotificationGateway.findFirst({
-      where: { tenantId, channelType: template.channelType, isActive: true }
-    })
+    const gateway = await getActiveGatewayWithRouting(tenantId, template.channelType)
     if (!gateway) throw new Error('No active gateway found for this channel')
 
     const log = await prisma.tenantNotificationLog.create({
@@ -293,9 +381,7 @@ export async function dispatchNotification(
   variables: Record<string, string> = {}
 ) {
   try {
-    const gateway = await prisma.tenantNotificationGateway.findFirst({
-      where: { tenantId, channelType, isActive: true }
-    })
+    const gateway = await getActiveGatewayWithRouting(tenantId, channelType)
 
     let template = await prisma.tenantNotificationTemplate.findFirst({
       where: { tenantId, templateKey, channelType }
@@ -483,9 +569,7 @@ export async function sendOrderConfirmationEmail(tenantId: string, orderId: stri
     if (!order) throw new Error("Order not found")
 
     // Find active email gateway
-    const gateway = await prisma.tenantNotificationGateway.findFirst({
-      where: { tenantId, channelType: 'email', isActive: true }
-    })
+    const gateway = await getActiveGatewayWithRouting(tenantId, 'email')
     if (!gateway) {
       console.warn("No active email gateway found. Skipping order confirmation email.")
       return { success: false, error: "No active email gateway found" }

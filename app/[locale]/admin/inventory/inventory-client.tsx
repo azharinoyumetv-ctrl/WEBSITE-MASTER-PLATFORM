@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Warehouse, AlertTriangle, CheckCircle2, TrendingDown, MapPin, Package, RefreshCw, ArrowUpDown, Search, Loader2, Plus, Edit2, Trash2, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { adjustInventory, transferStock, addInventoryBalance, updateInventoryBalance, deleteInventoryBalance, createLocation, updateLocation, deleteLocation } from '@/lib/actions/inventory'
+import { adjustInventory, transferStock, addInventoryBalance, updateInventoryBalance, deleteInventoryBalance, createLocation, updateLocation, deleteLocation, bulkAdjustInventory, bulkDeleteInventoryBalances } from '@/lib/actions/inventory'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 const STATUS_CONFIG = {
@@ -26,6 +26,9 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
   const [adjustModal, setAdjustModal] = useState<any | null>(null)
   const [adjustQty, setAdjustQty] = useState('')
   const [isAdjusting, setIsAdjusting] = useState(false)
+
+  // Selection state for bulk operations
+  const [selectedBalances, setSelectedBalances] = useState<string[]>([])
 
   // QR State
   const [qrModal, setQrModal] = useState<any | null>(null)
@@ -64,6 +67,7 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
   useEffect(() => { 
     setBalances(initialBalances)
     setLocations(initialLocations)
+    setSelectedBalances([])
   }, [initialBalances, initialLocations])
 
   const filteredBalances = balances.filter(b => {
@@ -96,11 +100,15 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
     }
   }
 
-  const exportToCSV = () => {
+  const exportToCSV = (onlySelected = false) => {
+    const itemsToExport = onlySelected 
+      ? filteredBalances.filter(b => selectedBalances.includes(b.id))
+      : filteredBalances;
+
     const headers = ['Item', 'SKU', 'Location', 'Quantity On Hand', 'Reserved', 'Status', 'Last Updated']
     const csvContent = [
       headers.join(','),
-      ...filteredBalances.map(b => [
+      ...itemsToExport.map(b => [
         `"${b.catalogItem?.title || ''}"`,
         `"${b.catalogItem?.sku || ''}"`,
         `"${locations.find(l => l.id === b.locationId)?.name || 'Unknown'}"`,
@@ -410,10 +418,115 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
               <Plus className="w-4 h-4" /> Add Stock
             </button>
           </div>
+          {selectedBalances.length > 0 && (
+            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 flex flex-col lg:flex-row items-center justify-between gap-4 mb-4 animate-slide-up">
+              <span className="text-sm font-semibold text-indigo-800">{selectedBalances.length} items selected</span>
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Bulk Adjust Qty */}
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-1">
+                  <input 
+                    type="number" 
+                    placeholder="Qty (+5/-10)" 
+                    id="bulk-qty-adjust"
+                    className="w-24 text-xs px-2 py-1.5 focus:outline-none bg-transparent" 
+                  />
+                  <button 
+                    onClick={async () => {
+                      const el = document.getElementById('bulk-qty-adjust') as HTMLInputElement
+                      const adj = parseInt(el?.value || '')
+                      if (isNaN(adj)) { toast.error('Invalid quantity'); return }
+                      const res = await bulkAdjustInventory(tenantId, selectedBalances, adj)
+                      if (res.success) {
+                        toast.success('Inventory adjusted successfully')
+                        setSelectedBalances([])
+                        if (el) el.value = ''
+                      } else {
+                        toast.error(res.error || 'Failed to adjust')
+                      }
+                    }}
+                    className="btn btn-primary btn-sm text-xs py-1 px-2.5 focus:ring-2 focus:ring-indigo-500"
+                  >
+                    Adjust
+                  </button>
+                </div>
+
+                {/* Bulk Threshold */}
+                <div className="flex items-center gap-2 bg-white border border-slate-200 rounded-lg p-1">
+                  <input 
+                    type="number" 
+                    placeholder="Limit (e.g. 5)" 
+                    id="bulk-threshold-adjust"
+                    className="w-24 text-xs px-2 py-1.5 focus:outline-none bg-transparent" 
+                  />
+                  <button 
+                    onClick={async () => {
+                      const el = document.getElementById('bulk-threshold-adjust') as HTMLInputElement
+                      const thresh = parseInt(el?.value || '')
+                      if (isNaN(thresh) || thresh < 0) { toast.error('Invalid threshold'); return }
+                      const res = await bulkAdjustInventory(tenantId, selectedBalances, 0, thresh)
+                      if (res.success) {
+                        toast.success('Threshold updated successfully')
+                        setSelectedBalances([])
+                        if (el) el.value = ''
+                      } else {
+                        toast.error(res.error || 'Failed to update threshold')
+                      }
+                    }}
+                    className="btn btn-primary btn-sm text-xs py-1 px-2.5 focus:ring-2 focus:ring-indigo-500"
+                  >
+                    Set Limit
+                  </button>
+                </div>
+
+                {/* Export Selected */}
+                <button 
+                  onClick={() => {
+                    exportToCSV(true)
+                    setSelectedBalances([])
+                  }}
+                  className="btn btn-secondary btn-sm text-xs py-1.5 px-3 focus:ring-2 focus:ring-indigo-500"
+                >
+                  Export Selected
+                </button>
+
+                {/* Bulk Delete */}
+                <button 
+                  onClick={async () => {
+                    if (confirm(`Are you sure you want to delete these ${selectedBalances.length} inventory balances?`)) {
+                      const res = await bulkDeleteInventoryBalances(tenantId, selectedBalances)
+                      if (res.success) {
+                        toast.success('Selected balances deleted successfully')
+                        setSelectedBalances([])
+                      } else {
+                        toast.error(res.error || 'Failed to delete balances')
+                      }
+                    }
+                  }}
+                  className="btn btn-secondary btn-sm text-xs py-1.5 px-3 hover:bg-red-50 hover:border-red-200 text-red-600 focus:ring-2 focus:ring-indigo-500"
+                >
+                  Delete Selected
+                </button>
+              </div>
+            </div>
+          )}
           <div className="card overflow-hidden">
             <table className="data-table">
               <thead>
                 <tr>
+                  <th className="w-10">
+                    <input 
+                      type="checkbox" 
+                      checked={filteredBalances.length > 0 && selectedBalances.length === filteredBalances.length}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedBalances(filteredBalances.map(b => b.id))
+                        } else {
+                          setSelectedBalances([])
+                        }
+                      }}
+                      className="form-checkbox h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 focus:outline-none"
+                    />
+                  </th>
                   <th>Item</th>
                   <th>On Hand</th>
                   <th>Reserved</th>
@@ -429,6 +542,20 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
                   const available = bal.quantityOnHand - bal.quantityReserved
                   return (
                     <tr key={bal.id}>
+                      <td>
+                        <input 
+                          type="checkbox" 
+                          checked={selectedBalances.includes(bal.id)}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setSelectedBalances(prev => [...prev, bal.id])
+                            } else {
+                              setSelectedBalances(prev => prev.filter(id => id !== bal.id))
+                            }
+                          }}
+                          className="form-checkbox h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 focus:outline-none"
+                        />
+                      </td>
                       <td className="font-medium text-slate-900">{bal.catalogItem?.title || 'Unknown Item'}</td>
                       <td className="font-bold text-slate-900">{bal.quantityOnHand}</td>
                       <td className="text-amber-600">{bal.quantityReserved}</td>
@@ -477,7 +604,7 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
                 })}
                 {filteredBalances.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="text-center py-8 text-slate-500">No inventory records found.</td>
+                    <td colSpan={8} className="text-center py-8 text-slate-500">No inventory records found.</td>
                   </tr>
                 )}
               </tbody>
