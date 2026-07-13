@@ -258,6 +258,19 @@ export async function createDokuCheckout(
 ) {
   try {
     const auth = await getDokuAuth(tenantId);
+    const tenant = await prisma.systemTenant.findUnique({
+      where: { id: tenantId }
+    });
+    if (!tenant) throw new Error("Tenant not found");
+
+    let host = '';
+    if (tenant.customDomain) {
+      host = `https://${tenant.customDomain}`;
+    } else {
+      const subdomain = tenant.subdomain;
+      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com';
+      host = `https://${subdomain}.${baseDomain}`;
+    }
     
     // Jokul Checkout API URL
     const baseUrl = auth.environment === 'production'
@@ -303,8 +316,8 @@ export async function createDokuCheckout(
         amount: Math.round(amount),
         invoice_number: uniqueInvoiceNumber,
         currency: 'IDR',
-        callback_url: 'https://store.dagangos.com/api/webhook/doku/result',
-        callback_url_result: 'https://store.dagangos.com/api/webhook/doku/result'
+        callback_url: `${host}/api/webhook/doku/result`,
+        callback_url_result: `${host}/api/webhook/doku/result`
       },
       payment: {
         payment_due_date: 60,
@@ -514,13 +527,15 @@ export async function handleDokuNotification(req: Request) {
 
     // Determine internal payment status
     const dokuStatus = body.transaction?.status || body.status;
-    let paymentStatus: 'succeeded' | 'failed' | 'cancelled' | 'pending' = 'pending';
+    let paymentStatus: 'succeeded' | 'failed' | 'cancelled' | 'pending' | 'refunded' | 'expired' = 'pending';
     if (dokuStatus === 'SUCCESS') {
       paymentStatus = 'succeeded';
     } else if (dokuStatus === 'FAILED') {
       paymentStatus = 'failed';
     } else if (dokuStatus === 'CANCEL') {
       paymentStatus = 'cancelled';
+    } else if (dokuStatus === 'REFUND' || dokuStatus === 'DISPUTE' || dokuStatus === 'CHARGEBACK') {
+      paymentStatus = 'refunded';
     }
 
     const externalTransactionId = body.transaction?.token || body.transaction?.reference_id || invoiceNumber;
@@ -589,7 +604,7 @@ export async function handleDokuNotification(req: Request) {
             receiptUrl: `/orders/${orderId}/receipt`
           }
         });
-      } else if (paymentStatus === 'failed' || paymentStatus === 'cancelled') {
+      } else if (paymentStatus === 'failed' || paymentStatus === 'cancelled' || paymentStatus === 'refunded') {
         await tx.tenantOrder.update({
           where: { id: orderId },
           data: { orderStatus: 'cancelled' }

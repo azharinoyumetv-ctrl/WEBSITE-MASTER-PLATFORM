@@ -54,7 +54,7 @@ export function decrypt(text: string): string {
 export function generateCheckoutNonce(tenantId: string): string {
   const expires = Date.now() + 1000 * 60 * 60; // 1 hour
   const payload = `${tenantId}:${expires}`;
-  const hmac = crypto.createHmac('sha256', process.env.ENCRYPTION_KEY || 'fallback-key').update(payload).digest('hex');
+  const hmac = crypto.createHmac('sha256', getEncryptionKey()).update(payload).digest('hex');
   return Buffer.from(`${payload}:${hmac}`).toString('base64');
 }
 
@@ -67,7 +67,7 @@ export function validateCheckoutNonce(nonce: string, tenantId: string): boolean 
     if (Date.now() > parseInt(expiresStr)) return false;
     
     const payload = `${tenantId}:${expiresStr}`;
-    const expectedHmac = crypto.createHmac('sha256', process.env.ENCRYPTION_KEY || 'fallback-key').update(payload).digest('hex');
+    const expectedHmac = crypto.createHmac('sha256', getEncryptionKey()).update(payload).digest('hex');
     return crypto.timingSafeEqual(Buffer.from(hmac, 'utf8'), Buffer.from(expectedHmac, 'utf8'));
   } catch (e) {
     return false;

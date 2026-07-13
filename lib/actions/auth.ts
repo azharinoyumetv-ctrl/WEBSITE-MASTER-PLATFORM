@@ -182,10 +182,16 @@ export async function logoutEverywhere() {
   const user = await getAuthenticatedUser().catch(() => null)
   if (!user?.id) return { success: false, error: 'Unauthorized' }
   
-  await prisma.tenantRefreshToken.updateMany({
-    where: { userId: user.id },
-    data: { isRevoked: true }
-  })
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: user.id },
+      data: { tokenVersion: { increment: 1 } }
+    }),
+    prisma.tenantRefreshToken.updateMany({
+      where: { userId: user.id },
+      data: { isRevoked: true }
+    })
+  ])
   
   return { success: true }
 }

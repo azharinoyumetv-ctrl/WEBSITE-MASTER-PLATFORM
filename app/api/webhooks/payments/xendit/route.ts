@@ -62,6 +62,8 @@ export async function POST(req: Request) {
         status = 'expired';
       } else if (body.status === 'FAILED') {
         status = 'failed';
+      } else if (body.status === 'REFUNDED' || body.status === 'DISPUTED') {
+        status = 'refunded';
       }
 
       await prisma.tenantPayment.update({
@@ -74,7 +76,7 @@ export async function POST(req: Request) {
       });
     }
 
-    // Update order status if paid
+    // Update order status if paid, else cancel if failed/refunded/disputed
     if (body.status === 'PAID' || body.status === 'COMPLETED' || body.status === 'SETTLED') {
       await prisma.tenantOrder.update({
         where: { id: order.id },
@@ -87,6 +89,28 @@ export async function POST(req: Request) {
       const customerEmail = order.guestEmail || body.payer_email || 'customer@example.com';
       sendOrderConfirmationEmail(order.tenantId, order.id, customerEmail)
         .catch(err => console.error("Failed to send async order confirmation email", err));
+    } else if (body.status === 'FAILED' || body.status === 'EXPIRED' || body.status === 'REFUNDED' || body.status === 'DISPUTED') {
+      await prisma.tenantOrder.update({
+        where: { id: order.id },
+        data: { orderStatus: 'cancelled' }
+      });
+
+      if (payment) {
+        await prisma.tenantPaymentLedger.create({
+          data: {
+            tenantId: order.tenantId,
+            paymentId: payment.id,
+            orderId: order.id,
+            type: 'reversal',
+            amount: payment.amount,
+            currency: payment.currency,
+            gateway: 'xendit',
+            gatewayTxId: body.id || 'unknown',
+            status: 'failed',
+            metadata: body
+          }
+        });
+      }
     }
 
     return NextResponse.json({ success: true });

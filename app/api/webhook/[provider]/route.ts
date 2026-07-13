@@ -158,7 +158,13 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
 
       // Midtrans notification webhook format
       orderId = body.order_id
-      status = (body.transaction_status === 'capture' || body.transaction_status === 'settlement') ? 'succeeded' : 'failed'
+      if (body.transaction_status === 'capture' || body.transaction_status === 'settlement') {
+        status = 'succeeded'
+      } else if (body.transaction_status === 'refund' || body.transaction_status === 'chargeback') {
+        status = 'refunded'
+      } else {
+        status = 'failed'
+      }
     } else {
       return NextResponse.json({ error: 'Unknown provider' }, { status: 400 })
     }
@@ -202,6 +208,35 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
             }).catch(e => console.error("Failed to send WhatsApp notification on webhook", e))
           }
         }
+      }
+    } else if (orderId && (status === 'failed' || status === 'refunded')) {
+      await prisma.tenantPayment.updateMany({
+        where: { orderId },
+        data: { paymentStatus: status }
+      })
+      await prisma.tenantOrder.updateMany({
+        where: { id: orderId },
+        data: { orderStatus: 'cancelled' }
+      })
+
+      const order = await prisma.tenantOrder.findFirst({
+        where: { id: orderId }
+      })
+      if (order?.tenantId) {
+        await prisma.tenantPaymentLedger.create({
+          data: {
+            tenantId: order.tenantId,
+            paymentId: orderId,
+            orderId: order.id,
+            type: 'reversal',
+            amount: order.totalAmount,
+            currency: order.currency || 'USD',
+            gateway: provider,
+            gatewayTxId: body.id || body.transaction_id || 'unknown',
+            status: 'failed',
+            metadata: body
+          }
+        })
       }
     }
 

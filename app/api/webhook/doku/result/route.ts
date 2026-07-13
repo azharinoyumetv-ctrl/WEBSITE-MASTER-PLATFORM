@@ -13,7 +13,12 @@ export async function GET(req: Request) {
     return NextResponse.redirect(`${protocol}://${host}/checkout?status=success&invoice=${invoiceNumber || ''}`);
   } catch (error) {
     console.error('Doku GET redirect handler error:', error);
-    return NextResponse.redirect('https://store.dagangos.com/checkout?status=error');
+    try {
+      const url = new URL(req.url);
+      return NextResponse.redirect(`${url.protocol}//${url.host}/checkout?status=error`);
+    } catch {
+      return NextResponse.redirect('https://store.dagangos.com/checkout?status=error');
+    }
   }
 }
 

@@ -4,11 +4,14 @@ import { getAuthenticatedUser } from '@/lib/rbac'
 
 export async function POST(req: Request) {
   try {
-    await getAuthenticatedUser()
+    const user = await getAuthenticatedUser()
 
     const { tenantId, moduleKey, isEnabled } = await req.json()
 
-    // toggleTenantModule internally enforces the platform_owner role check.
+    if (user.tenantId !== tenantId) {
+      return NextResponse.json({ error: "Unauthorized tenant access" }, { status: 403 })
+    }
+
     const res = await toggleTenantModule(tenantId, moduleKey, isEnabled)
     if (!res.success) throw new Error(res.error)
 

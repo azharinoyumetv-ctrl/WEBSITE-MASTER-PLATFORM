@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Monitor, ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, QrCode, Search, Wifi, Clock, FileText, ArrowDownCircle, ArrowUpCircle, Download, LayoutList, X } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -32,10 +32,89 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
   const [isScanningCamera, setIsScanningCamera] = useState(false)
   const [manualScanInput, setManualScanInput] = useState('')
 
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const streamRef = useRef<MediaStream | null>(null)
+
   useEffect(() => {
     const t = setInterval(() => setTime(new Date()), 1000)
     return () => clearInterval(t)
   }, [])
+
+  // Camera stream access hook
+  useEffect(() => {
+    if (isScanningCamera) {
+      navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+        .then(stream => {
+          streamRef.current = stream
+          if (videoRef.current) {
+            videoRef.current.srcObject = stream
+            videoRef.current.play().catch(err => console.error("Video play failed:", err))
+          }
+        })
+        .catch(err => {
+          console.error("Camera access failed:", err)
+          toast.error("Could not access camera.")
+        })
+    } else {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+        streamRef.current = null
+      }
+    }
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop())
+      }
+    }
+  }, [isScanningCamera])
+
+  // Barcode detection hook
+  useEffect(() => {
+    let active = true
+    let detector: any = null
+
+    if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+      try {
+        detector = new (window as any).BarcodeDetector({ formats: ['code_128', 'ean_13', 'qr_code', 'upc_a'] })
+      } catch (e) {
+        console.warn("BarcodeDetector formats unsupported:", e)
+      }
+    }
+
+    const scanFrame = async () => {
+      if (!active || !isScanningCamera || !videoRef.current || !detector) return
+      
+      try {
+        const barcodes = await detector.detect(videoRef.current)
+        if (barcodes.length > 0) {
+          const barcodeValue = barcodes[0].rawValue
+          const matched = initialCatalogItems.find(item => item.sku === barcodeValue)
+          if (matched) {
+            addToCart(matched)
+            toast.success(`Scanned: ${matched.title}`)
+            setIsScanningCamera(false)
+            return
+          }
+        }
+      } catch (err) {
+        // Ignore detection errors during frame drops
+      }
+
+      if (active) {
+        requestAnimationFrame(scanFrame)
+      }
+    }
+
+    if (isScanningCamera && detector) {
+      setTimeout(() => {
+        requestAnimationFrame(scanFrame)
+      }, 1000)
+    }
+
+    return () => {
+      active = false
+    }
+  }, [isScanningCamera, initialCatalogItems])
 
   // Global hardware barcode scanner input interceptor
   useEffect(() => {
@@ -595,13 +674,14 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
             <div className="p-6 space-y-4 flex flex-col items-center">
               {/* Webcam Viewport */}
               <div className="w-full h-48 bg-black rounded-xl border border-gray-800 flex flex-col items-center justify-center relative overflow-hidden">
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-cover"
+                  playsInline
+                  muted
+                />
                 <div className="absolute inset-0 border-2 border-emerald-500/30 m-8 rounded-lg animate-pulse pointer-events-none" />
                 <div className="absolute h-0.5 w-3/4 bg-emerald-500 top-1/2 left-1/2 -translate-y-1/2 -translate-x-1/2 animate-[bounce_2s_infinite] pointer-events-none shadow-[0_0_8px_#10B981]" />
-                <div className="text-gray-500 text-xs text-center z-10 p-4">
-                  <Monitor className="w-8 h-8 text-gray-600 mx-auto mb-2 animate-bounce" />
-                  <p>Align barcode inside the box</p>
-                  <p className="text-[10px] text-gray-600 mt-1">(Camera stream simulated or BarcodeDetector active)</p>
-                </div>
               </div>
               
               <div className="w-full text-center">
