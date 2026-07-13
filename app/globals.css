@@ -156,6 +156,23 @@
     @apply badge bg-slate-100 text-slate-600 border border-slate-200;
   }
 
+  /* Specific color-name badge tokens */
+  .badge-blue {
+    @apply badge bg-blue-50 text-blue-700 border border-blue-200;
+  }
+
+  .badge-emerald {
+    @apply badge bg-emerald-50 text-emerald-700 border border-emerald-200;
+  }
+
+  .badge-amber {
+    @apply badge bg-amber-50 text-amber-700 border border-amber-200;
+  }
+
+  .badge-red {
+    @apply badge bg-red-50 text-red-700 border border-red-200;
+  }
+
   /* Sidebar nav item */
   .nav-item {
     @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 cursor-pointer;

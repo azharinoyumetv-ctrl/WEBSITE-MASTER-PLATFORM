@@ -315,11 +315,11 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
                   <td className="font-medium text-slate-800 text-sm">{log.recipient}</td>
                   <td className="text-xs text-slate-500 font-mono">{log.channelType}</td>
                   <td>
-                    <span className={cn('badge text-[10px] uppercase', log.channelType === 'email' ? 'badge-info' : 'badge-success')}>{log.channelType}</span>
+                    <span className={cn('badge text-[10px] uppercase', log.channelType === 'email' ? 'badge-blue' : 'badge-emerald')}>{log.channelType}</span>
                   </td>
                   <td>
                     <div className="flex items-center gap-1">
-                      <span className={cn('badge text-[10px]', log.status === 'delivered' ? 'badge-success' : (log.status === 'pending' ? 'badge-warning' : 'badge-error'))}>{log.status.toUpperCase()}</span>
+                      <span className={cn('badge text-[10px]', log.status === 'delivered' ? 'badge-emerald' : (log.status === 'pending' ? 'badge-amber' : 'badge-red'))}>{log.status.toUpperCase()}</span>
                       {log.retryCount > 0 && <span className="text-[10px] text-slate-400">({log.retryCount} retries)</span>}
                     </div>
                     {log.deliveryError && <p className="text-[10px] text-red-500 mt-1 max-w-xs truncate" title={log.deliveryError}>{log.deliveryError}</p>}

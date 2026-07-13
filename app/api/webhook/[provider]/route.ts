@@ -198,6 +198,15 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
       }
     }
 
+    if (orderId) {
+      const payment = await prisma.tenantPayment.findFirst({
+        where: { orderId }
+      })
+      if (payment && payment.paymentStatus === status) {
+        return NextResponse.json({ success: true, message: 'Status already up-to-date' })
+      }
+    }
+
     if (idempotencyKey && tenantId) {
       await prisma.paymentIdempotencyKey.create({
         data: {
@@ -246,7 +255,7 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
           const website = await prisma.tenantWebsite.findUnique({
             where: { tenantId: order.tenantId }
           })
-          const themeConfig = website?.themeConfig as any
+          const themeConfig = website?.themeConfig as { whatsappPaNumber?: string, whatsappPhoneId?: string, whatsappToken?: string, whatsappTemplate?: string } | null
           if (themeConfig) {
             const { whatsappPaNumber, whatsappPhoneId, whatsappToken, whatsappTemplate } = themeConfig
             if (whatsappPaNumber && whatsappPhoneId && whatsappToken && whatsappTemplate) {
@@ -329,8 +338,9 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
 
     return NextResponse.json({ success: true })
     
-  } catch (error: any) {
+  } catch (error) {
+    const errorMsg = error instanceof Error ? error.message : String(error)
     console.error('Generic webhook error:', error)
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json({ error: errorMsg }, { status: 500 })
   }
 }

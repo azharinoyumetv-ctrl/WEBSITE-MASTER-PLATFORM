@@ -7,8 +7,8 @@ import {
   LayoutDashboard, Globe, Users, Shield, Package, ShoppingCart,
   CreditCard, Monitor, Warehouse, Users2, CalendarCheck, Sparkles,
   Bell, BarChart3, Code2, Settings, ChevronLeft, ChevronRight,
-  LogOut, Building2, Menu, X, AlertCircle, ToggleLeft,
-  Activity, FileText, Zap, Sun, Moon,
+  LogOut, Building2, Menu, X, ToggleLeft,
+  Activity, Zap, Sun, Moon,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getUnreadAlertCount, getMonitoringStatus } from '@/lib/actions/monitoring'
@@ -132,7 +132,7 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
               const tKey = item.label.toLowerCase().replace(/ /g, '_').replace('-', '') as any
               // Fallback to item.label if translation is missing (though we've added them all)
               let translatedLabel = item.label
-              try { translatedLabel = t(tKey) } catch(e) {}
+              try { translatedLabel = t(tKey) } catch {}
               
               return (
                 <Link

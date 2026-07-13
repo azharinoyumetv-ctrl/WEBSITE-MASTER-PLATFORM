@@ -42,23 +42,9 @@ export function decrypt(text: string): string {
     decrypted = Buffer.concat([decrypted, decipher.final()])
     return decrypted.toString()
   } catch (primaryErr) {
-    const fallbackKeyStr = process.env.FALLBACK_ENCRYPTION_KEY || process.env.FALLBACK_KEY
-    if (!fallbackKeyStr) {
-      console.error('Decryption failed with primary key, and no fallback key env variable is configured')
-      return ''
-    }
-    try {
-      const fallbackKey = Buffer.from(fallbackKeyStr, 'utf-8')
-      const key = crypto.scryptSync(fallbackKey, salt, 32)
-      const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
-      let decrypted = decipher.update(encryptedText)
-      decrypted = Buffer.concat([decrypted, decipher.final()])
-      console.warn('Decryption succeeded using secure fallback key from env. Ensure this record is re-saved to migrate to the new encryption key.')
-      return decrypted.toString()
-    } catch (fallbackErr: any) {
-      console.error('Decryption failed with both primary and fallback key:', fallbackErr?.message || fallbackErr)
-      return ''
-    }
+    const errorMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr)
+    console.error('Decryption failed with primary key:', errorMsg)
+    return ''
   }
 }
 
@@ -81,20 +67,13 @@ export function validateCheckoutNonce(nonce: string, tenantId: string): boolean 
     
     try {
       const expectedHmac = crypto.createHmac('sha256', getEncryptionKey()).update(payload).digest('hex');
-      if (crypto.timingSafeEqual(Buffer.from(hmac, 'utf8'), Buffer.from(expectedHmac, 'utf8'))) {
-        return true;
-      }
+      return crypto.timingSafeEqual(Buffer.from(hmac, 'utf8'), Buffer.from(expectedHmac, 'utf8'));
     } catch (e) {
-      // Primary key failed or was missing
+      const errorMsg = e instanceof Error ? e.message : String(e)
+      console.error('Checkout nonce validation failed with primary key:', errorMsg);
+      return false;
     }
-
-    const fallbackKeyStr = process.env.FALLBACK_ENCRYPTION_KEY || process.env.FALLBACK_KEY;
-    if (fallbackKeyStr) {
-      const fallbackHmac = crypto.createHmac('sha256', Buffer.from(fallbackKeyStr, 'utf-8')).update(payload).digest('hex');
-      return crypto.timingSafeEqual(Buffer.from(hmac, 'utf8'), Buffer.from(fallbackHmac, 'utf8'));
-    }
-    return false;
-  } catch (e) {
+  } catch {
     return false;
   }
 }
