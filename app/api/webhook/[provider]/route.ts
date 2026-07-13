@@ -3,6 +3,7 @@ import prisma from '@/lib/prisma'
 import crypto from 'crypto'
 import { decrypt } from '@/lib/crypto'
 import { sendWhatsAppTemplate } from '@/lib/whatsapp'
+import { sendOrderConfirmationEmail } from '@/lib/actions/notifications'
 
 const RATE_LIMIT_WINDOW = 60000 // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 50 // 50 requests per minute per IP
@@ -169,16 +170,23 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
         data: { paymentStatus: status }
       })
       await prisma.tenantOrder.updateMany({
-        where: { id: orderId }, // assuming payment id or order id match up
-        data: { orderStatus: 'processing' } // Update order status upon successful payment
+        where: { id: orderId },
+        data: { 
+          orderStatus: 'processing',
+          receiptUrl: `/orders/${orderId}/receipt`
+        }
       })
       
-      // Send WhatsApp Notification to the Merchant/PA about successful order
       const order = await prisma.tenantOrder.findFirst({
         where: { id: orderId }
       })
-      
+
       if (order?.tenantId) {
+        // Send confirmation email asynchronously
+        const customerEmail = order.guestEmail || body.payer_email || 'customer@example.com';
+        sendOrderConfirmationEmail(order.tenantId, order.id, customerEmail)
+          .catch(err => console.error("Failed to send async generic order confirmation email", err));
+
         const website = await prisma.tenantWebsite.findUnique({
           where: { tenantId: order.tenantId }
         })

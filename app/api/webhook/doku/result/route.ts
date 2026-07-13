@@ -3,7 +3,8 @@ import { NextResponse } from 'next/server';
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
-    const invoiceNumber = searchParams.get('invoice_number') || searchParams.get('order_id');
+    const rawInvoice = searchParams.get('invoice_number') || searchParams.get('order_id') || '';
+    const invoiceNumber = rawInvoice.includes('_') ? rawInvoice.split('_')[0] : rawInvoice;
     
     // Redirect back to home or checkout page
     const host = req.headers.get('host') || 'store.dagangos.com';

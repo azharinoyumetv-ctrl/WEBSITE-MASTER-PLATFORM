@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
 import { decrypt } from '@/lib/crypto'
 import crypto from 'crypto'
+import { sendOrderConfirmationEmail } from './notifications'
 
 async function getXenditAuth(tenantId: string) {
   const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })
@@ -295,10 +296,12 @@ export async function createDokuCheckout(
       ];
     }
 
+    const uniqueInvoiceNumber = `${orderId}_${Date.now()}`;
+
     const body = {
       order: {
         amount: Math.round(amount),
-        invoice_number: orderId,
+        invoice_number: uniqueInvoiceNumber,
         currency: 'IDR',
         callback_url: 'https://store.dagangos.com/api/webhook/doku/result',
         callback_url_result: 'https://store.dagangos.com/api/webhook/doku/result'
@@ -349,7 +352,7 @@ export async function createDokuCheckout(
     }
 
     const paymentUrl = data.payment?.url || data.response?.payment?.payment_url || data.payment_url;
-    const invoiceId = data.payment?.token || data.response?.uuid || data.uuid || orderId;
+    const invoiceId = data.payment?.token || data.response?.uuid || data.uuid || uniqueInvoiceNumber;
 
     if (!paymentUrl) {
       throw new Error('DOKU API response did not contain a payment URL');
@@ -449,10 +452,11 @@ export async function handleDokuNotification(req: Request) {
     const bodyText = await req.text();
     const body = JSON.parse(bodyText);
 
-    const invoiceNumber = body.order?.invoice_number || body.invoice_number;
-    if (!invoiceNumber) {
+    const rawInvoiceNumber = body.order?.invoice_number || body.invoice_number;
+    if (!rawInvoiceNumber) {
       return { status: 400, body: { error: 'Missing invoice number' } };
     }
+    const invoiceNumber = rawInvoiceNumber.includes('_') ? rawInvoiceNumber.split('_')[0] : rawInvoiceNumber;
 
     // Look up the order to identify the tenant
     const order = await prisma.tenantOrder.findFirst({
@@ -580,7 +584,10 @@ export async function handleDokuNotification(req: Request) {
       if (paymentStatus === 'succeeded') {
         await tx.tenantOrder.update({
           where: { id: orderId },
-          data: { orderStatus: 'paid' }
+          data: { 
+            orderStatus: 'paid',
+            receiptUrl: `/orders/${orderId}/receipt`
+          }
         });
       } else if (paymentStatus === 'failed' || paymentStatus === 'cancelled') {
         await tx.tenantOrder.update({
@@ -591,6 +598,13 @@ export async function handleDokuNotification(req: Request) {
 
       return payment;
     });
+
+    // Send confirmation email asynchronously after transaction success
+    if (paymentStatus === 'succeeded') {
+      const emailRecipient = order?.guestEmail || body.customer?.email || 'customer@example.com';
+      sendOrderConfirmationEmail(tenantId, orderId, emailRecipient)
+        .catch(err => console.error("Failed to send async Doku order confirmation email", err));
+    }
 
     return { status: 200, body: { success: true, paymentId: updated.id } };
   } catch (error: any) {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { decrypt } from '@/lib/crypto';
+import { sendOrderConfirmationEmail } from '@/lib/actions/notifications';
 
 export async function POST(req: Request) {
   try {
@@ -77,8 +78,15 @@ export async function POST(req: Request) {
     if (body.status === 'PAID' || body.status === 'COMPLETED' || body.status === 'SETTLED') {
       await prisma.tenantOrder.update({
         where: { id: order.id },
-        data: { orderStatus: 'paid' }
+        data: { 
+          orderStatus: 'paid',
+          receiptUrl: `/orders/${order.id}/receipt`
+        }
       });
+
+      const customerEmail = order.guestEmail || body.payer_email || 'customer@example.com';
+      sendOrderConfirmationEmail(order.tenantId, order.id, customerEmail)
+        .catch(err => console.error("Failed to send async order confirmation email", err));
     }
 
     return NextResponse.json({ success: true });

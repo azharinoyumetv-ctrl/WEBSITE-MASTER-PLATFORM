@@ -355,3 +355,121 @@ export async function retryNotificationLog(tenantId: string, logId: string) {
     return { success: false, error: error.message }
   }
 }
+
+export async function sendOrderConfirmationEmail(tenantId: string, orderId: string, recipientEmail: string) {
+  try {
+    const order = await prisma.tenantOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        items: {
+          include: {
+            catalogItem: true
+          }
+        }
+      }
+    })
+    
+    if (!order) throw new Error("Order not found")
+
+    // Find active email gateway
+    const gateway = await prisma.tenantNotificationGateway.findFirst({
+      where: { tenantId, channelType: 'email', isActive: true }
+    })
+    if (!gateway) {
+      console.warn("No active email gateway found. Skipping order confirmation email.")
+      return { success: false, error: "No active email gateway found" }
+    }
+
+    const config = gateway.encryptedCredentials as any
+    const password = config.password ? decrypt(config.password) : ''
+    const transporter = nodemailer.createTransport({
+      host: config.host,
+      port: parseInt(config.port, 10),
+      secure: config.encryption === 'SSL' || config.port === '465',
+      auth: {
+        user: config.username,
+        pass: password,
+      }
+    })
+
+    const itemsHtml = order.items.map(item => `
+      <tr>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd;">${item.catalogItem?.title || 'Product'}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: center;">${item.quantity}</td>
+        <td style="padding: 8px; border-bottom: 1px solid #ddd; text-align: right;">Rp ${Number(item.unitPrice).toLocaleString('id-ID')}</td>
+      </tr>
+    `).join('')
+
+    const emailHtml = `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #eee; border-radius: 5px;">
+        <h2 style="color: #4F46E5; text-align: center;">Order Confirmed!</h2>
+        <p>Dear Customer,</p>
+        <p>Thank you for your order. We have successfully received your payment.</p>
+        
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+          <thead>
+            <tr style="background-color: #f8f9fa;">
+              <th style="padding: 8px; text-align: left; border-bottom: 2px solid #ddd;">Item</th>
+              <th style="padding: 8px; text-align: center; border-bottom: 2px solid #ddd;">Qty</th>
+              <th style="padding: 8px; text-align: right; border-bottom: 2px solid #ddd;">Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemsHtml}
+          </tbody>
+          <tfoot>
+            <tr>
+              <td colspan="2" style="padding: 8px; text-align: right; font-weight: bold;">Total:</td>
+              <td style="padding: 8px; text-align: right; font-weight: bold; color: #4F46E5;">Rp ${Number(order.totalAmount).toLocaleString('id-ID')}</td>
+            </tr>
+          </tfoot>
+        </table>
+        
+        <div style="margin-top: 30px; text-align: center;">
+          <a href="https://store.dagangos.com/orders/${orderId}/receipt" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Receipt</a>
+        </div>
+      </div>
+    `
+
+    // Log the notification
+    const log = await prisma.tenantNotificationLog.create({
+      data: {
+        tenantId,
+        gatewayId: gateway.id,
+        recipient: recipientEmail,
+        channelType: 'email',
+        status: 'pending'
+      }
+    })
+
+    try {
+      await transporter.sendMail({
+        from: config.username,
+        to: recipientEmail,
+        subject: `Order Confirmation - #${orderId}`,
+        html: emailHtml
+      })
+
+      await prisma.tenantNotificationLog.update({
+        where: { id: log.id },
+        data: {
+          status: 'delivered',
+          sentAt: new Date()
+        }
+      })
+      return { success: true }
+    } catch (err: any) {
+      await prisma.tenantNotificationLog.update({
+        where: { id: log.id },
+        data: {
+          status: 'failed',
+          deliveryError: err.message
+        }
+      })
+      throw err
+    }
+  } catch (error: any) {
+    console.error("sendOrderConfirmationEmail error:", error)
+    return { success: false, error: error.message }
+  }
+}

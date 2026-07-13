@@ -451,3 +451,75 @@ export async function generateReceipt(tenantId: string, orderId: string) {
     return { success: false, error: error.message }
   }
 }
+
+export async function getPublicReceiptHtml(orderId: string) {
+  try {
+    const order = await prisma.tenantOrder.findUnique({
+      where: { id: orderId },
+      include: { items: { include: { catalogItem: true } } }
+    })
+    if (!order) return { success: false, error: 'Order not found' }
+    
+    const tax = Number(order.totalAmount) * 0.1
+    const subtotal = Number(order.totalAmount) - tax
+    
+    const format = (amt: number) => {
+      if (order.currency === 'EUR') return `€${amt.toFixed(2)}`
+      if (order.currency === 'GBP') return `£${amt.toFixed(2)}`
+      if (order.currency === 'IDR') return `Rp ${amt.toLocaleString('id-ID')}`
+      return `${order.currency === 'JPY' ? '¥' : '$'}${amt.toFixed(2)}`
+    }
+
+    const receiptHtml = `
+      <div style="font-family: 'Courier New', monospace; padding: 24px; max-width: 350px; margin: auto; background: #fff; color: #000; border: 1px solid #ddd; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
+        <div style="text-align: center; margin-bottom: 16px;">
+          <h2 style="margin: 0; font-size: 20px; font-weight: bold; letter-spacing: 1px;">STORE RECEIPT</h2>
+          <p style="margin: 4px 0 0; font-size: 11px; color: #666;">Tenant ID: ${order.tenantId.slice(0, 8).toUpperCase()}</p>
+        </div>
+        
+        <div style="font-size: 12px; border-bottom: 1px dashed #000; pb-10; margin-bottom: 12px; padding-bottom: 8px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Order ID:</span>
+            <span style="font-weight: bold;">${order.id.slice(0, 8).toUpperCase()}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span>Date:</span>
+            <span>${order.createdAt.toLocaleString()}</span>
+          </div>
+        </div>
+
+        <div style="font-size: 12px; border-bottom: 1px dashed #000; margin-bottom: 12px; padding-bottom: 8px;">
+          ${order.items.map(item => `
+            <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+              <span>${item.catalogItem?.title || 'Product'} (x${item.quantity})</span>
+              <span>${format(Number(item.unitPrice) * item.quantity)}</span>
+            </div>
+          `).join('')}
+        </div>
+
+        <div style="font-size: 12px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Subtotal:</span>
+            <span>${format(subtotal)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span>Tax (10%):</span>
+            <span>${format(tax)}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-weight: bold; font-size: 14px; margin-top: 8px; border-top: 1px dashed #000; padding-top: 8px;">
+            <span>TOTAL:</span>
+            <span>${format(Number(order.totalAmount))}</span>
+          </div>
+        </div>
+
+        <div style="text-align: center; font-size: 11px; color: #666; margin-top: 24px; border-top: 1px dashed #000; padding-top: 12px;">
+          <p style="margin: 0; font-weight: bold;">Thank you for your business!</p>
+          <p style="margin: 4px 0 0;">Please retain this receipt for your records.</p>
+        </div>
+      </div>
+    `
+    return { success: true, receiptHtml }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
