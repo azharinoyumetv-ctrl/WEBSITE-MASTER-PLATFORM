@@ -62,8 +62,10 @@ export async function POST(req: Request) {
         status = 'expired';
       } else if (body.status === 'FAILED') {
         status = 'failed';
-      } else if (body.status === 'REFUNDED' || body.status === 'DISPUTED') {
+      } else if (body.status === 'REFUNDED') {
         status = 'refunded';
+      } else if (body.status === 'DISPUTED') {
+        status = 'disputed';
       }
 
       await prisma.tenantPayment.update({
@@ -74,9 +76,26 @@ export async function POST(req: Request) {
           metadata: body
         }
       });
+
+      if (body.status === 'DISPUTED') {
+        const existingDispute = await prisma.tenantPaymentDispute.findFirst({
+          where: { tenantId: order.tenantId, paymentId: payment.id }
+        });
+        if (!existingDispute) {
+          await prisma.tenantPaymentDispute.create({
+            data: {
+              tenantId: order.tenantId,
+              paymentId: payment.id,
+              status: 'under_review',
+              amount: payment.amount,
+              reason: 'Xendit Webhook Disputed Notification'
+            }
+          });
+        }
+      }
     }
 
-    // Update order status if paid, else cancel if failed/refunded/disputed
+    // Update order status if paid, else cancel if failed/refunded
     if (body.status === 'PAID' || body.status === 'COMPLETED' || body.status === 'SETTLED') {
       await prisma.tenantOrder.update({
         where: { id: order.id },
@@ -89,7 +108,7 @@ export async function POST(req: Request) {
       const customerEmail = order.guestEmail || body.payer_email || 'customer@example.com';
       sendOrderConfirmationEmail(order.tenantId, order.id, customerEmail)
         .catch(err => console.error("Failed to send async order confirmation email", err));
-    } else if (body.status === 'FAILED' || body.status === 'EXPIRED' || body.status === 'REFUNDED' || body.status === 'DISPUTED') {
+    } else if (body.status === 'FAILED' || body.status === 'EXPIRED' || body.status === 'REFUNDED') {
       await prisma.tenantOrder.update({
         where: { id: order.id },
         data: { orderStatus: 'cancelled' }

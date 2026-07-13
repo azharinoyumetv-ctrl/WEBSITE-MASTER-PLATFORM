@@ -160,7 +160,9 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
       orderId = body.order_id
       if (body.transaction_status === 'capture' || body.transaction_status === 'settlement') {
         status = 'succeeded'
-      } else if (body.transaction_status === 'refund' || body.transaction_status === 'chargeback') {
+      } else if (body.transaction_status === 'chargeback') {
+        status = 'disputed'
+      } else if (body.transaction_status === 'refund') {
         status = 'refunded'
       } else {
         status = 'failed'
@@ -209,6 +211,31 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
           }
         }
       }
+    } else if (orderId && status === 'disputed') {
+      await prisma.tenantPayment.updateMany({
+        where: { orderId },
+        data: { paymentStatus: 'disputed' }
+      })
+
+      const payment = await prisma.tenantPayment.findFirst({
+        where: { orderId }
+      })
+      if (payment) {
+        const existingDispute = await prisma.tenantPaymentDispute.findFirst({
+          where: { tenantId: payment.tenantId, paymentId: payment.id }
+        })
+        if (!existingDispute) {
+          await prisma.tenantPaymentDispute.create({
+            data: {
+              tenantId: payment.tenantId,
+              paymentId: payment.id,
+              status: 'under_review',
+              amount: payment.amount,
+              reason: `${provider} Webhook Chargeback Notification`
+            }
+          })
+        }
+      }
     } else if (orderId && (status === 'failed' || status === 'refunded')) {
       await prisma.tenantPayment.updateMany({
         where: { orderId },
@@ -240,10 +267,10 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
       }
     }
 
-    return NextResponse.json({ received: true })
+    return NextResponse.json({ success: true })
     
   } catch (error: any) {
-    console.error('Webhook error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    console.error('Generic webhook error:', error)
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }

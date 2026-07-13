@@ -309,7 +309,7 @@ export async function createDokuCheckout(
       ];
     }
 
-    const uniqueInvoiceNumber = `${orderId}_${Date.now()}`;
+    const uniqueInvoiceNumber = `${orderId.slice(0, 8)}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
 
     const body = {
       order: {
@@ -645,5 +645,114 @@ export async function getPaymentStatus(tenantId: string, orderId: string) {
     return { success: true, status: payment?.paymentStatus || 'not_found' };
   } catch (error: any) {
     return { success: false, error: error.message };
+  }
+}
+
+export async function getDisputes(tenantId: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'payments', 'read')
+
+    const disputes = await prisma.tenantPaymentDispute.findMany({
+      where: { tenantId },
+      include: {
+        payment: true
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+    return { success: true, disputes }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function createOrUpdateDispute(
+  tenantId: string,
+  paymentId: string,
+  data: {
+    status?: string
+    reason?: string
+    evidenceText?: string
+    evidenceFile?: string
+    amount?: number
+  }
+) {
+  try {
+    const user = await getAuthenticatedUser()
+    await requirePermission(user.id, tenantId, 'payments', 'write')
+
+    const payment = await prisma.tenantPayment.findUnique({
+      where: { id: paymentId, tenantId }
+    })
+    if (!payment) throw new Error('Payment not found')
+
+    const existing = await prisma.tenantPaymentDispute.findFirst({
+      where: { tenantId, paymentId }
+    })
+
+    const finalAmount = data.amount !== undefined ? data.amount : Number(payment.amount)
+
+    let dispute
+    if (existing) {
+      dispute = await prisma.tenantPaymentDispute.update({
+        where: { id: existing.id },
+        data: {
+          status: data.status,
+          reason: data.reason,
+          evidenceText: data.evidenceText,
+          evidenceFile: data.evidenceFile,
+          amount: finalAmount
+        }
+      })
+    } else {
+      dispute = await prisma.tenantPaymentDispute.create({
+        data: {
+          tenantId,
+          paymentId,
+          status: data.status || 'under_review',
+          reason: data.reason || 'Customer Dispute',
+          evidenceText: data.evidenceText,
+          evidenceFile: data.evidenceFile,
+          amount: finalAmount
+        }
+      })
+    }
+
+    if (data.status === 'lost') {
+      await prisma.$transaction(async (tx) => {
+        await tx.tenantPayment.update({
+          where: { id: paymentId },
+          data: { paymentStatus: 'refunded' }
+        })
+        await tx.tenantOrder.update({
+          where: { id: payment.orderId },
+          data: { orderStatus: 'cancelled' }
+        })
+        await tx.tenantPaymentLedger.create({
+          data: {
+            tenantId,
+            paymentId,
+            orderId: payment.orderId,
+            type: 'reversal',
+            amount: finalAmount,
+            currency: payment.currency,
+            gateway: payment.processorKey,
+            gatewayTxId: payment.externalTransactionId || 'unknown',
+            status: 'failed',
+            metadata: { disputeId: dispute.id, reason: data.reason || 'Dispute Lost' }
+          }
+        })
+      })
+    } else if (data.status === 'won' || data.status === 'under_review' || data.status === 'evidence_submitted') {
+      await prisma.tenantPayment.update({
+        where: { id: paymentId },
+        data: { paymentStatus: 'disputed' }
+      })
+    }
+
+    revalidatePath('/admin/payments')
+    return { success: true, dispute }
+  } catch (error: any) {
+    return { success: false, error: error.message }
   }
 }

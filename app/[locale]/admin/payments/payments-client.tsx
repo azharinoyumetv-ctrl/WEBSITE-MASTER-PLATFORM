@@ -1,19 +1,25 @@
 'use client'
 
 import { useState } from 'react'
-import { CreditCard, DollarSign, TrendingUp, RefreshCw, AlertTriangle, CheckCircle2, Clock, Search, Edit2, Loader2 } from 'lucide-react'
+import { CreditCard, DollarSign, TrendingUp, RefreshCw, AlertTriangle, CheckCircle2, Clock, Search, Edit2, Loader2, ShieldAlert, FileText, UploadCloud, Check, X } from 'lucide-react'
 import { formatCurrency, formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
-import { refundPayment, capturePayment, manualAdjustPayment } from '@/lib/actions/payments'
+import { refundPayment, capturePayment, manualAdjustPayment, createOrUpdateDispute } from '@/lib/actions/payments'
 import toast from 'react-hot-toast'
 
-export function PaymentsClient({ initialPayments, tenantId }: { initialPayments: any[], tenantId: string }) {
+export function PaymentsClient({ initialPayments, initialDisputes = [], tenantId }: { initialPayments: any[], initialDisputes?: any[], tenantId: string }) {
   const [payments, setPayments] = useState(initialPayments)
+  const [disputes, setDisputes] = useState<any[]>(initialDisputes)
   const [search, setSearch] = useState('')
   const [isProcessing, setIsProcessing] = useState<Record<string, boolean>>({})
+  const [activeTab, setActiveTab] = useState<'transactions' | 'disputes'>('transactions')
   
   const [adjustingPayment, setAdjustingPayment] = useState<any>(null)
   const [adjustAmount, setAdjustAmount] = useState<string>('')
   const [adjustReason, setAdjustReason] = useState<string>('')
+
+  const [selectedDispute, setSelectedDispute] = useState<any | null>(null)
+  const [evidenceText, setEvidenceText] = useState('')
+  const [evidenceFile, setEvidenceFile] = useState('')
 
   const filtered = payments.filter(p =>
     p.id.includes(search.toLowerCase()) || (p.externalTransactionId?.includes(search) ?? false)
@@ -59,6 +65,49 @@ export function PaymentsClient({ initialPayments, tenantId }: { initialPayments:
     }
   }
 
+  const handleCreateManualDispute = async (p: any) => {
+    if (!confirm('Flag this payment as disputed for manual review/hold?')) return
+    setIsProcessing(prev => ({ ...prev, [p.id]: true }))
+    const res = await createOrUpdateDispute(tenantId, p.id, {
+      status: 'under_review',
+      reason: 'Manual Admin Flagged Dispute'
+    })
+    setIsProcessing(prev => ({ ...prev, [p.id]: false }))
+
+    if (res.success) {
+      toast.success('Dispute created under review')
+      setDisputes(prev => [res.dispute, ...prev])
+      setPayments(prev => prev.map(pay => pay.id === p.id ? { ...pay, paymentStatus: 'disputed' } : pay))
+    } else {
+      toast.error('Failed to flag dispute: ' + res.error)
+    }
+  }
+
+  const handleUpdateDisputeStatus = async (newStatus: string) => {
+    setIsProcessing(prev => ({ ...prev, [selectedDispute.id]: true }))
+    const res = await createOrUpdateDispute(tenantId, selectedDispute.paymentId, {
+      status: newStatus,
+      evidenceText,
+      evidenceFile
+    })
+    setIsProcessing(prev => ({ ...prev, [selectedDispute.id]: false }))
+
+    if (res.success) {
+      toast.success(`Dispute status updated to ${newStatus}`)
+      const updatedDispute = { ...selectedDispute, status: newStatus, evidenceText, evidenceFile }
+      setDisputes(prev => prev.map(d => d.id === selectedDispute.id ? updatedDispute : d))
+      
+      setPayments(prev => prev.map(p => p.id === selectedDispute.paymentId ? { 
+        ...p, 
+        paymentStatus: newStatus === 'lost' ? 'refunded' : 'disputed'
+      } : p))
+      
+      setSelectedDispute(null)
+    } else {
+      toast.error('Failed to update dispute: ' + res.error)
+    }
+  }
+
   return (
     <div className="page-container animate-slide-up">
       <div className="section-header">
@@ -87,88 +136,173 @@ export function PaymentsClient({ initialPayments, tenantId }: { initialPayments:
         ))}
       </div>
 
-      <div className="flex gap-3 mb-4">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-          <input type="text" placeholder="Search transactions..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" id="payment-search" />
-        </div>
+      <div className="flex border-b border-slate-200 mb-6">
+        <button 
+          onClick={() => setActiveTab('transactions')}
+          className={cn("px-4 py-2 text-sm font-semibold border-b-2 transition-all", activeTab === 'transactions' ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-600 hover:text-slate-900")}
+        >
+          Transactions
+        </button>
+        <button 
+          onClick={() => setActiveTab('disputes')}
+          className={cn("px-4 py-2 text-sm font-semibold border-b-2 transition-all flex items-center gap-1.5", activeTab === 'disputes' ? "border-indigo-600 text-indigo-600" : "border-transparent text-slate-600 hover:text-slate-900")}
+        >
+          <ShieldAlert className="w-4 h-4 text-amber-500" />
+          Disputes & Chargebacks
+          {disputes.filter(d => d.status === 'under_review').length > 0 && (
+            <span className="bg-amber-500 text-white rounded-full px-1.5 py-0.5 text-[10px]">
+              {disputes.filter(d => d.status === 'under_review').length}
+            </span>
+          )}
+        </button>
       </div>
 
-      <div className="card overflow-hidden">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>Transaction ID</th>
-              <th>Order</th>
-              <th>Gateway</th>
-              <th>Amount</th>
-              <th>Status</th>
-              <th>Date</th>
-              <th className="text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.map(p => (
-              <tr key={p.id}>
-                <td>
-                  <div>
-                    <p className="font-mono text-xs font-semibold text-slate-700">{p.id.slice(0, 8).toUpperCase()}</p>
-                    {p.externalTransactionId && (
-                      <p className="text-[10px] text-slate-400 font-mono truncate max-w-[160px]">{p.externalTransactionId}</p>
-                    )}
-                  </div>
-                </td>
-                <td className="font-mono text-xs text-indigo-600">{p.orderId?.slice(0, 8).toUpperCase() || 'N/A'}</td>
-                <td>
-                  <span className="badge badge-neutral capitalize">{p.processorKey}</span>
-                </td>
-                <td className="font-semibold">{formatCurrency(Number(p.amount))} <span className="text-xs text-slate-400">{p.currency}</span></td>
-                <td><span className={`badge ${getStatusBadgeClass(p.paymentStatus)}`}>{p.paymentStatus}</span></td>
-                <td className="text-sm text-slate-400">{formatDate(p.createdAt, 'relative')}</td>
-                <td className="text-right">
-                  <div className="flex items-center justify-end gap-2">
-                    {p.paymentStatus === 'initiated' && (
-                      <button 
-                        onClick={() => handleAction(capturePayment, p.id, 'captured')} 
-                        disabled={isProcessing[p.id]}
-                        className="btn btn-ghost btn-sm text-emerald-600"
-                      >
-                        {isProcessing[p.id] ? 'Processing...' : 'Capture'}
-                      </button>
-                    )}
-                    {p.paymentStatus === 'succeeded' && (
-                      <>
-                        <button 
-                          onClick={() => handleAction(refundPayment, p.id, 'refunded')} 
-                          disabled={isProcessing[p.id]}
-                          className="btn btn-ghost btn-sm text-red-500"
-                        >
-                          {isProcessing[p.id] ? 'Processing...' : 'Refund'}
-                        </button>
-                        <button 
-                          onClick={() => setAdjustingPayment(p)} 
-                          disabled={isProcessing[p.id]}
-                          className="btn btn-ghost btn-sm text-indigo-500"
-                        >
-                          Adjust
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-            {filtered.length === 0 && (
+      {activeTab === 'transactions' ? (
+        <>
+          <div className="flex gap-3 mb-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+              <input type="text" placeholder="Search transactions..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-9" id="payment-search" />
+            </div>
+          </div>
+
+          <div className="card overflow-hidden">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Transaction ID</th>
+                  <th>Order</th>
+                  <th>Gateway</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                  <th className="text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map(p => (
+                  <tr key={p.id}>
+                    <td>
+                      <div>
+                        <p className="font-mono text-xs font-semibold text-slate-700">{p.id.slice(0, 8).toUpperCase()}</p>
+                        {p.externalTransactionId && (
+                          <p className="text-[10px] text-slate-400 font-mono truncate max-w-[160px]">{p.externalTransactionId}</p>
+                        )}
+                      </div>
+                    </td>
+                    <td className="font-mono text-xs text-indigo-600">{p.orderId?.slice(0, 8).toUpperCase() || 'N/A'}</td>
+                    <td>
+                      <span className="badge badge-neutral capitalize">{p.processorKey}</span>
+                    </td>
+                    <td className="font-semibold">{formatCurrency(Number(p.amount))} <span className="text-xs text-slate-400">{p.currency}</span></td>
+                    <td><span className={`badge ${getStatusBadgeClass(p.paymentStatus)}`}>{p.paymentStatus}</span></td>
+                    <td className="text-sm text-slate-400">{formatDate(p.createdAt, 'relative')}</td>
+                    <td className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {p.paymentStatus === 'initiated' && (
+                          <button 
+                            onClick={() => handleAction(capturePayment, p.id, 'captured')} 
+                            disabled={isProcessing[p.id]}
+                            className="btn btn-ghost btn-sm text-emerald-600"
+                          >
+                            {isProcessing[p.id] ? 'Processing...' : 'Capture'}
+                          </button>
+                        )}
+                        {p.paymentStatus === 'succeeded' && (
+                          <>
+                            <button 
+                              onClick={() => handleAction(refundPayment, p.id, 'refunded')} 
+                              disabled={isProcessing[p.id]}
+                              className="btn btn-ghost btn-sm text-red-500"
+                            >
+                              {isProcessing[p.id] ? 'Processing...' : 'Refund'}
+                            </button>
+                            <button 
+                              onClick={() => handleCreateManualDispute(p)} 
+                              disabled={isProcessing[p.id]}
+                              className="btn btn-ghost btn-sm text-amber-500"
+                            >
+                              Dispute
+                            </button>
+                            <button 
+                              onClick={() => setAdjustingPayment(p)} 
+                              disabled={isProcessing[p.id]}
+                              className="btn btn-ghost btn-sm text-indigo-500"
+                            >
+                              Adjust
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filtered.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="text-center py-8 text-slate-500">No payments found.</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+            <div className="px-4 py-3 border-t border-slate-100">
+              <p className="text-xs text-slate-400">Showing {filtered.length} of {payments.length} transactions</p>
+            </div>
+          </div>
+        </>
+      ) : (
+        <div className="card overflow-hidden">
+          <table className="data-table">
+            <thead>
               <tr>
-                <td colSpan={7} className="text-center py-8 text-slate-500">No payments found.</td>
+                <th>Dispute ID</th>
+                <th>Payment Ref</th>
+                <th>Reason</th>
+                <th>Amount</th>
+                <th>Status</th>
+                <th>Date</th>
+                <th className="text-right">Actions</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-        <div className="px-4 py-3 border-t border-slate-100">
-          <p className="text-xs text-slate-400">Showing {filtered.length} of {payments.length} transactions</p>
+            </thead>
+            <tbody>
+              {disputes.map(d => (
+                <tr key={d.id}>
+                  <td><code className="text-xs">{d.id.slice(0, 8).toUpperCase()}</code></td>
+                  <td><code className="text-xs text-indigo-600">{d.paymentId.slice(0, 8).toUpperCase()}</code></td>
+                  <td>{d.reason}</td>
+                  <td className="font-semibold">{formatCurrency(Number(d.amount))}</td>
+                  <td>
+                    <span className={cn('badge text-[10px] capitalize', 
+                      d.status === 'won' ? 'badge-success' :
+                      d.status === 'lost' ? 'badge-error' :
+                      d.status === 'evidence_submitted' ? 'badge-info' : 'badge-warning'
+                    )}>
+                      {d.status.replace('_', ' ')}
+                    </span>
+                  </td>
+                  <td className="text-xs text-slate-400">{formatDate(d.createdAt)}</td>
+                  <td className="text-right">
+                    <button onClick={() => {
+                      setSelectedDispute(d)
+                      setEvidenceText(d.evidenceText || '')
+                      setEvidenceFile(d.evidenceFile || '')
+                    }} className="btn btn-ghost btn-sm text-indigo-600">
+                      Manage
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {disputes.length === 0 && (
+                <tr>
+                  <td colSpan={7} className="text-center py-8 text-slate-500">No disputes recorded.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+          <div className="px-4 py-3 border-t border-slate-100">
+            <p className="text-xs text-slate-400">Showing {disputes.length} disputes</p>
+          </div>
         </div>
-      </div>
+      )}
 
       {adjustingPayment && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -211,6 +345,84 @@ export function PaymentsClient({ initialPayments, tenantId }: { initialPayments:
                 {isProcessing[adjustingPayment.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Edit2 className="w-4 h-4" />} 
                 Adjust
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {selectedDispute && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 animate-slide-up">
+            <div className="flex justify-between items-start mb-4">
+              <h3 className="text-lg font-bold">Manage Dispute</h3>
+              <span className={cn('badge text-[10px] capitalize', 
+                selectedDispute.status === 'won' ? 'badge-success' :
+                selectedDispute.status === 'lost' ? 'badge-error' :
+                selectedDispute.status === 'evidence_submitted' ? 'badge-info' : 'badge-warning'
+              )}>
+                {selectedDispute.status.replace('_', ' ')}
+              </span>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1 text-xs text-slate-600">
+                <p><strong>Dispute ID:</strong> <span className="font-mono">{selectedDispute.id}</span></p>
+                <p><strong>Payment Reference:</strong> <span className="font-mono">{selectedDispute.paymentId}</span></p>
+                <p><strong>Reason:</strong> {selectedDispute.reason}</p>
+                <p><strong>Disputed Amount:</strong> {formatCurrency(Number(selectedDispute.amount))}</p>
+              </div>
+
+              <div>
+                <label className="form-label">Evidence Text</label>
+                <textarea 
+                  value={evidenceText}
+                  onChange={e => setEvidenceText(e.target.value)}
+                  className="form-input min-h-[80px]"
+                  placeholder="Provide tracking numbers, delivery confirmations, or explanation..."
+                />
+              </div>
+
+              <div>
+                <label className="form-label">Evidence Document Link (Optional)</label>
+                <input 
+                  type="text"
+                  value={evidenceFile}
+                  onChange={e => setEvidenceFile(e.target.value)}
+                  className="form-input"
+                  placeholder="https://example.com/receipt.pdf"
+                />
+              </div>
+            </div>
+
+            <div className="mt-6 flex flex-wrap gap-2 justify-between">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => handleUpdateDisputeStatus('won')} 
+                  disabled={isProcessing[selectedDispute.id]}
+                  className="btn btn-sm btn-secondary text-emerald-600 border-emerald-100 hover:bg-emerald-50"
+                >
+                  <Check className="w-3.5 h-3.5 mr-1" /> Mark Won
+                </button>
+                <button 
+                  onClick={() => handleUpdateDisputeStatus('lost')} 
+                  disabled={isProcessing[selectedDispute.id]}
+                  className="btn btn-sm btn-secondary text-red-500 border-red-100 hover:bg-red-50"
+                >
+                  <X className="w-3.5 h-3.5 mr-1" /> Mark Lost
+                </button>
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={() => setSelectedDispute(null)} className="btn btn-sm btn-secondary">Cancel</button>
+                <button 
+                  onClick={() => handleUpdateDisputeStatus('evidence_submitted')} 
+                  disabled={isProcessing[selectedDispute.id]}
+                  className="btn btn-sm btn-primary"
+                >
+                  {isProcessing[selectedDispute.id] ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4 mr-1" />} 
+                  Submit Evidence
+                </button>
+              </div>
             </div>
           </div>
         </div>

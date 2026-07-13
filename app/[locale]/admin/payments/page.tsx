@@ -1,4 +1,4 @@
-import { getPayments } from '@/lib/actions/payments'
+import { getPayments, getDisputes } from '@/lib/actions/payments'
 import { PaymentsClient } from './payments-client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -18,7 +18,10 @@ export default async function PaymentsPage() {
     return <div className="p-8 text-red-500">Error: No tenant context found.</div>
   }
 
-  const res = await getPayments(tenantId)
+  const [res, disputesRes] = await Promise.all([
+    getPayments(tenantId),
+    getDisputes(tenantId)
+  ])
 
   if (!res.success) {
     const errorMsg = (res as any).error || 'Unknown error'
@@ -36,6 +39,7 @@ export default async function PaymentsPage() {
   }
 
   const initialPayments = res.payments!
+  const initialDisputes = disputesRes.success ? disputesRes.disputes! : []
 
-  return <PaymentsClient initialPayments={initialPayments} tenantId={tenantId} />
+  return <PaymentsClient initialPayments={initialPayments} initialDisputes={initialDisputes} tenantId={tenantId} />
 }

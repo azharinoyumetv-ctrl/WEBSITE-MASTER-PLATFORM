@@ -1,4 +1,4 @@
-import { getAnalytics } from '@/lib/actions/analytics'
+import { getAnalytics, getReportSchedules, getGeneratedReports } from '@/lib/actions/analytics'
 import { AnalyticsClient } from './analytics-client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -21,7 +21,11 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
   const daysParam = searchParams.days as string
   const days = daysParam && !isNaN(parseInt(daysParam, 10)) ? parseInt(daysParam, 10) : 7
 
-  const res = await getAnalytics(tenantId, days)
+  const [res, schedulesRes, reportsRes] = await Promise.all([
+    getAnalytics(tenantId, days),
+    getReportSchedules(tenantId),
+    getGeneratedReports(tenantId)
+  ])
 
   if (!res.success) {
     const errorMsg = (res as any).error || 'Unknown error'
@@ -42,6 +46,15 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
   }
 
   const initialData = res.analytics!
+  const initialSchedules = schedulesRes.success ? schedulesRes.schedules! : []
+  const initialReports = reportsRes.success ? reportsRes.reports! : []
 
-  return <AnalyticsClient initialData={initialData} tenantId={tenantId} />
+  return (
+    <AnalyticsClient 
+      initialData={initialData} 
+      initialSchedules={initialSchedules} 
+      initialReports={initialReports} 
+      tenantId={tenantId} 
+    />
+  )
 }

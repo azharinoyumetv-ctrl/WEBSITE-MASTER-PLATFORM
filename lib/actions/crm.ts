@@ -2,9 +2,14 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
+import { getAuthenticatedUser, requirePermission } from "@/lib/rbac"
 
 export async function getCrmData(tenantId: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'crm', 'read')
+
     const contacts = await prisma.tenantCrmContact.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' }
@@ -27,6 +32,10 @@ export async function getCrmData(tenantId: string) {
 
 export async function createCrmContact(tenantId: string, data: { firstName: string, lastName: string, email: string, phoneNumber?: string, tags?: string[] }) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'crm', 'write')
+
     const contact = await prisma.tenantCrmContact.create({
       data: {
         tenantId,
@@ -58,9 +67,22 @@ export async function createCrmContact(tenantId: string, data: { firstName: stri
 
 export async function updateCrmContact(tenantId: string, id: string, data: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'crm', 'write')
+
+    // Strict allowlist for fields that client-side updates are permitted to touch
+    const safeData: any = {}
+    if (data.email !== undefined) safeData.email = String(data.email)
+    if (data.phoneNumber !== undefined) safeData.phoneNumber = data.phoneNumber ? String(data.phoneNumber) : null
+    if (data.firstName !== undefined) safeData.firstName = String(data.firstName)
+    if (data.lastName !== undefined) safeData.lastName = String(data.lastName)
+    if (data.tags !== undefined) safeData.tags = Array.isArray(data.tags) ? data.tags : []
+    if (data.customMetadata !== undefined) safeData.customMetadata = data.customMetadata
+
     const contact = await prisma.tenantCrmContact.update({
       where: { id, tenantId },
-      data
+      data: safeData
     })
     revalidatePath('/admin/crm')
     return { success: true, contact }
@@ -71,6 +93,10 @@ export async function updateCrmContact(tenantId: string, id: string, data: any) 
 
 export async function deleteCrmContact(tenantId: string, id: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'crm', 'write')
+
     await prisma.tenantCrmContact.delete({
       where: { id, tenantId }
     })
@@ -83,6 +109,10 @@ export async function deleteCrmContact(tenantId: string, id: string) {
 
 export async function addTimelineEvent(tenantId: string, contactId: string, eventType: string, eventPayload: any) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'crm', 'write')
+
     const event = await prisma.tenantCrmTimeline.create({
       data: {
         tenantId,
@@ -102,6 +132,10 @@ export async function addTimelineEvent(tenantId: string, contactId: string, even
 
 export async function sendTimelineWhatsApp(tenantId: string, contactId: string, message: string) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'crm', 'write')
+
     const contact = await prisma.tenantCrmContact.findUnique({
       where: { id: contactId, tenantId }
     })
@@ -110,7 +144,6 @@ export async function sendTimelineWhatsApp(tenantId: string, contactId: string, 
     const token = process.env.META_WA_TOKEN
     const phoneId = process.env.META_WA_PHONE_ID
     
-    // 1. Send via Meta Graph API
     if (token && phoneId) {
       const response = await fetch(`https://graph.facebook.com/v17.0/${phoneId}/messages`, {
         method: 'POST',
@@ -134,7 +167,6 @@ export async function sendTimelineWhatsApp(tenantId: string, contactId: string, 
       console.warn('WhatsApp API not configured, simulating delivery')
     }
 
-    // 2. Record in timeline
     const event = await prisma.tenantCrmTimeline.create({
       data: {
         tenantId,
@@ -154,6 +186,10 @@ export async function sendTimelineWhatsApp(tenantId: string, contactId: string, 
 
 export async function bulkDeleteCrmContacts(tenantId: string, contactIds: string[]) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'crm', 'write')
+
     const res = await prisma.tenantCrmContact.deleteMany({
       where: {
         tenantId,
@@ -169,6 +205,10 @@ export async function bulkDeleteCrmContacts(tenantId: string, contactIds: string
 
 export async function importCrmContacts(tenantId: string, contacts: any[]) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'crm', 'write')
+
     let imported = 0
     const data = contacts.map(c => ({
       tenantId,

@@ -315,13 +315,158 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
   }
 }
 
-export async function saveAnalyticsSchedule(tenantId: string, data: { frequency: string, email: string }) {
+import { getAuthenticatedUser, requirePermission } from "@/lib/rbac"
+
+export async function getReportSchedules(tenantId: string) {
   try {
-    // There is no explicit model for analytics schedule in Prisma currently.
-    // Saving this implies persisting it to a JSON config or scheduling a cron task.
-    // For now, this serves as the backend entry point to save the configuration.
-    // E.g., we could save this to TenantWebsite.settings or similar.
-    return { success: true, schedule: data }
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'analytics', 'read')
+
+    const schedules = await prisma.tenantAnalyticsReportSchedule.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' }
+    })
+    return { success: true, schedules }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function createReportSchedule(tenantId: string, data: { reportName: string, frequency: string, recipient: string, format: string }) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'analytics', 'write')
+
+    const schedule = await prisma.tenantAnalyticsReportSchedule.create({
+      data: {
+        tenantId,
+        reportName: data.reportName,
+        frequency: data.frequency,
+        recipient: data.recipient,
+        format: data.format
+      }
+    })
+    
+    // Auto-generate initial report
+    await generateReportInternal(tenantId, schedule.id)
+
+    const { revalidatePath } = require('next/cache')
+    revalidatePath('/admin/analytics')
+    return { success: true, schedule }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateReportSchedule(tenantId: string, id: string, data: { reportName?: string, frequency?: string, recipient?: string, format?: string, isActive?: boolean }) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'analytics', 'write')
+
+    const schedule = await prisma.tenantAnalyticsReportSchedule.update({
+      where: { id, tenantId },
+      data: {
+        reportName: data.reportName,
+        frequency: data.frequency,
+        recipient: data.recipient,
+        format: data.format,
+        isActive: data.isActive
+      }
+    })
+
+    const { revalidatePath } = require('next/cache')
+    revalidatePath('/admin/analytics')
+    return { success: true, schedule }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function deleteReportSchedule(tenantId: string, id: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'analytics', 'write')
+
+    await prisma.tenantAnalyticsReportSchedule.delete({
+      where: { id, tenantId }
+    })
+
+    const { revalidatePath } = require('next/cache')
+    revalidatePath('/admin/analytics')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function getGeneratedReports(tenantId: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'analytics', 'read')
+
+    const reports = await prisma.tenantGeneratedReport.findMany({
+      where: { tenantId },
+      orderBy: { createdAt: 'desc' }
+    })
+    return { success: true, reports }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+async function generateReportInternal(tenantId: string, scheduleId: string) {
+  const schedule = await prisma.tenantAnalyticsReportSchedule.findUnique({
+    where: { id: scheduleId, tenantId }
+  })
+  if (!schedule) throw new Error('Schedule not found')
+
+  const analyticsRes = await getAnalytics(tenantId, 7)
+  if (!analyticsRes.success || !analyticsRes.analytics) {
+    throw new Error('Failed to fetch analytics data: ' + (analyticsRes.error || 'Empty data'))
+  }
+
+  const data = analyticsRes.analytics
+  let content = ''
+  if (schedule.format === 'csv') {
+    content = `Metric,Value\n` +
+              `Page Views,${data.pageViews}\n` +
+              `Unique Visitors,${data.uniqueVisitors}\n` +
+              `Conversions,${data.conversions}\n` +
+              `Revenue,${data.revenue}\n` +
+              `Bounce Rate,${data.bounceRate}%\n` +
+              `Avg Session Duration,${data.avgSessionDuration}\n`
+  } else {
+    content = JSON.stringify(data, null, 2)
+  }
+
+  const base64 = Buffer.from(content).toString('base64')
+  const fileUrl = `data:${schedule.format === 'csv' ? 'text/csv' : 'application/json'};base64,${base64}`
+
+  return await prisma.tenantGeneratedReport.create({
+    data: {
+      tenantId,
+      reportName: `${schedule.reportName} (${schedule.frequency})`,
+      fileUrl
+    }
+  })
+}
+
+export async function triggerGenerateReport(tenantId: string, scheduleId: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'analytics', 'write')
+
+    const report = await generateReportInternal(tenantId, scheduleId)
+
+    const { revalidatePath } = require('next/cache')
+    revalidatePath('/admin/analytics')
+    return { success: true, report }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
