@@ -192,7 +192,36 @@ async function sendWithRetryAndLog(logId: string, maxRetries = 3) {
           text: html.replace(/<[^>]*>/g, '')
         })
       } else if (log.channelType === 'sms') {
-        console.log(`[SMS] Sending to ${log.recipient} via Twilio simulation.`)
+        const config = gateway.encryptedCredentials as any
+        const authToken = config.password ? decrypt(config.password) : ''
+        const accountSid = config.accountSid
+        const fromNumber = config.fromNumber || config.from
+
+        if (!accountSid || !authToken || !fromNumber) {
+          throw new Error('Twilio credentials missing (accountSid, password/authToken, fromNumber)')
+        }
+
+        const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`
+        const authHeader = 'Basic ' + Buffer.from(`${accountSid}:${authToken}`).toString('base64')
+        
+        const params = new URLSearchParams()
+        params.append('To', log.recipient)
+        params.append('From', fromNumber)
+        params.append('Body', log.metadata ? (log.metadata as any).body || 'You have a new notification.' : 'You have a new notification.')
+
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Authorization': authHeader,
+            'Content-Type': 'application/x-www-form-urlencoded'
+          },
+          body: params.toString()
+        })
+
+        if (!response.ok) {
+          const errText = await response.text()
+          throw new Error(`Twilio API error: ${response.status} - ${errText}`)
+        }
       }
       success = true
     } catch (err: any) {
