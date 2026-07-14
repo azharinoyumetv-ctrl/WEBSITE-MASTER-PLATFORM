@@ -52,8 +52,8 @@ function getTenantFromHost(hostname: string): string {
 function applySecurityHeaders(res: NextResponse) {
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
-    "style-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com",
+    "style-src 'self'",
     "img-src 'self' data: https:",
     "connect-src 'self' https://challenges.cloudflare.com",
     "frame-ancestors 'none'",
