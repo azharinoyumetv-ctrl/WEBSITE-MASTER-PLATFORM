@@ -1,0 +1,81 @@
+import { NextResponse } from 'next/server'
+import prisma from '@/lib/prisma'
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json()
+    const { instanceId, tenantId, instanceUrl, customDomains, licenseKey, infraMetadata } = body
+
+    if (!instanceId || !tenantId || !instanceUrl || !licenseKey) {
+      return NextResponse.json({ success: false, error: 'Missing registration details' }, { status: 400 })
+    }
+
+    // Upsert tenant instance
+    const instance = await prisma.tenantInstance.upsert({
+      where: { instanceId },
+      update: {
+        instanceUrl,
+        licenseKeyHash: licenseKey, // Simple storage for hash
+        status: 'active',
+        infraMetadata: infraMetadata || {},
+        lastHeartbeat: new Date()
+      },
+      create: {
+        tenantId,
+        instanceId,
+        instanceUrl,
+        licenseKeyHash: licenseKey,
+        status: 'active',
+        infraMetadata: infraMetadata || {},
+        lastHeartbeat: new Date()
+      }
+    })
+
+    // Upsert domains if provided
+    if (customDomains && Array.isArray(customDomains)) {
+      for (const domain of customDomains) {
+        await prisma.tenantDomain.upsert({
+          where: { tenantId_domain: { tenantId, domain } },
+          update: {
+            instanceId: instance.id,
+            isVerified: true // Assume verified on bootstrap
+          },
+          create: {
+            tenantId,
+            instanceId: instance.id,
+            domain,
+            isVerified: true,
+            isPrimary: false
+          }
+        })
+      }
+    }
+
+    // Seed default entitlements
+    const enabledModules = ['catalog', 'booking', 'ecommerce']
+    const featureFlags = { ai_assistant: true, advanced_analytics: true }
+    const quota = { maxUsers: 25, storageQuotaGB: 50 }
+
+    await prisma.tenantEntitlement.create({
+      data: {
+        tenantId,
+        instanceId: instance.id,
+        enabledModules,
+        featureFlags,
+        quota
+      }
+    })
+
+    return NextResponse.json({
+      status: 'registered',
+      entitlements: {
+        modules: enabledModules,
+        maxUsers: quota.maxUsers,
+        storageQuotaGB: quota.storageQuotaGB
+      },
+      syncInterval: 300
+    })
+  } catch (error: any) {
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+  }
+}

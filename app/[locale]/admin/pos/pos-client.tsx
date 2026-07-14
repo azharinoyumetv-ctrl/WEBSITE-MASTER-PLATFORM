@@ -183,12 +183,12 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
     const res = await processPosPayment(tenantId, initialTerminal.id, cart, paymentMethod, grandTotal, baseCurrency)
     setIsProcessing(false)
     
-    if (res.success) {
+    if (res.success && res.order) {
       toast.success(`Payment of ${formatCurrency(grandTotal, baseCurrency)} processed via ${paymentMethod.toUpperCase()}`)
       setCart([])
       
       const receiptRes = await generateReceipt(tenantId, res.order.id)
-      if (receiptRes.success) setReceiptHtml(receiptRes.receiptHtml)
+      if (receiptRes.success) setReceiptHtml(receiptRes.receiptHtml || null)
     } else {
       toast.error(res.error || 'Failed to process payment')
     }
@@ -262,7 +262,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
     if (!activeSession) return
     const res = await getCashDrawerEvents(tenantId, activeSession.id)
     if (res.success) {
-      setDrawerEvents(res.events)
+      setDrawerEvents(res.events || [])
       setShowDrawerLog(true)
     } else toast.error(res.error)
   }

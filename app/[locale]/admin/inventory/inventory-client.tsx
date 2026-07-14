@@ -408,7 +408,7 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
                 <option key={l.id} value={l.id}>{l.name}</option>
               ))}
             </select>
-            <button onClick={exportToCSV} className="btn btn-secondary flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
+            <button onClick={() => exportToCSV()} className="btn btn-secondary flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
               <Download className="w-4 h-4" /> Export CSV
             </button>
             <button onClick={() => setIsTransferModalOpen(true)} className="btn btn-secondary flex items-center gap-2 focus:ring-2 focus:ring-indigo-500">

@@ -54,9 +54,16 @@ export const authOptions: NextAuthOptions = {
 
         const ip = (req.headers as any)?.['x-forwarded-for'] || (req.headers as any)?.['x-real-ip'] || 'unknown'
         
+        // 1. IP-based rate limiting
         const rl = await checkRateLimit(ip, 'auth', 20, 15 * 60 * 1000)
         if (rl.limited) {
           throw new Error("Too many attempts. Please try again later.")
+        }
+
+        // 2. Email-based rate limiting
+        const rlEmail = await checkRateLimit(credentials.email, 'auth_email', 5, 15 * 60 * 1000)
+        if (rlEmail.limited) {
+          throw new Error("Too many login attempts for this email. Please try again later.")
         }
 
         if (rl.count > 3) {
@@ -128,6 +135,16 @@ export const authOptions: NextAuthOptions = {
               where: { id: user.authCredential.id },
               data: updateData
             })
+          } else {
+            // Create the TenantAuthCredential to track failedLoginAttempts for this legacy user
+            await prisma.tenantAuthCredential.create({
+              data: {
+                tenantId: user.tenantId,
+                userId: user.id,
+                passwordHash: user.passwordHash,
+                failedLoginAttempts: 1
+              }
+            }).catch(() => {})
           }
           throw new Error("Invalid credentials")
         }
@@ -143,6 +160,12 @@ export const authOptions: NextAuthOptions = {
         // Reset IP rate limit on successful login
         await prisma.systemApiRateLimit.update({
           where: { id: rl.id },
+          data: { count: 0 }
+        })
+
+        // Reset Email rate limit on successful login
+        await prisma.systemApiRateLimit.update({
+          where: { id: rlEmail.id },
           data: { count: 0 }
         })
 

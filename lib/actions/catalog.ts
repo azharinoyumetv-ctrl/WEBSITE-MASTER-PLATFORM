@@ -90,7 +90,7 @@ export async function getCatalogItems(tenantId: string) {
     const items = await prisma.tenantCatalogItem.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
-      include: { category: true }
+      include: { category: true, variants: true, media: true }
     })
     return { success: true, items }
   } catch (error: any) {
@@ -114,8 +114,26 @@ export async function createCatalogItem(tenantId: string, data: any) {
         description: data.description,
         isVisible: data.isVisible ?? true,
         customAttributes: data.customAttributes || {},
-        imageUrls: data.imageUrls || []
-      }
+        imageUrls: data.imageUrls || [],
+        variants: data.variants ? {
+          create: data.variants.map((v: any) => ({
+            tenantId,
+            name: v.name,
+            sku: v.sku || null,
+            priceOffset: v.priceOffset || 0,
+            quantity: v.quantity || 0
+          }))
+        } : undefined,
+        media: data.media ? {
+          create: data.media.map((m: any) => ({
+            tenantId,
+            url: m.url,
+            fileType: m.fileType || 'image/jpeg',
+            fileSize: m.fileSize || 0
+          }))
+        } : undefined
+      },
+      include: { category: true, variants: true, media: true }
     })
     revalidatePath('/admin/catalog')
     return { success: true, item }
@@ -130,19 +148,51 @@ export async function updateCatalogItem(tenantId: string, itemId: string, data: 
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'catalog', 'write')
 
-    const item = await prisma.tenantCatalogItem.update({
-      where: { id: itemId, tenantId },
-      data: {
-        title: data.title,
-        sku: data.sku,
-        basePrice: data.basePrice,
-        categoryId: data.categoryId || null,
-        description: data.description,
-        isVisible: data.isVisible,
-        customAttributes: data.customAttributes,
-        imageUrls: data.imageUrls
+    const item = await prisma.$transaction(async (tx) => {
+      if (data.variants) {
+        await tx.tenantCatalogItemVariant.deleteMany({
+          where: { catalogItemId: itemId, tenantId }
+        })
       }
+      if (data.media) {
+        await tx.tenantCatalogItemMedia.deleteMany({
+          where: { catalogItemId: itemId, tenantId }
+        })
+      }
+
+      return await tx.tenantCatalogItem.update({
+        where: { id: itemId, tenantId },
+        data: {
+          title: data.title,
+          sku: data.sku,
+          basePrice: data.basePrice,
+          categoryId: data.categoryId || null,
+          description: data.description,
+          isVisible: data.isVisible,
+          customAttributes: data.customAttributes,
+          imageUrls: data.imageUrls,
+          variants: data.variants ? {
+            create: data.variants.map((v: any) => ({
+              tenantId,
+              name: v.name,
+              sku: v.sku || null,
+              priceOffset: v.priceOffset || 0,
+              quantity: v.quantity || 0
+            }))
+          } : undefined,
+          media: data.media ? {
+            create: data.media.map((m: any) => ({
+              tenantId,
+              url: m.url,
+              fileType: m.fileType || 'image/jpeg',
+              fileSize: m.fileSize || 0
+            }))
+          } : undefined
+        },
+        include: { category: true, variants: true, media: true }
+      })
     })
+
     revalidatePath('/admin/catalog')
     return { success: true, item }
   } catch (error: any) {

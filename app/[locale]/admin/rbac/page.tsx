@@ -18,7 +18,7 @@ export default async function RbacPage() {
   }
 
   const res = await getRoles(tenantId)
-  const roles = res.success ? res.roles : []
+  const roles = res.roles || []
 
   return <RbacClient initialRoles={roles} tenantId={tenantId} />
 }

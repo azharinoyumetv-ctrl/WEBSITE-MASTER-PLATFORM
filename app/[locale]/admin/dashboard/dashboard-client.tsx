@@ -110,7 +110,7 @@ function RecentOrdersCard({ orders }: { orders: any[] }) {
               </div>
               <div>
                 <p className="text-xs font-semibold text-slate-900">Order #{order.id.slice(-6).toUpperCase()}</p>
-                <p className="text-[10px] text-slate-400">{formatDate(order.createdAt, 'datetime')}</p>
+                <p className="text-[10px] text-slate-400">{formatDate(order.createdAt, 'short')}</p>
               </div>
             </div>
             <div className="text-right">

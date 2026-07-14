@@ -18,7 +18,7 @@ export default async function PagesPage() {
   }
 
   const res = await getAdminPages(tenantId)
-  const initialPages = res.success ? res.pages : []
+  const initialPages = res.pages || []
 
   return <PagesClient initialPages={initialPages} tenantId={tenantId} />
 }

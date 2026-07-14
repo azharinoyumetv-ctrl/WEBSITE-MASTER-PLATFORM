@@ -12,7 +12,7 @@ export default async function ProfilePage() {
   }
 
   const tenantId = (session.user as any).tenantId
-  const userId = session.user.id
+  const userId = (session.user as any).id
   
   if (!tenantId || !userId) {
     return <div className="p-8 text-red-500">Error: User context is missing.</div>

@@ -70,23 +70,46 @@ function applySecurityHeaders(res: NextResponse) {
 export default async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  // 1. Auth check for protected admin routes
-  const isProtected = (pathname.match(/^\/(en|id)\/admin/) || pathname.startsWith('/admin')) && !pathname.includes('/auth/login')
+  const isSecure = process.env.NEXTAUTH_URL?.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https'
+  const token = await getToken({ 
+    req: request,
+    secret: process.env.NEXTAUTH_SECRET,
+    secureCookie: isSecure
+  })
+
+  const hostname = request.headers.get('host') || ''
+  const targetTenantId = getTenantFromHost(hostname)
+
+  // 1. Cross-tenant routing validation if user has active session
+  if (token && targetTenantId !== 'default') {
+    const userRoles = (token.roles as string[]) || []
+    const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super-admin')
+    
+    if (token.tenantId !== targetTenantId && !isSuperAdmin) {
+      console.warn(`Rejecting cross-tenant access from tenant ${token.tenantId} to target ${targetTenantId}`);
+      if (request.headers.has('next-action') || pathname.startsWith('/api')) {
+        return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized tenant access' }, { status: 403 }))
+      }
+      const origin = getBaseUrl(request)
+      const locale = getLocale(request)
+      return applySecurityHeaders(NextResponse.redirect(new URL(`/${locale}/auth/login`, origin)))
+    }
+  }
+
+  // 2. Auth check for protected admin routes and admin server actions
+  const nextAction = request.headers.get('next-action')
+  const referer = request.headers.get('referer') || ''
+  const isProtectedAction = nextAction && referer.includes('/admin')
+
+  const isProtected = (
+    (pathname.match(/^\/(en|id)\/admin/) || pathname.startsWith('/admin')) && 
+    !pathname.includes('/auth/login')
+  ) || isProtectedAction
 
   if (isProtected) {
-    const isSecure = process.env.NEXTAUTH_URL?.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https'
-    const token = await getToken({ 
-      req: request,
-      secret: process.env.NEXTAUTH_SECRET,
-      secureCookie: isSecure
-    })
-    
     let isAuthorized = false
     
     if (token) {
-      const hostname = request.headers.get('host') || ''
-      const targetTenantId = getTenantFromHost(hostname)
-      
       const userRoles = (token.roles as string[]) || []
       const hasAnyRole = userRoles.length > 0
       const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super-admin')
@@ -97,6 +120,10 @@ export default async function middleware(request: NextRequest) {
     }
     
     if (!isAuthorized) {
+      if (request.headers.has('next-action') || pathname.startsWith('/api')) {
+        return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
+      }
+
       // Determine locale to redirect to
       const localeMatch = pathname.match(/^\/(en|id)(\/|$)/)
       const locale = localeMatch ? localeMatch[1] : getLocale(request)
@@ -115,7 +142,7 @@ export default async function middleware(request: NextRequest) {
     }
   }
 
-  // 2. Run our routing logic (which extracts tenant and locale)
+  // 3. Run our routing logic (which extracts tenant and locale)
   return applySecurityHeaders(handleRouting(request))
 }
 

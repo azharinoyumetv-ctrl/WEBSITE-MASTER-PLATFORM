@@ -72,6 +72,11 @@ model SystemTenant {
   paymentDisputes           TenantPaymentDispute[]
   reportSchedules           TenantAnalyticsReportSchedule[]
   generatedReports          TenantGeneratedReport[]
+  catalogItemVariants       TenantCatalogItemVariant[]
+  catalogItemMedia          TenantCatalogItemMedia[]
+  tenantInstances           TenantInstance[]
+  tenantDomains             TenantDomain[]
+  tenantEntitlements        TenantEntitlement[]
 
   @@map("system_tenants")
 }
@@ -407,6 +412,8 @@ model TenantCatalogItem {
   category          TenantCategory?          @relation(fields: [categoryId], references: [id], onDelete: SetNull)
   orderItems        TenantOrderItem[]
   inventoryBalances TenantInventoryBalance[]
+  variants          TenantCatalogItemVariant[]
+  media             TenantCatalogItemMedia[]
 
   @@index([tenantId, categoryId])
   @@map("tenant_catalog_items")
@@ -1123,4 +1130,108 @@ model TenantPosShift {
 
   @@index([tenantId, userId])
   @@map("tenant_pos_shifts")
+}
+
+// ============================================================
+// CATALOG EXTENSIONS
+// ============================================================
+
+model TenantCatalogItemVariant {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  catalogItemId String   @map("catalog_item_id") @db.Uuid
+  name          String   @db.VarChar(255)
+  sku           String?  @db.VarChar(100)
+  priceOffset   Decimal  @default(0.00) @map("price_offset") @db.Decimal(12, 2)
+  quantity      Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant      SystemTenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  catalogItem TenantCatalogItem @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, catalogItemId])
+  @@map("tenant_catalog_item_variants")
+}
+
+model TenantCatalogItemMedia {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  catalogItemId String   @map("catalog_item_id") @db.Uuid
+  url           String   @db.Text
+  fileType      String   @map("file_type") @db.VarChar(100)
+  fileSize      Int      @map("file_size")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant      SystemTenant      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  catalogItem TenantCatalogItem @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, catalogItemId])
+  @@map("tenant_catalog_item_media")
+}
+
+// ============================================================
+// SELF-HOSTED INFRASTRUCTURE
+// ============================================================
+
+model TenantInstance {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  instanceId     String    @unique @map("instance_id") @db.Uuid
+  instanceUrl    String    @map("instance_url") @db.VarChar(255)
+  licenseKeyHash String    @map("license_key_hash") @db.VarChar(255)
+  status         String    @default("active") @db.VarChar(32)
+  registeredAt   DateTime  @default(now()) @map("registered_at") @db.Timestamptz
+  lastHeartbeat  DateTime? @map("last_heartbeat") @db.Timestamptz
+  syncErrorCount Int       @default(0) @map("sync_error_count")
+  infraMetadata  Json      @default("{}") @map("infra_metadata")
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant       SystemTenant        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  domains      TenantDomain[]
+  entitlements TenantEntitlement[]
+
+  @@index([tenantId])
+  @@index([licenseKeyHash])
+  @@map("tenant_instances")
+}
+
+model TenantDomain {
+  id                 String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId           String    @map("tenant_id") @db.Uuid
+  instanceId         String?   @map("instance_id") @db.Uuid
+  domain             String    @db.VarChar(255)
+  verificationMethod String    @default("dns_txt") @map("verification_method") @db.VarChar(32)
+  verificationToken  String?   @map("verification_token") @db.VarChar(255)
+  isVerified         Boolean   @default(false) @map("is_verified")
+  isPrimary          Boolean   @default(false) @map("is_primary")
+  verifiedAt         DateTime? @map("verified_at") @db.Timestamptz
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant   SystemTenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  instance TenantInstance? @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, domain])
+  @@index([tenantId])
+  @@map("tenant_domains")
+}
+
+model TenantEntitlement {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId       String    @map("tenant_id") @db.Uuid
+  instanceId     String?   @map("instance_id") @db.Uuid
+  enabledModules Json      @default("[]") @map("enabled_modules")
+  featureFlags   Json      @default("{}") @map("feature_flags")
+  quota          Json      @default("{}") @map("quota")
+  validFrom      DateTime  @default(now()) @map("valid_from") @db.Timestamptz
+  validUntil     DateTime? @map("valid_until") @db.Timestamptz
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz
+
+  tenant   SystemTenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  instance TenantInstance? @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, instanceId])
+  @@map("tenant_entitlements")
 }

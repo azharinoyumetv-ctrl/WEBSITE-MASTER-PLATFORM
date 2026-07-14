@@ -83,9 +83,12 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
 
     const res = await inviteUser(tenantId, inviteEmail, inviteRole, invitedBy)
     setIsInviting(false)
-    if (res.success && res.user) {
+    if (res.success) {
       toast.success('Invitation sent successfully')
-      setUsers([res.user, ...users])
+      const invitedUser = (res as any).user
+      if (invitedUser) {
+        setUsers([invitedUser, ...users])
+      }
       setShowInviteModal(false)
       setInviteEmail('')
     } else {

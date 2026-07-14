@@ -53,7 +53,7 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
       const parsed = JSON.parse(val)
       const valid = layoutBlockSchema.safeParse(parsed)
       if (!valid.success) {
-        setJsonError(valid.error.errors[0].message)
+        setJsonError(valid.error.issues[0]?.message || 'Validation error')
       } else {
         setJsonError(null)
         setEditingPage({ ...editingPage, layoutBlocks: parsed })
@@ -75,7 +75,7 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
     const res = await saveAdminPage(tenantId, editingPage.id, editingPage)
     setIsSaving(false)
 
-    if (res.success) {
+    if (res.success && res.page) {
       toast.success('Page saved successfully')
       if (editingPage.id) {
         setPages(pages.map(p => p.id === res.page.id ? res.page : p))

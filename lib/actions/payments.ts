@@ -462,6 +462,16 @@ export async function createMidtransCheckout(tenantId: string, orderId: string, 
 export async function handleDokuNotification(req: Request) {
   try {
     const headersList = req.headers;
+    const clientId = headersList.get('client-id') || '';
+    const requestId = headersList.get('request-id') || '';
+    const timestamp = headersList.get('request-timestamp') || '';
+    const incomingSignature = headersList.get('signature') || '';
+
+    if (!clientId || !requestId || !timestamp || !incomingSignature) {
+      console.warn('Rejecting DOKU webhook POST: missing required authentication headers.');
+      return { status: 401, body: { error: 'Missing authentication headers' } };
+    }
+
     const bodyText = await req.text();
     const body = JSON.parse(bodyText);
 
@@ -500,10 +510,6 @@ export async function handleDokuNotification(req: Request) {
     const auth = await getDokuAuth(tenantId);
 
     // Verify DOKU signature
-    const clientId = headersList.get('client-id') || '';
-    const requestId = headersList.get('request-id') || '';
-    const timestamp = headersList.get('request-timestamp') || '';
-    const incomingSignature = headersList.get('signature') || '';
 
     // Calculate Digest
     const digest = crypto.createHash('sha256').update(bodyText).digest('base64');
