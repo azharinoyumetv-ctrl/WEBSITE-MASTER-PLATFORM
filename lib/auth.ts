@@ -123,7 +123,7 @@ export const authOptions: NextAuthOptions = {
         }
 
         if (user.authCredential?.lockedUntil && user.authCredential.lockedUntil > new Date()) {
-          throw new Error("Account temporarily locked due to too many failed attempts")
+          throw new Error('Invalid credentials')
         }
 
         let isValidPassword = false;
