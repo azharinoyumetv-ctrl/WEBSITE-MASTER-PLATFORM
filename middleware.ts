@@ -112,9 +112,10 @@ export default async function middleware(request: NextRequest) {
     if (token) {
       const userRoles = (token.roles as string[]) || []
       const hasAnyRole = userRoles.length > 0
+      const isPlatformOwner = userRoles.some(r => r.toLowerCase() === 'platform_owner' || r.toLowerCase() === 'platform owner')
       const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super-admin')
       
-      if (hasAnyRole && (token.tenantId === targetTenantId || isSuperAdmin)) {
+      if (hasAnyRole && (token.tenantId === targetTenantId || isPlatformOwner || isSuperAdmin)) {
         isAuthorized = true
       }
     }
