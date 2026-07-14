@@ -52,7 +52,18 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Missing credentials")
         }
 
-        const ip = (req.headers as any)?.['x-forwarded-for'] || (req.headers as any)?.['x-real-ip'] || 'unknown'
+        const headers = (req as any)?.headers || {}
+        const directIp = (req as any)?.ip || (req as any)?.socket?.remoteAddress || ''
+        const forwarded = (headers['x-forwarded-for'] || headers['x-real-ip'] || '') as string
+        let ip = 'unknown'
+        const firstHop = (forwarded.split(',')[0] || '').trim()
+        if (/^(::1|127\.0\.0\.1|0\.0\.0\.0|localhost)$/.test(directIp) && firstHop) {
+          ip = firstHop
+        } else if (firstHop) {
+          ip = firstHop
+        } else {
+          ip = directIp || 'unknown'
+        }
         
         // 1. IP-based rate limiting
         const rl = await checkRateLimit(ip, 'auth', 20, 15 * 60 * 1000)
