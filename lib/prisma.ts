@@ -1,27 +1,36 @@
 import { PrismaClient } from '@prisma/client'
 import { PrismaPg } from '@prisma/adapter-pg'
 import { Pool } from 'pg'
-import fs from 'fs'
-import path from 'path'
+
+const stripQuotes = (value: string | undefined): string | undefined => {
+  if (!value) return value
+  const trimmed = value.trim()
+  if ((trimmed.startsWith('"') && trimmed.endsWith('"')) || (trimmed.startsWith("'") && trimmed.endsWith("'"))) {
+    return trimmed.slice(1, -1)
+  }
+  return trimmed
+}
 
 const loadDatabaseUrl = (): string => {
-  const envPath = path.resolve(process.cwd(), '.env')
-  const content = fs.readFileSync(envPath, 'utf-8')
-  const match = content.match(/^DATABASE_URL=['"]?([^'"\n]+)['"]?/m)
-  const value = match ? match[1] : null
-  if (!value) {
+  const connectionString = stripQuotes(process.env.DATABASE_URL)
+  if (!connectionString) {
     console.error(
       '[prisma] FATAL: DATABASE_URL is not set in environment variables.\n' +
-      'Set DATABASE_URL in your .env file or PM2 ecosystem config and rebuild.'
+        'Set DATABASE_URL via environment variables, PM2 ecosystem config, or container secrets and rebuild.'
     )
     throw new Error('DATABASE_URL is not set in environment variables.')
   }
-  return value
+  return connectionString
 }
 
 const prismaClientSingleton = () => {
   const connectionString = loadDatabaseUrl()
-  const pool = new Pool({ connectionString })
+  const pool = new Pool({
+    connectionString,
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 10000
+  })
   const adapter = new PrismaPg(pool)
   return new PrismaClient({ adapter })
 }

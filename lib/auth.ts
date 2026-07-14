@@ -97,15 +97,18 @@ export const authOptions: NextAuthOptions = {
         })
 
         if (!user) {
-          throw new Error("Invalid credentials")
+          await checkRateLimit(credentials.email, 'auth_email', 5, 15 * 60 * 1000).catch(() => {})
+          throw new Error('Invalid credentials')
         }
 
-        if (user.status === "suspended" || (user.tenant && user.tenant.status === "suspended")) {
-          throw new Error("Account suspended")
+        if (user.status === 'suspended' || (user.tenant && user.tenant.status === 'suspended')) {
+          console.warn(`Login attempt for suspended account: ${user.id}`)
+          throw new Error('Invalid credentials')
         }
 
-        if (user.status === "pending_verification") {
-          throw new Error("Email not verified")
+        if (user.status === 'pending_verification') {
+          console.warn(`Login attempt for unverified account: ${user.id}`)
+          throw new Error('Invalid credentials')
         }
 
         if (user.authCredential?.lockedUntil && user.authCredential.lockedUntil > new Date()) {
