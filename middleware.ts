@@ -8,8 +8,9 @@ export const config = {
   ],
 }
 
-const locales = ['en', 'id']
-const defaultLocale = 'en'
+import i18nConfig from './i18n'
+const locales = i18nConfig.locales
+const defaultLocale = i18nConfig.defaultLocale
 
 function getLocale(request: NextRequest) {
   // 1. Check cookies
