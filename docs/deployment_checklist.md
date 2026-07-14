@@ -17,10 +17,15 @@ Follow this checklist to provision, configure, and go live with the Website Mast
 ## 3. Environment Configuration
 - [ ] **Copy Environment File:** `cp .env.example .env`
 - [ ] **Configure Core Variables:** 
-  - `DATABASE_URL` (Point to your production Postgres instance).
+  - `DATABASE_URL` — Point to your production Postgres instance.
+    ⚠️  **URL-encode special characters in the password** — `#` → `%23`, `@` → `%40`.
+    An unescaped `#` is treated as a URL fragment separator by the Node URL parser,
+    which corrupts the hostname and causes Prisma to throw `EAI_AGAIN` at runtime.
+    Example: `postgresql://postgres:MyPass%23Word@localhost:5432/mydb?schema=public`
   - `NEXTAUTH_URL` (Your production domain, e.g., `https://store.dagangos.com`).
   - `NEXTAUTH_SECRET`, `JWT_SECRET`, `JWT_REFRESH_SECRET` (Generate secure random 32-byte hex strings).
   - `ENCRYPTION_KEY` (Required for Xendit/Midtrans API key encryption at rest; must be 32 bytes).
+  - `CONTROL_PLANE_SECRET` (Required for `/api/v1` HMAC auth; generate with `openssl rand -hex 32`).
 - [ ] **Configure WhatsApp (Optional):**
   - Add `WHATSAPP_PHONE_NUMBER_ID`, `WHATSAPP_ACCESS_TOKEN`, `WHATSAPP_TEMPLATE_NAME`, and `PA_WHATSAPP_NUMBER` to enable system-level fallbacks for notifications.
 
