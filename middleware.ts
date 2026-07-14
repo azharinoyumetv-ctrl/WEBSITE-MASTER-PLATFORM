@@ -71,14 +71,25 @@ export default async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   const isSecure = process.env.NEXTAUTH_URL?.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https'
-  const token = await getToken({ 
-    req: request,
-    secret: process.env.NEXTAUTH_SECRET,
-    secureCookie: isSecure
-  })
-
   const hostname = request.headers.get('host') || ''
   const targetTenantId = getTenantFromHost(hostname)
+
+  const nextAction = request.headers.get('next-action')
+  const referer = request.headers.get('referer') || ''
+  const isProtectedAction = nextAction && referer.includes('/admin')
+
+  const isProtected = (
+    (pathname.match(/^\/(en|id)\/admin/) || pathname.startsWith('/admin')) && 
+    !pathname.includes('/auth/login')
+  ) || isProtectedAction
+
+  const token = (targetTenantId !== 'default' || isProtected)
+    ? await getToken({ 
+        req: request,
+        secret: process.env.NEXTAUTH_SECRET,
+        secureCookie: isSecure
+      })
+    : null
 
   // 1. Cross-tenant routing validation if user has active session
   if (token && targetTenantId !== 'default') {
@@ -97,14 +108,6 @@ export default async function middleware(request: NextRequest) {
   }
 
   // 2. Auth check for protected admin routes and admin server actions
-  const nextAction = request.headers.get('next-action')
-  const referer = request.headers.get('referer') || ''
-  const isProtectedAction = nextAction && referer.includes('/admin')
-
-  const isProtected = (
-    (pathname.match(/^\/(en|id)\/admin/) || pathname.startsWith('/admin')) && 
-    !pathname.includes('/auth/login')
-  ) || isProtectedAction
 
   if (isProtected) {
     let isAuthorized = false
