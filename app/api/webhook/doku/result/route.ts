@@ -28,7 +28,7 @@ export async function POST(req: Request) {
     const protocol = req.headers.get('x-forwarded-proto') || 'https';
     return NextResponse.redirect(`${protocol}://${host}/checkout?status=success`);
   } catch (error: any) {
-    console.error('Doku webhook result handler error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    console.error('[webhook/doku/result] POST error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

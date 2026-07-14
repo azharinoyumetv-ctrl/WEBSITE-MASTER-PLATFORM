@@ -30,10 +30,10 @@ export async function POST(request: Request) {
       receivedAt: new Date().toISOString()
     })
   } catch (error: any) {
-    console.error('Webhook processing error:', error)
+    console.error('[webhook] Processing error:', error)
     return NextResponse.json(
-      { success: false, error: error.message || 'Invalid JSON payload' },
-      { status: 400 }
+      { success: false, error: 'Internal server error' },
+      { status: 500 }
     )
   }
 }

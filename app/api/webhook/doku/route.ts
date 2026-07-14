@@ -6,7 +6,7 @@ export async function POST(req: Request) {
     const { status, body } = await handleDokuNotification(req);
     return NextResponse.json(body, { status });
   } catch (error: any) {
-    console.error('Doku webhook handler error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    console.error('[webhook/doku] Handler error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
