@@ -6,8 +6,8 @@ module.exports = {
       args: 'run start',
       env: {
         NODE_ENV: 'production',
-        ENCRYPTION_KEY: 'default-32-character-encrypt-key',
-        NEXTAUTH_SECRET: 'your-super-secret-key-change-in-production'
+        ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
+        NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET
       }
     }
   ]

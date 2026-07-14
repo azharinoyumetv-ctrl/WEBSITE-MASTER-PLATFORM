@@ -10,6 +10,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Missing registration details' }, { status: 400 })
     }
 
+    // Ensure tenant exists to prevent Foreign Key constraint crash on fresh tenants
+    await prisma.systemTenant.upsert({
+      where: { id: tenantId },
+      update: {},
+      create: {
+        id: tenantId,
+        companyName: `Tenant ${tenantId.slice(0, 8)}`,
+        subdomain: `tenant-${tenantId.slice(0, 8)}`,
+        status: 'active',
+        plan: 'enterprise'
+      }
+    })
+
     // Upsert tenant instance
     const instance = await prisma.tenantInstance.upsert({
       where: { instanceId },
