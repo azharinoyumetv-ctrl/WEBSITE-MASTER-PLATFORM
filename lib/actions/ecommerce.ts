@@ -41,7 +41,8 @@ export async function updateOrderStatus(tenantId: string, orderId: string, statu
     const currentStatus = currentOrder.orderStatus
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
       pending: ['paid', 'cancelled'],
-      paid: ['processing', 'cancelled'],
+      paid: ['pending_fulfillment', 'processing', 'cancelled'],
+      pending_fulfillment: ['processing', 'shipped', 'cancelled'],
       processing: ['shipped', 'cancelled'],
       shipped: ['completed', 'cancelled'],
       completed: [],
@@ -81,7 +82,8 @@ export async function bulkUpdateOrderStatus(tenantId: string, orderIds: string[]
 
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
       pending: ['paid', 'cancelled'],
-      paid: ['processing', 'cancelled'],
+      paid: ['pending_fulfillment', 'processing', 'cancelled'],
+      pending_fulfillment: ['processing', 'shipped', 'cancelled'],
       processing: ['shipped', 'cancelled'],
       shipped: ['completed', 'cancelled'],
       completed: [],
@@ -146,7 +148,17 @@ export async function cancelOrder(tenantId: string, orderId: string, reason?: st
   }
 }
 
-export async function createOrder(tenantId: string, data: { email: string, items: { id: string, quantity: number }[] }) {
+export async function createOrder(
+  tenantId: string,
+  data: {
+    email: string
+    name: string
+    phone: string
+    companyName?: string
+    notes?: string
+    items: { id: string, quantity: number }[]
+  }
+) {
   try {
     const catalogItems = await prisma.tenantCatalogItem.findMany({
       where: { id: { in: data.items.map(i => i.id) }, tenantId }
@@ -174,6 +186,13 @@ export async function createOrder(tenantId: string, data: { email: string, items
         guestEmail: data.email,
         totalAmount,
         orderStatus: 'pending',
+        // Repurpose shippingAddress JSON as service-order contact details
+        shippingAddress: {
+          name: data.name,
+          phone: data.phone,
+          companyName: data.companyName || '',
+        },
+        notes: data.notes || null,
         items: {
           create: orderItemsData
         }

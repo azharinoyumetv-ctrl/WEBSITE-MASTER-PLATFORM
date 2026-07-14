@@ -81,7 +81,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
               >
                 {t('explore_packages')}
               </a>
-              <a href="/contact" className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all text-sm">
+              <a href="/checkout" className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all text-sm">
                 {t('contact_sales')}
               </a>
             </div>
@@ -194,7 +194,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             </div>
 
             <a 
-              href="/contact"
+              href="/checkout"
               className="block text-center py-3.5 text-white font-bold rounded-xl transition-opacity hover:opacity-90 shadow-lg text-sm w-full"
               style={{ backgroundColor: primaryColor }}
             >

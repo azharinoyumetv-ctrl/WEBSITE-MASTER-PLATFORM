@@ -16,71 +16,72 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Invalid or expired checkout session' }, { status: 403 })
     }
 
+    // --- Requirements-before-payment gate ---
+    if (!body.name || String(body.name).trim() === '') {
+      return NextResponse.json({ error: 'Customer name is required' }, { status: 400 })
+    }
+    if (!body.phone || String(body.phone).trim() === '') {
+      return NextResponse.json({ error: 'Customer phone is required' }, { status: 400 })
+    }
+    if (!body.email || String(body.email).trim() === '') {
+      return NextResponse.json({ error: 'Customer email is required for checkout' }, { status: 400 })
+    }
+
+    // Items are mandatory — do not trust client-supplied amounts
+    if (!body.items || !Array.isArray(body.items) || body.items.length === 0) {
+      return NextResponse.json({ error: 'At least one item is required for checkout' }, { status: 400 })
+    }
+
     const websiteRes = await prisma.tenantWebsite.findUnique({
       where: { tenantId }
     })
     
     const themeConfig = websiteRes?.themeConfig as any || {}
     const paymentGateway = themeConfig.paymentGateway || 'unset'
-    
-    if (!body.email) {
-      return NextResponse.json({ error: 'Customer email is required for checkout' }, { status: 400 })
-    }
-    
-    if (!body.amount) {
-      return NextResponse.json({ error: 'Order amount is required for checkout' }, { status: 400 })
-    }
+    const currency = body.currency || themeConfig.baseCurrency || 'IDR'
 
-    const currency = body.currency || themeConfig.baseCurrency || 'USD'
+    // Server-side price computation — never trust client amount
+    const catalogItems = await prisma.tenantCatalogItem.findMany({
+      where: { id: { in: body.items.map((i: any) => i.id) }, tenantId }
+    })
 
-    let orderId = ''
-    let totalAmount = body.amount
+    let computedTotal = 0
+    const orderItemsData = body.items.map((i: any) => {
+      const catItem = catalogItems.find((c: any) => c.id === i.id)
+      if (!catItem) throw new Error(`Item ${i.id} not found or not accessible`)
+      const unitPrice = catItem.basePrice
+      const total = Number(unitPrice) * i.quantity
+      computedTotal += total
+      return {
+        tenantId,
+        catalogItemId: i.id,
+        quantity: i.quantity,
+        unitPrice: unitPrice,
+        totalPrice: total
+      }
+    })
 
-    if (body.items && Array.isArray(body.items) && body.items.length > 0) {
-      const catalogItems = await prisma.tenantCatalogItem.findMany({
-        where: { id: { in: body.items.map((i: any) => i.id) }, tenantId }
-      })
-      
-      let computedTotal = 0
-      const orderItemsData = body.items.map((i: any) => {
-        const catItem = catalogItems.find(c => c.id === i.id)
-        if (!catItem) throw new Error(`Item ${i.id} not found`)
-        const unitPrice = catItem.basePrice
-        const total = Number(unitPrice) * i.quantity
-        computedTotal += total
-        return {
-          tenantId,
-          catalogItemId: i.id,
-          quantity: i.quantity,
-          unitPrice: unitPrice,
-          totalPrice: total
+    const order = await prisma.tenantOrder.create({
+      data: {
+        tenantId,
+        guestEmail: body.email,
+        totalAmount: computedTotal,
+        orderStatus: 'pending',
+        // Service-order contact fields stored in shippingAddress JSON
+        shippingAddress: {
+          name: String(body.name).trim(),
+          phone: String(body.phone).trim(),
+          companyName: body.companyName ? String(body.companyName).trim() : '',
+        },
+        notes: body.notes ? String(body.notes).trim() : null,
+        items: {
+          create: orderItemsData
         }
-      })
-      
-      const order = await prisma.tenantOrder.create({
-        data: {
-          tenantId,
-          guestEmail: body.email,
-          totalAmount: computedTotal,
-          orderStatus: 'pending',
-          items: {
-            create: orderItemsData
-          }
-        }
-      })
-      orderId = order.id
-      totalAmount = computedTotal
-    } else {
-      const order = await prisma.tenantOrder.create({
-        data: {
-          tenantId,
-          guestEmail: body.email,
-          totalAmount: body.amount,
-          orderStatus: 'pending'
-        }
-      })
-      orderId = order.id
-    }
+      }
+    })
+
+    const orderId = order.id
+    const totalAmount = computedTotal
 
     // Create initiated payment record
     await prisma.tenantPayment.create({
@@ -100,7 +101,7 @@ export async function POST(req: NextRequest) {
       if (websiteRes?.xenditEncryptedSecret && websiteRes.xenditEncryptedSecretIv) {
         apiKey = decrypt(`${websiteRes.xenditEncryptedSecretIv}:${websiteRes.xenditEncryptedSecret}`) || apiKey
       }
-      if (!apiKey) return NextResponse.json({ error: 'Payment provider not configured. Add your API key in Settings or set the platform environment variable.' }, { status: 500 })
+      if (!apiKey) return NextResponse.json({ error: 'Payment provider not configured. Add your API key in Settings.' }, { status: 500 })
 
       const res = await fetch('https://api.xendit.co/v2/invoices', {
         method: 'POST',
@@ -128,7 +129,7 @@ export async function POST(req: NextRequest) {
       if (websiteRes?.midtransEncryptedServerKey && websiteRes.midtransEncryptedServerKeyIv) {
         serverKey = decrypt(`${websiteRes.midtransEncryptedServerKeyIv}:${websiteRes.midtransEncryptedServerKey}`) || serverKey
       }
-      if (!serverKey) return NextResponse.json({ error: 'Payment provider not configured. Add your API key in Settings or set the platform environment variable.' }, { status: 500 })
+      if (!serverKey) return NextResponse.json({ error: 'Payment provider not configured. Add your API key in Settings.' }, { status: 500 })
 
       const baseUrl = (serverKey.startsWith('SB-') || serverKey.toLowerCase().includes('sandbox'))
         ? 'https://app.sandbox.midtrans.com/snap/v1/transactions' 
@@ -147,7 +148,9 @@ export async function POST(req: NextRequest) {
             gross_amount: totalAmount
           },
           customer_details: {
-            email: body.email
+            email: body.email,
+            first_name: String(body.name).trim(),
+            phone: String(body.phone).trim()
           }
         })
       })
@@ -161,7 +164,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Invalid or unsupported payment gateway configured' }, { status: 400 })
     
   } catch (error: any) {
-    console.error('Checkout error:', error)
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+    console.error('[checkout] Internal error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

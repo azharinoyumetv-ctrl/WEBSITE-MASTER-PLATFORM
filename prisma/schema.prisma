@@ -451,6 +451,7 @@ model TenantOrder {
 enum OrderStatus {
   pending
   paid
+  pending_fulfillment
   processing
   shipped
   completed

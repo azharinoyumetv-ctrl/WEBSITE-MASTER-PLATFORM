@@ -184,7 +184,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
                 </div>
 
                 <a 
-                  href="/contact"
+                  href="/checkout"
                   className="block text-center py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 w-full"
                   style={{ backgroundColor: primaryColor }}
                 >
@@ -210,7 +210,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
                   <p className="text-slate-600 text-sm leading-relaxed">{addon.desc}</p>
                 </div>
                 <div className="mt-4 border-t border-slate-50 pt-4 flex justify-end">
-                  <a href="/contact" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">{t('add_to_package')}</a>
+                  <a href="/checkout" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">{t('add_to_package')}</a>
                 </div>
               </div>
             ))}

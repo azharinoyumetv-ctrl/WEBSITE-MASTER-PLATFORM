@@ -17,7 +17,12 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
 }) {
   const [cart, setCart] = useState<{item: any, quantity: number}[]>([])
   const [step, setStep] = useState(1)
+  // Service-order contact fields
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
+  const [companyName, setCompanyName] = useState('')
+  const [notes, setNotes] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [paymentVerifyStatus, setPaymentVerifyStatus] = useState<'idle' | 'checking' | 'success' | 'failed' | 'cancelled' | 'timeout'>('idle')
   const [attempts, setAttempts] = useState(0)
@@ -99,12 +104,18 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
   const total = cart.reduce((sum, {item, quantity}) => sum + (Number(item.basePrice) * quantity), 0)
 
   const handleCheckout = async () => {
-    if (!email) return toast.error('Please enter your email')
+    if (!name.trim()) return toast.error('Please enter your full name')
+    if (!phone.trim()) return toast.error('Please enter your phone number')
+    if (!email.trim()) return toast.error('Please enter your email address')
     if (cart.length === 0) return toast.error('Cart is empty')
 
     setIsProcessing(true)
     const res = await createOrder(tenantId, {
-      email,
+      email: email.trim(),
+      name: name.trim(),
+      phone: phone.trim(),
+      companyName: companyName.trim() || undefined,
+      notes: notes.trim() || undefined,
       items: cart.map(c => ({ id: c.item.id, quantity: c.quantity }))
     })
     
@@ -286,17 +297,66 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
               Proceed to Checkout <ArrowRight className="w-4 h-4 ml-2" />
             </button>
           ) : (
-            <div className="space-y-4 animate-scale-in">
-              <div className="border-t border-slate-100 pt-4">
-                <label className="form-label">Email Address</label>
-                <input 
-                  type="email" 
-                  value={email} 
-                  onChange={e => setEmail(e.target.value)} 
-                  placeholder="you@example.com" 
-                  className="form-input" 
-                />
+            <div className="space-y-3 animate-scale-in">
+              <div className="border-t border-slate-100 pt-4 space-y-3">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Contact Details</p>
+
+                <div>
+                  <label className="form-label">Full Name <span className="text-red-500">*</span></label>
+                  <input 
+                    type="text" 
+                    value={name} 
+                    onChange={e => setName(e.target.value)} 
+                    placeholder="Your full name" 
+                    className="form-input" 
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Phone Number <span className="text-red-500">*</span></label>
+                  <input 
+                    type="tel" 
+                    value={phone} 
+                    onChange={e => setPhone(e.target.value)} 
+                    placeholder="+62 812 3456 7890" 
+                    className="form-input" 
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Email Address <span className="text-red-500">*</span></label>
+                  <input 
+                    type="email" 
+                    value={email} 
+                    onChange={e => setEmail(e.target.value)} 
+                    placeholder="you@example.com" 
+                    className="form-input" 
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Company / Business Name <span className="text-slate-400 font-normal text-xs">(optional)</span></label>
+                  <input 
+                    type="text" 
+                    value={companyName} 
+                    onChange={e => setCompanyName(e.target.value)} 
+                    placeholder="PT. Your Company" 
+                    className="form-input" 
+                  />
+                </div>
+
+                <div>
+                  <label className="form-label">Notes / Special Requests <span className="text-slate-400 font-normal text-xs">(optional)</span></label>
+                  <textarea 
+                    value={notes} 
+                    onChange={e => setNotes(e.target.value)} 
+                    placeholder="Any special requirements or messages for our team..." 
+                    rows={3}
+                    className="form-input resize-none" 
+                  />
+                </div>
               </div>
+
               <button 
                 onClick={handleCheckout} 
                 disabled={isProcessing}

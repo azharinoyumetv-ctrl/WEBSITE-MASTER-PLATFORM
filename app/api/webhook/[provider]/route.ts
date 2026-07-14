@@ -237,7 +237,7 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
         await prisma.tenantOrder.updateMany({
           where: { id: orderId },
           data: { 
-            orderStatus: 'processing',
+            orderStatus: 'pending_fulfillment',
             receiptUrl: `/orders/${orderId}/receipt`
           }
         })
@@ -339,8 +339,7 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
     return NextResponse.json({ success: true })
     
   } catch (error) {
-    const errorMsg = error instanceof Error ? error.message : String(error)
-    console.error('Generic webhook error:', error)
-    return NextResponse.json({ error: errorMsg }, { status: 500 })
+    console.error('[webhook/provider] Internal error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
