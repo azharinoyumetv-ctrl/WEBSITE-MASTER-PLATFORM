@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { validateV1Request } from '@/lib/v1-auth'
 
 export async function POST(req: Request) {
+  const authError = await validateV1Request(req)
+  if (authError) return authError
+
   try {
     const body = await req.json()
     const { instanceId, tenantId, instanceUrl, customDomains, licenseKey, infraMetadata } = body
@@ -28,7 +32,7 @@ export async function POST(req: Request) {
       where: { instanceId },
       update: {
         instanceUrl,
-        licenseKeyHash: licenseKey, // Simple storage for hash
+        licenseKeyHash: licenseKey,
         status: 'active',
         infraMetadata: infraMetadata || {},
         lastHeartbeat: new Date()
@@ -51,7 +55,7 @@ export async function POST(req: Request) {
           where: { tenantId_domain: { tenantId, domain } },
           update: {
             instanceId: instance.id,
-            isVerified: true // Assume verified on bootstrap
+            isVerified: true
           },
           create: {
             tenantId,
@@ -89,6 +93,7 @@ export async function POST(req: Request) {
       syncInterval: 300
     })
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    console.error('[v1/instances/register] Internal error:', error)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }

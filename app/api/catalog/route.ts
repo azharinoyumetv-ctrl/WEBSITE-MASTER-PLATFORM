@@ -27,6 +27,7 @@ export async function GET(req: Request) {
     })
     return NextResponse.json({ success: true, items })
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    console.error('[catalog GET] Internal error:', error)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }

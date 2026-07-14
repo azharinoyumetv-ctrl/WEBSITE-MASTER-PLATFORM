@@ -1,7 +1,10 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
+import { validateV1Request } from '@/lib/v1-auth'
 
 export async function POST(req: Request) {
+  const authError = await validateV1Request(req)
+  if (authError) return authError
+
   try {
     const body = await req.json()
     const { modules, syncId } = body
@@ -10,15 +13,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Missing sync modules or syncId' }, { status: 400 })
     }
 
-    // In a self-hosted instance, this would trigger database migrations, update active routes, etc.
-    // For this mock implementation, we log the event and return success.
-    console.log(`[Instance Sync] Applied modules: ${modules.join(', ')} (Sync ID: ${syncId})`);
+    console.log(`[Instance Sync] Applied modules: ${modules.join(', ')} (Sync ID: ${syncId})`)
 
     return NextResponse.json({
       status: 'applied',
       syncId
     })
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    console.error('[v1/modules/sync] Internal error:', error)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }

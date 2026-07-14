@@ -63,6 +63,7 @@ export async function POST(req: Request) {
     
     return NextResponse.json({ success: true })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[auth/forgot-password] Internal error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

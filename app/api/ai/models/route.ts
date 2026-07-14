@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getTempAiSecret } from '@/lib/actions/website'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export async function POST(req: NextRequest) {
   try {
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const rl = await checkRateLimit(ip, 'ai_models', 30, 60 * 1000)
+    if (rl.limited) {
+      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
+    }
+
     const { providerKey, secretToken, customBaseUrl } = await req.json()
     
     if (!secretToken) {
@@ -53,7 +60,6 @@ export async function POST(req: NextRequest) {
         }
       }
       if (models.length === 0) {
-        // Fallback for Claude if endpoint has issues
         models = [
           'claude-3-5-sonnet-latest',
           'claude-3-5-haiku-latest',
@@ -64,6 +70,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ models })
   } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 })
+    console.error('[ai/models] Internal error:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import crypto from 'crypto'
 import { encrypt, decrypt } from '@/lib/crypto'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,12 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
+    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const rl = await checkRateLimit(ip, 'auth_captcha', 20, 60 * 1000)
+    if (rl.limited) {
+      return NextResponse.json({ success: false, error: 'Too many requests. Please try again later.' }, { status: 429 })
+    }
+
     const { token, answer } = await req.json()
     if (!token || !answer) {
       return NextResponse.json({ success: false, error: 'Missing token or answer' }, { status: 400 })

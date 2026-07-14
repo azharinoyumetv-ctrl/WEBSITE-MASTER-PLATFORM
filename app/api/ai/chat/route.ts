@@ -2,8 +2,16 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { sendWhatsAppTemplate } from '@/lib/whatsapp'
 import { decrypt } from '@/lib/crypto'
+import { checkRateLimit } from '@/lib/rate-limit'
+
 export async function POST(request: Request) {
   try {
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
+    const rl = await checkRateLimit(ip, 'ai_chat', 30, 60 * 1000)
+    if (rl.limited) {
+      return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
+    }
+
     const body = await request.json()
     const { prompt, type, context, tone } = body
     const tenantId = request.headers.get('x-tenant-id') || 'default'
@@ -157,9 +165,9 @@ export async function POST(request: Request) {
     }
 
   } catch (error: any) {
-    console.error('AI generation error:', error)
+    console.error('[ai/chat] Internal error:', error)
     return NextResponse.json(
-      { error: error.message || 'Failed to generate content' },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

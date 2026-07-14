@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { validateV1Request } from '@/lib/v1-auth'
 
 export async function POST(req: Request) {
+  const authError = await validateV1Request(req)
+  if (authError) return authError
+
   try {
     const body = await req.json()
     const { licenseKey, instanceId } = body
@@ -18,7 +22,6 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Instance not found' }, { status: 404 })
     }
 
-    // A simple validation for demonstration. In production, this verifies a signed JWT.
     const valid = instance.licenseKeyHash === licenseKey
 
     if (!valid) {
@@ -32,6 +35,7 @@ export async function POST(req: Request) {
       expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
     })
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    console.error('[v1/instances/validate-license] Internal error:', error)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }

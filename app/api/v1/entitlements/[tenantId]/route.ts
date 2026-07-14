@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { validateV1Request } from '@/lib/v1-auth'
 
 export async function GET(req: Request, { params }: { params: { tenantId: string } }) {
+  const authError = await validateV1Request(req)
+  if (authError) return authError
+
   try {
     const { tenantId } = params
 
@@ -28,6 +32,7 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
       quota: entitlement.quota
     })
   } catch (error: any) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 })
+    console.error('[v1/entitlements] Internal error:', error)
+    return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })
   }
 }
