@@ -8,22 +8,16 @@ export const config = {
   ],
 }
 
-import i18nConfig from './i18n'
-const locales = i18nConfig.locales
-const defaultLocale = i18nConfig.defaultLocale
+import { locales, defaultLocale } from './i18n'
 
-function getLocale(request: NextRequest) {
-  // 1. Check cookies
-  const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value
-  if (cookieLocale && locales.includes(cookieLocale)) {
-    return cookieLocale
-  }
-  // 2. Check Accept-Language
-  const acceptLanguage = request.headers.get('accept-language')
-  if (acceptLanguage) {
-    if (acceptLanguage.includes('id')) return 'id'
-  }
-  return defaultLocale
+function parseAcceptLanguage(request: NextRequest): string | null {
+  const raw = request.headers.get('accept-language')
+  if (!raw) return null
+  const parsed = raw
+    .split(',')
+    .map(part => part.trim().split(';')[0].toLowerCase())
+  const idMatch = parsed.find(part => part === 'id' || part.startsWith('id-'))
+  return idMatch ? 'id' : null
 }
 
 function getBaseUrl(request: NextRequest) {
@@ -103,7 +97,7 @@ export default async function middleware(request: NextRequest) {
         return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized tenant access' }, { status: 403 }))
       }
       const origin = getBaseUrl(request)
-      const locale = getLocale(request)
+      const locale = parseAcceptLanguage(request) || defaultLocale
       return applySecurityHeaders(NextResponse.redirect(new URL(`/${locale}/auth/login`, origin)))
     }
   }
@@ -131,7 +125,7 @@ export default async function middleware(request: NextRequest) {
 
       // Determine locale to redirect to
       const localeMatch = pathname.match(/^\/(en|id)(\/|$)/)
-      const locale = localeMatch ? localeMatch[1] : getLocale(request)
+      const locale = localeMatch ? localeMatch[1] : parseAcceptLanguage(request) || defaultLocale
       const origin = getBaseUrl(request)
       const redirectUrl = new URL(`/${locale}/auth/login`, origin)
       const callback = new URL(request.nextUrl.pathname + request.nextUrl.search, origin).href
@@ -180,7 +174,7 @@ function handleRouting(request: NextRequest) {
 
   // Redirect to localized URL if missing
   if (!localeInUrl) {
-    const locale = getLocale(request)
+    const locale = parseAcceptLanguage(request) || defaultLocale
     const origin = getBaseUrl(request)
     const redirectUrl = new URL(`/${locale}${pathname}${request.nextUrl.search}`, origin)
     return NextResponse.redirect(redirectUrl)
