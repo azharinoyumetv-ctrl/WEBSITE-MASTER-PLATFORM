@@ -134,12 +134,6 @@ export default async function SiteLayout({
             >
               {tStore('shop_now')}
             </Link>
-            <Link 
-              href="/auth/login" 
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              {tStore('login')}
-            </Link>
           </div>
         </div>
       </header>

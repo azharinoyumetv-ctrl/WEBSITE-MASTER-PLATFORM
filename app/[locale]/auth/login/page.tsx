@@ -190,7 +190,7 @@ export default function LoginPage() {
           </form>
 
           <div className="mt-7 border-t border-slate-100 pt-5 text-center">
-            <p className="text-sm text-slate-500">Need an account? <Link href="/auth/register" className="font-bold text-emerald-700 hover:text-emerald-800">Request access</Link></p>
+            <p className="text-sm text-slate-500">Workspace access is issued by DagangOS once your project is provisioned.</p>
             <p className="mt-3 text-xs text-slate-400">Bcrypt password hashing (cost 12) · HttpOnly secure session cookies</p>
           </div>
         </section>

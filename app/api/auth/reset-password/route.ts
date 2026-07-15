@@ -40,7 +40,7 @@ export async function POST(req: Request) {
       // Also update legacy hash if needed
       await tx.user.update({
         where: { id: authCred.user.id },
-        data: { passwordHash: newHash }
+        data: { passwordHash: newHash, status: 'active', emailVerified: true, verificationToken: null }
       })
       // Revoke all refresh tokens
       await tx.tenantRefreshToken.updateMany({

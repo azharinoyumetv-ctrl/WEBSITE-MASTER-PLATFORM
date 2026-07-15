@@ -68,8 +68,8 @@ type DashboardProps = {
     revenue: number
     totalOrders: number
     modules: ModuleItem[]
-    recentOrders: Array<{ id: string; createdAt?: string; totalAmount?: number; paymentStatus?: string }>
-    criticalItems: Array<{ id: string; catalogItem?: { title?: string }; location?: { locationName?: string }; quantityOnHand?: number; lowStockThreshold?: number }>
+    recentOrders: Array<{ id: string; createdAt?: string; totalAmount?: number; orderStatus?: string; guestEmail?: string | null }>
+    criticalItems: Array<{ id: string; itemTitle?: string; quantityOnHand?: number; lowStockThreshold?: number; status?: string }>
     recentLogs: Array<{ id: string; userName?: string; actionPerformed?: string; targetResource?: string; createdAt?: string }>
   }
   a: {
@@ -182,11 +182,11 @@ export function DashboardClient({
           <div className="mt-6 flex flex-wrap gap-3">
             <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[.07] px-3 py-1.5 text-sm text-slate-200">
               <CheckCircle2 className="w-4 h-4 text-emerald-300" />
-              <span>Platform Active</span>
+              <span>Workspace active</span>
             </div>
             <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[.07] px-3 py-1.5 text-sm text-slate-200">
-              <Activity className="w-4 h-4 text-emerald-300" />
-              <span>All systems operational</span>
+              <Activity className={cn('w-4 h-4', monitoringData?.systemStatus === 'healthy' ? 'text-emerald-300' : 'text-amber-300')} />
+              <span>{monitoringData?.systemStatus === 'healthy' ? 'Connectivity healthy' : 'Connectivity needs review'}</span>
             </div>
             <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[.07] px-3 py-1.5 text-sm text-slate-200">
               <Zap className="w-4 h-4 text-yellow-300" />

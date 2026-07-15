@@ -34,12 +34,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // Create map of enabled modules
   const enabledModules = new Set<string>()
-  PLATFORM_MODULES.forEach(mockMod => {
-    // If DB fetch failed, default all modules to enabled (graceful nav degradation)
-    const dbMod = (dbModules || []).find((m: any) => m.moduleKey === mockMod.key)
-    const isEnabled = res.success ? (dbMod ? dbMod.isEnabled : mockMod.isEnabled) : true
+  PLATFORM_MODULES.forEach(moduleDefinition => {
+    const dbMod = (dbModules || []).find((m: any) => m.moduleKey === moduleDefinition.key)
+    // Do not advertise unavailable capabilities if the module lookup fails.
+    const isEnabled = res.success ? Boolean(dbMod?.isEnabled) : moduleDefinition.isCore
     if (isEnabled) {
-      enabledModules.add(mockMod.key)
+      enabledModules.add(moduleDefinition.key)
     }
   })
 

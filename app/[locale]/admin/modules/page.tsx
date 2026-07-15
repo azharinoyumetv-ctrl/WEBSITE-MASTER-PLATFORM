@@ -42,11 +42,11 @@ export default async function ModulesPage() {
   const dbModules = res.modules!
 
   // Merge dynamic DB state with the platform's static capability registry
-  const modules = PLATFORM_MODULES.map(mockMod => {
-    const dbMod = dbModules.find(m => m.moduleKey === mockMod.key)
+  const modules = PLATFORM_MODULES.map(moduleDefinition => {
+    const dbMod = dbModules.find(m => m.moduleKey === moduleDefinition.key)
     return {
-      ...mockMod,
-      isEnabled: dbMod ? dbMod.isEnabled : mockMod.isEnabled
+      ...moduleDefinition,
+      isEnabled: Boolean(dbMod?.isEnabled)
     }
   })
 

@@ -5,7 +5,7 @@ import Link from 'next/link'
 import {
   Building2, Plus, Search, MoreHorizontal, Globe, ChevronRight,
   CheckCircle2, XCircle, AlertCircle, Settings2, Users,
-  Crown, Star, Zap, Loader2
+  Crown, Star, Zap, Loader2, Copy, ImageUp, Link2
 } from 'lucide-react'
 import { formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -23,6 +23,8 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
   const [tenants, setTenants] = useState(initialTenants)
   const [showModal, setShowModal] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [logoDataUrl, setLogoDataUrl] = useState('')
+  const [accessLink, setAccessLink] = useState<{ companyName: string; email: string; workspaceUrl: string; accessUrl: string; invitationQueued: boolean } | null>(null)
   const locale = useLocale()
 
   const [formData, setFormData] = useState({
@@ -47,25 +49,35 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
   }
 
   const handleProvision = async () => {
-    if (!formData.companyName || !formData.subdomain) {
-      return toast.error('Company Name and Subdomain are required')
+    if (!formData.companyName || !formData.subdomain || !formData.adminEmail) {
+      return toast.error('Company name, subdomain, and administrator email are required')
     }
 
     setIsCreating(true)
     const res = await createTenant({
       companyName: formData.companyName,
       subdomain: formData.subdomain,
+      adminEmail: formData.adminEmail,
       packageKey: formData.packageKey,
       addons: formData.addons,
+      logoUrl: logoDataUrl || undefined,
     })
     setIsCreating(false)
 
     if (res.success) {
-      toast.success('Tenant provisioned successfully!')
+      toast.success('Workspace provisioned and secure access link created.')
       setShowModal(false)
       // Optimistic update
       setTenants([res.tenant, ...tenants])
       setFormData({ companyName: '', subdomain: '', plan: 'core', adminEmail: '', packageKey: 'landing_page', addons: [] })
+      setLogoDataUrl('')
+      setAccessLink({
+        companyName: formData.companyName,
+        email: formData.adminEmail,
+        workspaceUrl: res.workspaceUrl || '',
+        accessUrl: res.accessUrl || '',
+        invitationQueued: res.invitationQueued || false,
+      })
     } else {
       toast.error(res.error || 'Failed to provision tenant')
     }
@@ -87,6 +99,21 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
           New Tenant
         </button>
       </div>
+
+      {accessLink && (
+        <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-black text-emerald-950">{accessLink.companyName} is ready to activate</p>
+              <p className="mt-1 text-xs text-emerald-800">Temporary domain: <a href={accessLink.workspaceUrl} target="_blank" rel="noreferrer" className="font-bold underline">{accessLink.workspaceUrl}</a></p>
+              <p className="mt-1 text-xs text-emerald-800">{accessLink.invitationQueued ? `An invitation was queued for ${accessLink.email}.` : 'Email delivery could not be queued; share the secure activation link manually.'}</p>
+            </div>
+            <button onClick={() => navigator.clipboard.writeText(accessLink.accessUrl).then(() => toast.success('Secure activation link copied'))} className="btn btn-secondary btn-sm shrink-0">
+              <Copy className="h-3.5 w-3.5" /> Copy activation link
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -307,6 +334,32 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                   placeholder="admin@yourcompany.com" 
                   className="form-input" 
                 />
+              </div>
+              <div>
+                <label className="form-label">Company Logo (optional)</label>
+                <div className="mt-1 flex items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3">
+                  {logoDataUrl ? <img src={logoDataUrl} alt="Tenant logo preview" className="h-11 w-11 rounded-lg bg-white object-contain p-1" /> : <ImageUp className="h-5 w-5 text-slate-400" />}
+                  <div className="min-w-0 flex-1">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        if (!file) return
+                        if (file.size > 500 * 1024) {
+                          toast.error('Use a PNG or JPG logo smaller than 500 KB.')
+                          event.target.value = ''
+                          return
+                        }
+                        const reader = new FileReader()
+                        reader.onload = () => setLogoDataUrl(String(reader.result || ''))
+                        reader.readAsDataURL(file)
+                      }}
+                    />
+                    <p className="mt-1 text-[10px] text-slate-500">Saved to the tenant workspace and used in its storefront header. PNG/JPG, max 500 KB.</p>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
