@@ -42,7 +42,7 @@ export async function getPosData(tenantId: string) {
   }
 }
 
-export async function processPosPayment(tenantId: string, terminalId: string, cart: any[], paymentMethod: string, total: number, currency: string = 'USD') {
+export async function processPosPayment(tenantId: string, terminalId: string, cart: any[], paymentMethod: string, total: number, currency: string = 'IDR') {
   try {
     const user = await getAuthenticatedUser()
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
@@ -395,6 +395,7 @@ export async function generateReceipt(tenantId: string, orderId: string) {
     const format = (amt: number) => {
       if (order.currency === 'EUR') return `€${amt.toFixed(2)}`
       if (order.currency === 'GBP') return `£${amt.toFixed(2)}`
+      if (order.currency === 'IDR') return `Rp ${amt.toLocaleString('id-ID')}`
       return `${order.currency === 'JPY' ? '¥' : '$'}${amt.toFixed(2)}`
     }
 

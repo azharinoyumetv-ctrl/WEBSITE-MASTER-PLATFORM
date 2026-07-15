@@ -6,7 +6,7 @@ import { formatCurrency, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { processPosPayment, openSession, closeCashDrawerSession, generateReceipt, openCashDrawer, recordCashDrop, recordCashPayout, getEndOfDayReport, getCashDrawerEvents } from '@/lib/actions/pos'
 
-export function PosClient({ initialTerminal, initialCatalogItems, initialSession, tenantId, userId, baseCurrency = 'USD' }: { initialTerminal: any, initialCatalogItems: any[], initialSession: any, tenantId: string, userId: string, baseCurrency?: string }) {
+export function PosClient({ initialTerminal, initialCatalogItems, initialSession, tenantId, userId, baseCurrency = 'IDR' }: { initialTerminal: any, initialCatalogItems: any[], initialSession: any, tenantId: string, userId: string, baseCurrency?: string }) {
   const [cart, setCart] = useState<Array<{id: string; title: string; price: number; qty: number}>>([])
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'qr'>('card')
   const [isProcessing, setIsProcessing] = useState(false)
@@ -31,6 +31,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
   const [receiptHtml, setReceiptHtml] = useState<string | null>(null)
   const [isScanningCamera, setIsScanningCamera] = useState(false)
   const [manualScanInput, setManualScanInput] = useState('')
+  const currencyPrefix = baseCurrency === 'IDR' ? 'Rp' : baseCurrency === 'JPY' ? '¥' : baseCurrency === 'EUR' ? '€' : baseCurrency === 'GBP' ? '£' : '$'
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -309,7 +310,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
                 Opening Float (Register Balance)
               </label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">{currencyPrefix}</span>
                 <input 
                   type="number" 
                   value={shiftAmount}
@@ -620,7 +621,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
               <div className="mt-4 pt-4 border-t border-gray-800">
                 <label className="block text-xs font-medium text-gray-400 mb-2">Counted Closing Balance</label>
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">{currencyPrefix}</span>
                   <input type="number" value={shiftAmount} onChange={e => setShiftAmount(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 pl-7 text-white" />
                 </div>
                 {parseFloat(shiftAmount || '0') !== shiftSummary.expectedDrawer && (

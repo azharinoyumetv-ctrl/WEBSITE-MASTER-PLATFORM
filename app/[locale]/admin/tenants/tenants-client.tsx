@@ -89,7 +89,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
       <div className="section-header">
         <div>
           <h2 className="section-title">Tenant Management</h2>
-          <p className="section-desc">Provision and manage client workspaces across the platform</p>
+          <p className="section-desc">Provision and manage client workspaces across the platform. The DagangOS control workspace is excluded.</p>
         </div>
         <button
           onClick={() => setShowModal(true)}

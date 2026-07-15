@@ -166,7 +166,7 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">{user?.name || 'Admin User'}</p>
-              <p className="text-slate-400 text-xs truncate">{t('tenant_admin')}</p>
+              <p className="text-slate-400 text-xs truncate">{user?.role || t('tenant_admin')}</p>
             </div>
           )}
         </Link>

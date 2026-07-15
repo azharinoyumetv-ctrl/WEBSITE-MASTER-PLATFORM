@@ -12,6 +12,7 @@ export async function getTenants() {
   try {
     const user = await requireSuperAdmin()
     const tenants = await prisma.systemTenant.findMany({
+      where: { id: { not: user.tenantId } },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
@@ -125,6 +126,7 @@ export async function createTenant(data: { companyName: string, subdomain: strin
             headings: 'Geist',
             base_font: 'Inter'
           },
+          baseCurrency: 'IDR',
           paymentGateway: 'unset',
           xenditEnabled: false,
           midtransEnabled: false,

@@ -325,7 +325,7 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
               orderId: order.id,
               type: 'reversal',
               amount: order.totalAmount,
-              currency: order.currency || 'USD',
+              currency: order.currency || 'IDR',
               gateway: provider,
               gatewayTxId: body.id || body.transaction_id || 'unknown',
               status: 'failed',

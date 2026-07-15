@@ -45,9 +45,9 @@ export async function getMonitoringStatus(tenantId: string) {
     const activeOrders = await prisma.tenantOrder.count({
       where: {
         tenantId,
-        orderStatus: {
-          in: ['pending', 'pending_requirements', 'quoted', 'awaiting_payment', 'paid', 'pending_fulfillment', 'processing', 'shipped'],
-        },
+        // Keep this compatible with older production enum definitions while
+        // the one-time schema repair adds the newer project-order states.
+        orderStatus: { notIn: ['completed', 'cancelled'] },
       },
     })
     

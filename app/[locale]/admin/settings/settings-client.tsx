@@ -195,7 +195,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
     themeConfig: initialWebsite?.themeConfig || {
       colors: { primary: '#4f46e5', secondary: '#10b981' },
       typography: { base_font: 'Inter' },
-      baseCurrency: 'USD'
+      baseCurrency: 'IDR'
     },
     globalSeoMetadata: initialWebsite?.globalSeoMetadata || { description: '' }
   })
@@ -267,14 +267,14 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
         paymentConfig.dokuSnapTokenUrl !== dokuSnapTokenUrlInit ||
         paymentConfig.dokuSharedKey !== dokuSharedKeyInit ||
         paymentConfig.dokuPreferredChannel !== (initialWebsite?.dokuPreferredChannel || 'all') ||
-        websiteData.themeConfig.paymentGateway !== (initialWebsite?.themeConfig?.paymentGateway || 'unset');
+        (websiteData.themeConfig.paymentGateway || 'unset') !== (initialWebsite?.themeConfig?.paymentGateway || 'unset');
     }
     if (tab === 'theme') {
       const siteTitleInit = initialWebsite?.siteTitle || 'Website'
       const themeConfigInit = initialWebsite?.themeConfig || {
         colors: { primary: '#4f46e5', secondary: '#10b981' },
         typography: { base_font: 'Inter' },
-        baseCurrency: 'USD'
+        baseCurrency: 'IDR'
       }
       const seoInit = initialWebsite?.globalSeoMetadata || { description: '' }
       
@@ -355,6 +355,16 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
 
   const [isSaving, setIsSaving] = useState(false)
 
+  const getPlanActionLabel = (plan: 'core' | 'professional' | 'enterprise') => {
+    const currentPlan = initialTenant?.plan || 'core'
+    const planRank: Record<string, number> = { core: 0, professional: 1, enterprise: 2, agency: 3 }
+
+    if (currentPlan === plan) return 'Active'
+    return (planRank[plan] ?? 0) < (planRank[currentPlan] ?? 0)
+      ? `Downgrade to ${plan}`
+      : `Upgrade to ${plan}`
+  }
+
   const handleSave = async () => {
     setIsSaving(true)
     let res: any = { success: true }
@@ -385,6 +395,13 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
 
   const handleUpgradePlan = async (planId: 'core' | 'professional' | 'enterprise') => {
     try {
+      const currentPlan = initialTenant?.plan || 'core'
+      const planRank: Record<string, number> = { core: 0, professional: 1, enterprise: 2, agency: 3 }
+      if ((planRank[planId] ?? 0) < (planRank[currentPlan] ?? 0)) {
+        toast.success(`Downgrade to ${planId} will be reviewed before the next billing period. No invoice was created.`)
+        return
+      }
+
       setIsSaving(true)
       setBillingSetupError('')
       const res = await generateBillingInvoice(tenantId, planId)
@@ -530,7 +547,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                     <label className="form-label">Base Currency</label>
                     <select 
                       className="form-select max-w-sm"
-                      value={websiteData.themeConfig.baseCurrency || 'USD'}
+                      value={websiteData.themeConfig.baseCurrency || 'IDR'}
                       onChange={(e) => setWebsiteData({
                         ...websiteData,
                         themeConfig: { ...websiteData.themeConfig, baseCurrency: e.target.value }
@@ -1191,7 +1208,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                         disabled={isSaving || (initialTenant?.plan || 'core') === plan} 
                         className={cn("btn w-full justify-center", plan === 'professional' ? 'btn-primary' : 'btn-secondary')}
                       >
-                        {(initialTenant?.plan || 'core') === plan ? 'Active' : 'Upgrade to ' + plan}
+                        {getPlanActionLabel(plan as 'core' | 'professional' | 'enterprise')}
                       </button>
                     </div>
                   ))}

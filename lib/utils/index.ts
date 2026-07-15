@@ -6,11 +6,15 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Format currency
-export function formatCurrency(amount: number, currency = 'USD'): string {
-  return new Intl.NumberFormat('en-US', {
+export function formatCurrency(amount: number, currency = 'IDR'): string {
+  const normalizedCurrency = currency.toUpperCase()
+  const isRupiah = normalizedCurrency === 'IDR'
+
+  return new Intl.NumberFormat(isRupiah ? 'id-ID' : 'en-US', {
     style: 'currency',
-    currency,
-    minimumFractionDigits: 2,
+    currency: normalizedCurrency,
+    minimumFractionDigits: isRupiah ? 0 : 2,
+    maximumFractionDigits: isRupiah ? 0 : 2,
   }).format(amount)
 }
 

@@ -21,7 +21,7 @@ const STATUS_ACTIONS: Record<string, OrderStatus[]> = {
   cancelled: [],
 }
 
-export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' }: { initialOrders: any[], tenantId: string, baseCurrency?: string }) {
+export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'IDR' }: { initialOrders: any[], tenantId: string, baseCurrency?: string }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()

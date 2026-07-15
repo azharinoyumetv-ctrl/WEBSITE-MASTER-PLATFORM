@@ -44,6 +44,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   })
 
   const enabledModulesList = Array.from(enabledModules)
+  const roles = ((session.user as any).roles || []) as string[]
+  const normalizedRoles = roles.map(role => role.toLowerCase())
+  const roleLabel = normalizedRoles.includes('platform_owner') || normalizedRoles.includes('platform owner')
+    ? 'Platform Owner'
+    : normalizedRoles.includes('super-admin')
+      ? 'Super Admin'
+      : roles[0] || 'Tenant Admin'
 
   return (
     <AdminLayoutClient 
@@ -51,7 +58,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
       tenant={tenant}
       user={{
         name: session.user.name || session.user.email?.split('@')[0] || 'Admin User',
-        role: (session.user as any).role || 'Tenant Admin'
+        role: roleLabel
       }}
     >
       {children}

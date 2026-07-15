@@ -3,6 +3,7 @@ import { z } from 'zod'
 import prisma from '@/lib/prisma'
 import { addonsList, packages } from '@/lib/constants/packages'
 import { resolvePublicTenant } from '@/lib/tenant-context'
+import { isTenantFeatureEnabled } from '@/lib/feature-flags'
 
 const requestSchema = z.object({
   tenantId: z.string().uuid(),
@@ -32,6 +33,11 @@ export async function POST(request: NextRequest) {
       // Do not let a public request create an order for a tenant selected by a
       // modified browser payload.
       return NextResponse.json({ success: false, error: 'Invalid storefront tenant' }, { status: 403 })
+    }
+
+    const visitor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+    if (!(await isTenantFeatureEnabled(publicTenant.id, 'project_setup_intake', visitor))) {
+      return NextResponse.json({ success: false, error: 'Project setup is temporarily unavailable' }, { status: 503 })
     }
 
     const selectedAddonKeys = Array.from(new Set(addons))

@@ -40,7 +40,7 @@ export default async function EcommercePage() {
 
   const initialOrders = res.orders!
 
-  let baseCurrency = 'USD'
+  let baseCurrency = 'IDR'
   try {
     const prisma = (await import('@/lib/prisma')).default
     const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })

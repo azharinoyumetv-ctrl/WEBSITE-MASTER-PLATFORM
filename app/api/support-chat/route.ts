@@ -6,6 +6,8 @@ import {
   SUPPORT_CHAT_POLICY_VERSION,
   SUPPORT_CHAT_SCOPE,
 } from '@/lib/support-chat-policy'
+import { isTenantFeatureEnabled } from '@/lib/feature-flags'
+import { resolvePublicTenant } from '@/lib/tenant-context'
 
 export const runtime = 'nodejs'
 
@@ -60,6 +62,12 @@ function createSystemPolicyPrompt() {
 export async function POST(request: NextRequest) {
   if (isRateLimited(request)) {
     return NextResponse.json({ error: 'Please wait a moment before sending another message.' }, { status: 429 })
+  }
+
+  const publicTenant = await resolvePublicTenant(request)
+  const visitor = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown'
+  if (publicTenant && !(await isTenantFeatureEnabled(publicTenant.id, 'public_support_chat', visitor))) {
+    return NextResponse.json({ error: 'Live support chat is currently unavailable.' }, { status: 503 })
   }
 
   const body = await request.json().catch(() => null)
