@@ -449,6 +449,9 @@ model TenantOrder {
 }
 
 enum OrderStatus {
+  pending_requirements
+  quoted
+  awaiting_payment
   pending
   paid
   pending_fulfillment
