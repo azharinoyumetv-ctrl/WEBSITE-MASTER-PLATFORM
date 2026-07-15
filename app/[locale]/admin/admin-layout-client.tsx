@@ -16,6 +16,7 @@ import { useTranslations } from 'next-intl'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { signOut } from 'next-auth/react'
 import { DagangOSBrand } from '@/components/DagangOSBrand'
+import { AdminLocaleBridge } from '@/components/AdminLocaleBridge'
 
 type NavItem = {
   href: string
@@ -423,6 +424,7 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
 
   return (
     <div className="flex h-screen bg-[#edf4f8] dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden">
+      <AdminLocaleBridge />
       <a 
         href="#main-content" 
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-white dark:focus:bg-slate-800 focus:text-indigo-600 dark:focus:text-indigo-400 focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
