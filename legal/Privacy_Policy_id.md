@@ -1,13 +1,13 @@
 # Kebijakan Privasi
 
 **Terakhir Diperbarui:** Juli 2026  
-**Perusahaan:** PT DagangOS Digital Indonesia
+**Perusahaan:** DagangOS Digital Indonesia
 
 ---
 
 ## 1. Pendahuluan
 
-PT DagangOS Digital Indonesia ("DagangOS", "kami") berkomitmen untuk melindungi privasi klien kami ("Anda", "Klien") dan pengguna akhir mereka. Kebijakan Privasi ini menjelaskan bagaimana kami mengumpulkan, menggunakan, mengungkapkan, dan melindungi informasi ketika Anda menggunakan layanan, perangkat lunak, dan platform kami.
+DagangOS Digital Indonesia ("DagangOS", "kami") berkomitmen untuk melindungi privasi klien kami ("Anda", "Klien") dan pengguna akhir mereka. Kebijakan Privasi ini menjelaskan bagaimana kami mengumpulkan, menggunakan, mengungkapkan, dan melindungi informasi ketika Anda menggunakan layanan, perangkat lunak, dan platform kami.
 
 ## 2. Informasi yang Kami Kumpulkan
 
@@ -68,4 +68,4 @@ Layanan kami terintegrasi dengan berbagai pihak ketiga (pemroses pembayaran, pen
 
 Jika Anda memiliki pertanyaan atau komentar tentang kebijakan ini, silakan kirim email ke Petugas Perlindungan Data kami di:  
 **Email:** privacy@dagangos.com  
-**Alamat:** PT DagangOS Digital Indonesia, Jakarta, Indonesia
+**Alamat:** DagangOS Digital Indonesia, Subang, Jawa Barat, Indonesia

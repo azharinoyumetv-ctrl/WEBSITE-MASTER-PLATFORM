@@ -1,13 +1,13 @@
 # Syarat & Ketentuan
 
 **Terakhir Diperbarui:** Juli 2026  
-**Perusahaan:** PT DagangOS Digital Indonesia
+**Perusahaan:** DagangOS Digital Indonesia
 
 ---
 
 ## 1. Pendahuluan
 
-Selamat datang di PT DagangOS Digital Indonesia ("DagangOS", "kami"). Syarat & Ketentuan ("Syarat") ini mengatur akses dan penggunaan Anda terhadap pengembangan situs web, perangkat lunak khusus, sistem POS, modul AI, layanan otomatisasi, dan produk terkait kami (secara kolektif disebut "Layanan"). Dengan menggunakan Layanan kami, Anda ("Klien", "Anda") setuju untuk terikat oleh Syarat ini.
+Selamat datang di DagangOS Digital Indonesia ("DagangOS", "kami"). Syarat & Ketentuan ("Syarat") ini mengatur akses dan penggunaan Anda terhadap pengembangan situs web, perangkat lunak khusus, sistem POS, modul AI, layanan otomatisasi, dan produk terkait kami (secara kolektif disebut "Layanan"). Dengan menggunakan Layanan kami, Anda ("Klien", "Anda") setuju untuk terikat oleh Syarat ini.
 
 ## 2. Definisi
 
@@ -39,7 +39,7 @@ DagangOS menyediakan solusi perdagangan digital modular. Ruang lingkup Layanan y
 ## 6. Kekayaan Intelektual & Kepemilikan
 
 - **Lisensi Platform**: Klien menerima lisensi abadi, non-eksklusif, dan tidak dapat dialihkan untuk menggunakan Platform yang diterapkan untuk operasi bisnis mereka sendiri.
-- **Kerangka Kerja Inti**: PT DagangOS Digital Indonesia memegang kepemilikan penuh atas kerangka kerja yang dapat digunakan kembali dan modul inti. Klien *tidak* menerima kepemilikan atas kode sumber dasar kecuali "Pembelian Kode Sumber Penuh" dibeli secara eksplisit.
+- **Kerangka Kerja Inti**: DagangOS Digital Indonesia memegang kepemilikan penuh atas kerangka kerja yang dapat digunakan kembali dan modul inti. Klien *tidak* menerima kepemilikan atas kode sumber dasar kecuali "Pembelian Kode Sumber Penuh" dibeli secara eksplisit.
 - **Data Klien**: Klien memegang kepemilikan penuh atas semua data bisnis, data pelanggan, dan konten yang diunggah.
 
 ## 7. Pengiriman & Penerimaan
@@ -48,7 +48,7 @@ Setelah Layanan dikirimkan ke lingkungan pementasan (staging), Klien memiliki 7 
 
 ## 8. Garansi & Tanggung Jawab
 
-LAYANAN DISEDIAKAN "SEBAGAIMANA ADANYA" TANPA JAMINAN DALAM BENTUK APA PUN. DALAM KEADAAN APA PUN PT DAGANGOS DIGITAL INDONESIA TIDAK BERTANGGUNG JAWAB ATAS KERUGIAN TIDAK LANGSUNG, INSIDENTAL, KHUSUS, KONSEKUENSIAL, ATAU HUKUMAN, TERMASUK HILANGNYA KEUNTUNGAN, DATA, ATAU GANGGUAN BISNIS, YANG TIMBUL DARI ATAU SEHUBUNGAN DENGAN LAYANAN ATAU KEGAGALAN INFRASTRUKTUR.
+LAYANAN DISEDIAKAN "SEBAGAIMANA ADANYA" TANPA JAMINAN DALAM BENTUK APA PUN. DALAM KEADAAN APA PUN DAGANGOS DIGITAL INDONESIA TIDAK BERTANGGUNG JAWAB ATAS KERUGIAN TIDAK LANGSUNG, INSIDENTAL, KHUSUS, KONSEKUENSIAL, ATAU HUKUMAN, TERMASUK HILANGNYA KEUNTUNGAN, DATA, ATAU GANGGUAN BISNIS, YANG TIMBUL DARI ATAU SEHUBUNGAN DENGAN LAYANAN ATAU KEGAGALAN INFRASTRUKTUR.
 
 ## 9. Pengakhiran
 
@@ -57,6 +57,6 @@ Masing-masing pihak dapat mengakhiri perjanjian dengan pemberitahuan tertulis 30
 ## 10. Informasi Kontak
 
 Untuk pertanyaan hukum, silakan hubungi:  
-**PT DagangOS Digital Indonesia**  
+**DagangOS Digital Indonesia**
 Email: legal@dagangos.com  
-Alamat: Jakarta, Indonesia
+Alamat: Subang, Jawa Barat, Indonesia

@@ -6,6 +6,7 @@ import { encrypt, decrypt } from '@/lib/crypto'
 import { requirePermission, getAuthenticatedUser } from '@/lib/rbac'
 import crypto from 'crypto'
 import { z } from 'zod'
+import { COMPANY } from '@/lib/company'
 
 const layoutBlockSchema = z.array(z.object({
   type: z.enum(['hero', 'text', 'features', 'catalog_grid', 'contact_form']),
@@ -41,7 +42,7 @@ export async function getPublicWebsiteConfig(tenantDomain: string) {
             success: true,
             website: {
               tenantId: fallbackTenant.id,
-              siteTitle: fallbackTenant.companyName || 'Website Master Platform',
+              siteTitle: fallbackTenant.companyName || COMPANY.legalName,
               themeConfig: { colors: { primary: '#4f46e5' } },
               globalSeoMetadata: { keywords: [], description: '' },
               faviconUrl: null,

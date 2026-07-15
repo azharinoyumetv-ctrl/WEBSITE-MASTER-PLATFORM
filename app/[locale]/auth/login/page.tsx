@@ -2,11 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, CheckCircle } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { DagangOSBrand } from '@/components/DagangOSBrand'
 import toast from 'react-hot-toast'
 import { useTranslations } from 'next-intl'
 
@@ -83,15 +82,7 @@ export default function LoginPage() {
         <div className="absolute inset-0 bg-grid-pattern opacity-10" />
         
         {/* Logo */}
-        <div className="relative flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl overflow-hidden bg-white flex items-center justify-center">
-            <Image src="/dagangos-logo.jpg" alt="DagangOS" width={40} height={40} className="w-full h-full object-cover" priority />
-          </div>
-          <div>
-            <p className="text-white font-bold text-lg leading-none">{t('logo_title')}</p>
-            <p className="text-indigo-300 text-xs">{t('logo_subtitle')}</p>
-          </div>
-        </div>
+        <DagangOSBrand className="relative" dark />
 
         {/* Hero text */}
         <div className="relative">
@@ -143,12 +134,7 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center px-6 py-12 max-w-lg lg:max-w-md">
         <div className="w-full max-w-sm animate-slide-up">
           {/* Mobile logo */}
-          <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center">
-              <Image src="/dagangos-logo.jpg" alt="DagangOS" width={36} height={36} className="w-full h-full object-cover" priority />
-            </div>
-            <p className="text-white font-bold text-lg">{t('logo_title')}</p>
-          </div>
+          <DagangOSBrand className="mb-8 lg:hidden" dark />
 
           <div>
             <h2 className="text-2xl font-bold text-white mb-1">{t('welcome')}</h2>
@@ -288,7 +274,7 @@ export default function LoginPage() {
 
           <div className="mt-8 pt-6 border-t border-white/5">
             <p className="text-center text-xs text-slate-600">
-              Protected by Ed25519 JWT + Bcrypt · AES-256 at rest · TLS 1.3
+              Bcrypt password hashing (cost 12) · HttpOnly secure session cookies
             </p>
           </div>
         </div>

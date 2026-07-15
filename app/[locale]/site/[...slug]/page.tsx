@@ -8,6 +8,7 @@ import { AboutClient } from '../about-client'
 import { ContactClient } from '../contact-client'
 import { getTranslations } from 'next-intl/server'
 import { addonsList, packages } from '@/lib/constants/packages'
+import { COMPANY } from '@/lib/company'
 
 export async function generateMetadata({ params }: { params: { slug?: string[] } }) {
   const headersList = headers()
@@ -27,7 +28,7 @@ export async function generateMetadata({ params }: { params: { slug?: string[] }
   const websiteRes = await getPublicWebsiteConfig(tenantId)
   const siteTitle = websiteRes.success && websiteRes.website?.siteTitle 
     ? websiteRes.website.siteTitle 
-    : 'DagangOS Digital Indonesia'
+    : COMPANY.legalName
 
   if (!websiteRes.success || !websiteRes.website) {
     return { title: `${pageLabels[slug] || 'Page'} | ${siteTitle}` }
@@ -82,7 +83,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
                 {[
                   { label: t('contact_email'), value: 'contact@dagangos.com', icon: '✉️' },
                   { label: t('contact_phone'), value: '+62 899 9155 182', icon: '📞' },
-                  { label: t('contact_address'), value: 'Jakarta, Indonesia', icon: '📍' },
+                  { label: t('contact_address'), value: COMPANY.address, icon: '📍' },
                   { label: t('contact_hours'), value: t('hours_value'), icon: '🕐' },
                 ].map((item) => (
                   <div key={item.label} className="flex gap-4">
@@ -247,7 +248,7 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
   let websiteConfig: any = null
   let dbPage: any = null
   let primaryColor = '#4f46e5'
-  let siteTitle = 'DagangOS Digital Indonesia'
+  let siteTitle = COMPANY.legalName
   let resolvedTenantId = ''
 
   if (tenantId) {

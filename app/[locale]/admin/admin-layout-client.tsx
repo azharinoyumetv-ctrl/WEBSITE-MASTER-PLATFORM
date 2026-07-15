@@ -1,7 +1,6 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
@@ -16,6 +15,7 @@ import { getUnreadAlertCount, getMonitoringStatus } from '@/lib/actions/monitori
 import { useTranslations } from 'next-intl'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { signOut } from 'next-auth/react'
+import { DagangOSBrand } from '@/components/DagangOSBrand'
 
 type NavItem = {
   href: string
@@ -107,15 +107,7 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
     >
       {/* Logo */}
       <div className={cn('flex items-center h-16 border-b border-white/10 px-4', collapsed ? 'justify-center' : 'gap-3')}>
-        <div className="w-8 h-8 rounded-lg overflow-hidden bg-white flex items-center justify-center flex-shrink-0">
-          <Image src="/dagangos-logo.jpg" alt="DagangOS" width={32} height={32} className="w-full h-full object-cover" priority />
-        </div>
-        {!collapsed && (
-          <div className="overflow-hidden">
-            <h2 className="text-white font-bold text-lg leading-tight truncate">Website Master</h2>
-            <p className="text-slate-400 text-[10px] uppercase tracking-wider mt-0.5 truncate"><span className="text-indigo-400 font-semibold">Platform</span> / DagangOS</p>
-          </div>
-        )}
+        <DagangOSBrand compact dark showName={!collapsed} />
       </div>
 
       {/* Navigation */}

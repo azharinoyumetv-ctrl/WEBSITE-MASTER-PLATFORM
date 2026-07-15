@@ -1,9 +1,9 @@
 # Data Processing Agreement (DPA)
 
 **Last Updated:** July 2026
-**Company:** PT DagangOS Digital Indonesia
+**Company:** DagangOS Digital Indonesia
 
-This DPA applies to Enterprise Clients where PT DagangOS Digital Indonesia ("Processor") processes Personal Data on behalf of the Client ("Controller") in the course of providing support, maintenance, or SaaS services.
+This DPA applies to Enterprise Clients where DagangOS Digital Indonesia ("Processor") processes Personal Data on behalf of the Client ("Controller") in the course of providing support, maintenance, or SaaS services.
 
 ## 1. Roles and Responsibilities
 * **Controller (Client):** Determines the purposes and means of processing Personal Data (e.g., your customers' data stored in the CRM or E-commerce database).

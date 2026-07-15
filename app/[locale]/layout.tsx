@@ -5,6 +5,7 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '@/components/providers'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
+import { COMPANY } from '@/lib/company'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -14,20 +15,20 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: {
-    default: 'Website Master Platform',
-    template: '%s | Website Master Platform',
+    default: `${COMPANY.legalName} | ${COMPANY.productName}`,
+    template: `%s | ${COMPANY.legalName}`,
   },
   description: 'Enterprise-grade multi-tenant SaaS platform — built for agencies and their clients',
   keywords: ['saas', 'multi-tenant', 'platform', 'cms', 'ecommerce', 'crm'],
   openGraph: {
     type: 'website',
-    title: 'Website Master Platform',
+    title: `${COMPANY.legalName} | ${COMPANY.productName}`,
     description: 'Enterprise-grade multi-tenant SaaS platform',
-    siteName: 'Website Master Platform',
+    siteName: COMPANY.legalName,
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Website Master Platform',
+    title: `${COMPANY.legalName} | ${COMPANY.productName}`,
     description: 'Enterprise-grade multi-tenant SaaS platform',
   },
   alternates: {

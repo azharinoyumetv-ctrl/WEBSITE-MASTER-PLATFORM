@@ -1,13 +1,13 @@
 # Privacy Policy
 
 **Last Updated:** July 2026  
-**Company:** PT DagangOS Digital Indonesia
+**Company:** DagangOS Digital Indonesia
 
 ---
 
 ## 1. Introduction
 
-PT DagangOS Digital Indonesia ("DagangOS", "we", "us") is committed to protecting the privacy of our clients ("you", "Client") and their end-users. This Privacy Policy explains how we collect, use, disclose, and safeguard information when you use our services, software, and platforms.
+DagangOS Digital Indonesia ("DagangOS", "we", "us") is committed to protecting the privacy of our clients ("you", "Client") and their end-users. This Privacy Policy explains how we collect, use, disclose, and safeguard information when you use our services, software, and platforms.
 
 ## 2. Information We Collect
 
@@ -68,5 +68,4 @@ Our services integrate with various third parties (payment processors, email pro
 
 If you have questions or comments about this policy, please email our Data Protection Officer at:  
 **Email:** privacy@dagangos.com  
-**Address:** PT DagangOS Digital Indonesia, Jakarta, Indonesia
-
+**Address:** DagangOS Digital Indonesia, Subang, Jawa Barat, Indonesia

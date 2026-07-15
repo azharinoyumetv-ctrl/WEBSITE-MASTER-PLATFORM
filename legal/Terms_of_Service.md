@@ -1,13 +1,13 @@
 # Terms of Service
 
 **Last Updated:** July 2026  
-**Company:** PT DagangOS Digital Indonesia
+**Company:** DagangOS Digital Indonesia
 
 ---
 
 ## 1. Introduction
 
-Welcome to PT DagangOS Digital Indonesia ("DagangOS", "we", "our", or "us"). These Terms of Service ("Terms") govern your access to and use of our website development, custom software, POS systems, AI modules, automation services, and related products (collectively, the "Services"). By engaging our Services, you ("Client", "you") agree to be bound by these Terms.
+Welcome to DagangOS Digital Indonesia ("DagangOS", "we", "our", or "us"). These Terms of Service ("Terms") govern your access to and use of our website development, custom software, POS systems, AI modules, automation services, and related products (collectively, the "Services"). By engaging our Services, you ("Client", "you") agree to be bound by these Terms.
 
 ## 2. Definitions
 
@@ -39,7 +39,7 @@ DagangOS provides modular digital commerce solutions. The exact scope of Service
 ## 6. Intellectual Property & Ownership
 
 - **Platform License**: The Client receives a perpetual, non-exclusive, non-transferable license to use the deployed Platform for their own business operations.
-- **Core Framework**: PT DagangOS Digital Indonesia retains full ownership of the reusable framework and core modules. The Client does *not* receive ownership of the base source code unless a "Full Source Code Buyout" is explicitly purchased.
+- **Core Framework**: DagangOS Digital Indonesia retains full ownership of the reusable framework and core modules. The Client does *not* receive ownership of the base source code unless a "Full Source Code Buyout" is explicitly purchased.
 - **Client Data**: The Client retains full ownership of all their business data, customer data, and uploaded content.
 
 ## 7. Delivery & Acceptance
@@ -48,7 +48,7 @@ Upon delivery of the Services to a staging environment, the Client has 7 days to
 
 ## 8. Warranty & Liability
 
-THE SERVICES ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL PT DAGANGOS DIGITAL INDONESIA BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS, DATA, OR BUSINESS INTERRUPTION, ARISING OUT OF OR IN CONNECTION WITH THE SERVICES OR INFRASTRUCTURE FAILURES.
+THE SERVICES ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL DAGANGOS DIGITAL INDONESIA BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS, DATA, OR BUSINESS INTERRUPTION, ARISING OUT OF OR IN CONNECTION WITH THE SERVICES OR INFRASTRUCTURE FAILURES.
 
 ## 9. Termination
 
@@ -57,7 +57,6 @@ Either party may terminate the agreement with 30 days written notice. Upon termi
 ## 10. Contact Information
 
 For legal inquiries, please contact:  
-**PT DagangOS Digital Indonesia**  
+**DagangOS Digital Indonesia**
 Email: legal@dagangos.com  
-Address: Jakarta, Indonesia
-
+Address: Subang, Jawa Barat, Indonesia

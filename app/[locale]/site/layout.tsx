@@ -2,6 +2,8 @@ import '@/app/globals.css'
 import { generateThemeCssVars } from '@/lib/utils'
 import Link from 'next/link'
 import Image from 'next/image'
+import { DagangOSBrand } from '@/components/DagangOSBrand'
+import { COMPANY } from '@/lib/company'
 import { headers } from 'next/headers'
 import { getPublicWebsiteConfig } from '@/lib/actions/website'
 import { getTranslations } from 'next-intl/server'
@@ -33,12 +35,12 @@ export default async function SiteLayout({
     // Keep the platform marketing site available if the database is briefly
     // unavailable, but prefer the resolved active tenant whenever possible.
     website = {
-      siteTitle: 'Website Master Platform',
+      siteTitle: COMPANY.legalName,
       themeConfig: { colors: { primary: '#4F46E5', secondary: '#10B981', background: '#FFFFFF', text: '#0F172A', accent: '#F59E0B' } }
     }
     tenant = {
       id: 'default',
-      companyName: 'Master Platform Default',
+      companyName: COMPANY.legalName,
       subdomain: 'store',
       customDomain: null
     }
@@ -70,7 +72,8 @@ export default async function SiteLayout({
   // Generate CSS variables for theme injection
   const cssVars = generateThemeCssVars(themeConfig)
   const primaryColor = themeConfig.colors.primary
-  const logoUrl = tenant.logoUrl || (tenantDomain === 'default' ? '/dagangos-logo.jpg' : null)
+  const logoUrl = tenant.logoUrl || null
+  const isCompanyStorefront = tenantDomain === 'default'
 
   const navigationTree = [
     { label: t('home'), target: '/' },
@@ -90,9 +93,9 @@ export default async function SiteLayout({
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Organization",
-            "name": tenant.companyName,
+            "name": isCompanyStorefront ? COMPANY.legalName : tenant.companyName,
             "url": `https://${website.domain || tenant.subdomain + '.' + (process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com')}`,
-            "logo": logoUrl || '',
+            "logo": logoUrl || (isCompanyStorefront ? '/dagangos-logo.jpg' : ''),
             "description": website.globalSeoMetadata?.description || ''
           })
         }}
@@ -102,6 +105,8 @@ export default async function SiteLayout({
           <Link href="/" className="flex items-center gap-2">
             {logoUrl ? (
               <Image src={logoUrl} alt={website.siteTitle} className="h-10 w-10 rounded-lg object-cover" width={40} height={40} unoptimized />
+            ) : isCompanyStorefront ? (
+              <DagangOSBrand compact />
             ) : (
               <span className="font-bold text-xl tracking-tight" style={{ color: primaryColor }}>
                 {website.siteTitle}
@@ -147,7 +152,7 @@ export default async function SiteLayout({
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-4 gap-8 mb-8">
             <div className="md:col-span-2">
-              <h3 className="text-white font-bold text-lg mb-3">{tenant.companyName}</h3>
+              <h3 className="text-white font-bold text-lg mb-3">{isCompanyStorefront ? COMPANY.legalName : tenant.companyName}</h3>
               <p className="text-slate-500 text-sm leading-relaxed">
                 {tStore('footer_desc')}
               </p>
@@ -175,7 +180,7 @@ export default async function SiteLayout({
           </div>
           <div className="border-t border-slate-800 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex flex-col md:flex-row items-center gap-4">
-              <p className="text-sm">&copy; {new Date().getFullYear()} {tenant.companyName}. {tStore('all_rights')}</p>
+              <p className="text-sm">&copy; {new Date().getFullYear()} {isCompanyStorefront ? COMPANY.legalName : tenant.companyName}. {tStore('all_rights')}</p>
               <div className="flex items-center gap-3">
                 <Link href="/terms" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('terms')}</Link>
                 <span className="text-slate-700 text-xs">&bull;</span>

@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Globe, Loader2, Lock, AlertCircle, ArrowLeft } from 'lucide-react'
+import { Loader2, Lock, AlertCircle, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { DagangOSBrand } from '@/components/DagangOSBrand'
 
 export default function ResetPasswordPage() {
   const router = useRouter()
@@ -58,14 +59,7 @@ export default function ResetPasswordPage() {
     <div className="min-h-screen flex bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm animate-slide-up">
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg">
-              <Globe className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-white font-bold text-xl leading-none">Master Platform</p>
-            </div>
-          </div>
+          <DagangOSBrand className="mb-8" dark />
 
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-2">Create New Password</h2>

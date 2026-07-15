@@ -1,9 +1,9 @@
 # Cookie Policy
 
 **Last Updated:** July 2026
-**Company:** PT DagangOS Digital Indonesia
+**Company:** DagangOS Digital Indonesia
 
-This Cookie Policy explains how PT DagangOS Digital Indonesia uses cookies and similar tracking technologies on our administrative dashboards, API portals, and marketing websites to recognize you, improve user experience, and ensure platform security.
+This Cookie Policy explains how DagangOS Digital Indonesia uses cookies and similar tracking technologies on our administrative dashboards, API portals, and marketing websites to recognize you, improve user experience, and ensure platform security.
 
 ## What are cookies?
 Cookies are small data files placed on your computer or mobile device when you visit a website. They are widely used by online service providers to make websites work efficiently, securely manage user sessions, and provide reporting information.
