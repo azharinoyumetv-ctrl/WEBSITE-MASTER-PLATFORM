@@ -498,3 +498,61 @@
   background-color: var(--tenant-color-primary);
   color: white;
 }
+
+/* DagangOS storefront motion system */
+@keyframes dagangos-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(5%, -4%, 0) scale(1.12); }
+}
+
+@keyframes dagangos-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-12px); }
+}
+
+@keyframes dagangos-grid {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 64px 64px, 64px 64px; }
+}
+
+.dagangos-aurora {
+  background:
+    radial-gradient(circle at 12% 20%, rgba(20, 184, 166, 0.28), transparent 31%),
+    radial-gradient(circle at 86% 18%, rgba(56, 189, 248, 0.24), transparent 30%),
+    radial-gradient(circle at 50% 92%, rgba(37, 99, 235, 0.28), transparent 40%),
+    #020617;
+}
+
+.dagangos-grid {
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.10) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.10) 1px, transparent 1px);
+  background-size: 64px 64px;
+  animation: dagangos-grid 18s linear infinite;
+}
+
+.dagangos-orb {
+  animation: dagangos-drift 13s ease-in-out infinite;
+}
+
+.dagangos-orb-delayed {
+  animation: dagangos-drift 16s ease-in-out -5s infinite;
+}
+
+.dagangos-float {
+  animation: dagangos-float 5s ease-in-out infinite;
+}
+
+.dagangos-float-delayed {
+  animation: dagangos-float 5.8s ease-in-out -2.5s infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dagangos-grid,
+  .dagangos-orb,
+  .dagangos-orb-delayed,
+  .dagangos-float,
+  .dagangos-float-delayed {
+    animation: none;
+  }
+}
