@@ -1,6 +1,7 @@
 export type ModuleItem = {
   id: string
-  moduleType: string
+  moduleType?: string
+  moduleKey: string
   isEnabled: boolean
 }
 
@@ -19,6 +20,8 @@ export type Analytics = {
 }
 
 export type MonitoringStatus = {
+  systemStatus?: string
+  nodes?: Array<{ service: string; status: string; latency: string; uptime: string }>
   alertHistory: Array<{
     id: string
     userName?: string

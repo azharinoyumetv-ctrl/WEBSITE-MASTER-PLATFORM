@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { ToggleLeft, ArrowRight } from 'lucide-react'
-import type { ModuleItem } from '../admin-types'
+import type { ModuleItem } from './admin-types'
 
 type ModuleStatusCardProps = {
   modules: ModuleItem[]
@@ -22,7 +22,7 @@ export function ModuleStatusCard({ modules }: ModuleStatusCardProps) {
         {modules.map((mod) => (
           <div key={mod.id} className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 border border-slate-100">
             <ToggleLeft className={cn("w-4 h-4", mod.isEnabled ? "text-emerald-500" : "text-slate-300")} />
-            <span className="text-xs font-medium text-slate-700 capitalize">{mod.moduleType.replace('_', ' ')}</span>
+            <span className="text-xs font-medium text-slate-700 capitalize">{(mod.moduleType || mod.moduleKey).replace('_', ' ')}</span>
           </div>
         ))}
       </div>

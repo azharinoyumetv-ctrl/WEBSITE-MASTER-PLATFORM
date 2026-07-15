@@ -40,7 +40,10 @@ export async function updateOrderStatus(tenantId: string, orderId: string, statu
 
     const currentStatus = currentOrder.orderStatus
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-      pending: ['paid', 'cancelled'],
+      pending: ['pending_requirements', 'quoted', 'awaiting_payment', 'paid', 'cancelled'],
+      pending_requirements: ['quoted', 'awaiting_payment', 'cancelled'],
+      quoted: ['awaiting_payment', 'paid', 'cancelled'],
+      awaiting_payment: ['paid', 'cancelled'],
       paid: ['pending_fulfillment', 'processing', 'cancelled'],
       pending_fulfillment: ['processing', 'shipped', 'cancelled'],
       processing: ['shipped', 'cancelled'],
@@ -81,7 +84,10 @@ export async function bulkUpdateOrderStatus(tenantId: string, orderIds: string[]
     })
 
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
-      pending: ['paid', 'cancelled'],
+      pending: ['pending_requirements', 'quoted', 'awaiting_payment', 'paid', 'cancelled'],
+      pending_requirements: ['quoted', 'awaiting_payment', 'cancelled'],
+      quoted: ['awaiting_payment', 'paid', 'cancelled'],
+      awaiting_payment: ['paid', 'cancelled'],
       paid: ['pending_fulfillment', 'processing', 'cancelled'],
       pending_fulfillment: ['processing', 'shipped', 'cancelled'],
       processing: ['shipped', 'cancelled'],

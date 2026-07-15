@@ -40,8 +40,31 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
   const metricsError = !metricsRes.success ? (metricsRes as any).error : null
   const analyticsError = !analyticsRes.success ? (analyticsRes as any).error : null
   
-  const m = metricsRes.success && metricsRes.metrics ? metricsRes.metrics : {
+  const rawMetrics = metricsRes.success && metricsRes.metrics ? metricsRes.metrics : {
     totalOrders: 0, revenue: 0, recentLogs: [], recentOrders: [], criticalItems: [], modules: []
+  }
+
+  const m = {
+    ...rawMetrics,
+    modules: rawMetrics.modules.map((mod: any) => ({
+      id: mod.id,
+      moduleKey: mod.moduleKey,
+      moduleType: mod.moduleType || mod.moduleKey,
+      isEnabled: mod.isEnabled
+    })),
+    recentOrders: rawMetrics.recentOrders.map((order: any) => ({
+      id: order.id,
+      createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
+      totalAmount: Number(order.totalAmount || 0),
+      paymentStatus: order.paymentStatus
+    })),
+    recentLogs: rawMetrics.recentLogs.map((log: any) => ({
+      id: log.id,
+      userName: log.userName,
+      actionPerformed: log.actionPerformed,
+      targetResource: log.targetResource,
+      createdAt: log.createdAt instanceof Date ? log.createdAt.toISOString() : log.createdAt
+    }))
   }
 
   const a = analyticsRes.success && analyticsRes.analytics ? analyticsRes.analytics : {

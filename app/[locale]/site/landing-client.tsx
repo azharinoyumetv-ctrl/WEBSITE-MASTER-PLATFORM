@@ -48,6 +48,14 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num)
   }
 
+  const projectSetupHref = () => {
+    const params = new URLSearchParams({ package: selectedPackage })
+    if (enabledAddons.length > 0) {
+      params.set('addons', enabledAddons.join(','))
+    }
+    return `/project-setup?${params.toString()}`
+  }
+
   return (
     <div className="w-full bg-slate-50 min-h-screen">
       {/* Interactive Hero Section */}
@@ -81,7 +89,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
               >
                 {t('explore_packages')}
               </a>
-              <a href="/checkout" className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all text-sm">
+              <a href={projectSetupHref()} className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all text-sm">
                 {t('contact_sales')}
               </a>
             </div>
@@ -194,7 +202,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             </div>
 
             <a 
-              href="/checkout"
+              href={projectSetupHref()}
               className="block text-center py-3.5 text-white font-bold rounded-xl transition-opacity hover:opacity-90 shadow-lg text-sm w-full"
               style={{ backgroundColor: primaryColor }}
             >
