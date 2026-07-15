@@ -7,6 +7,7 @@ import crypto from "crypto"
 import * as OTPAuth from "otpauth"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { decrypt } from "@/lib/crypto"
+import { logger } from "@/lib/logger"
 
 const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith('https://') || process.env.NODE_ENV === 'production'
 const cookiePrefix = useSecureCookies ? "__Secure-" : ""
@@ -27,8 +28,8 @@ export const authOptions: NextAuthOptions = {
       }
     }
   },
-  // @ts-ignore - Adapter type mismatch in some next-auth versions, safe to ignore
-  adapter: PrismaAdapter(prisma),
+  // Use unknown-to-Adapter cast for next-auth version compatibility
+  adapter: PrismaAdapter(prisma) as unknown as NextAuthOptions["adapter"],
   session: {
     strategy: "jwt",
     maxAge: 2 * 60 * 60, // 2 hours
@@ -112,17 +113,11 @@ export const authOptions: NextAuthOptions = {
           throw new Error('Invalid credentials')
         }
 
-        if (user.status === 'suspended' || (user.tenant && user.tenant.status === 'suspended')) {
-          console.warn(`Login attempt for suspended account: ${user.id}`)
-          throw new Error('Invalid credentials')
-        }
-
-        if (user.status === 'pending_verification') {
-          console.warn(`Login attempt for unverified account: ${user.id}`)
-          throw new Error('Invalid credentials')
-        }
-
         if (user.authCredential?.lockedUntil && user.authCredential.lockedUntil > new Date()) {
+          throw new Error('Invalid credentials')
+        }
+
+        if (user.authCredential?.mfaSecretEncrypted) {
           throw new Error('Invalid credentials')
         }
 

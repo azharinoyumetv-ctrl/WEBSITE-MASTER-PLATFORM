@@ -147,8 +147,6 @@ export async function registerTenantAdmin(data: any) {
       })
     })
 
-    console.log(`[EMAIL] Verification for ${email}: /auth/verify-email?token=${vToken}`)
-
     return { success: true, message: "Registration successful. Please check your email to verify your account." }
   } catch (error: any) {
     console.error("Registration error:", error)
@@ -212,7 +210,6 @@ export async function requestPasswordReset(email: string) {
   }
 
   // Send email (we use nodemailer with a generic transporter for now, or just log it if no config)
-  console.log(`[EMAIL] Password reset for ${email}: /auth/reset-password?token=${resetToken}`)
 
   return { success: true }
 }
@@ -248,7 +245,6 @@ export async function resendVerificationEmail(email: string) {
     data: { verificationToken: vToken }
   })
 
-  console.log(`[EMAIL] Resend Verification for ${email}: /auth/verify-email?token=${vToken}`)
   return { success: true }
 }
 

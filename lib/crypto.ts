@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { logger } from '@/lib/logger'
 
 const ALGORITHM = 'aes-256-cbc'
 const IV_LENGTH = 16 // For AES, this is always 16

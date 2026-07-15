@@ -7,8 +7,10 @@ import { checkRateLimit } from '@/lib/rate-limit'
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
-  // @ts-ignore
-  const svgCaptcha = (await import('svg-captcha')).default || await import('svg-captcha')
+  const svgCaptchaModule = await import('svg-captcha')
+  const svgCaptcha = (svgCaptchaModule as unknown as Record<string, unknown>).default as {
+    create(options: Record<string, unknown>): { text: string; data: string }
+  } || svgCaptchaModule as unknown as { create(options: Record<string, unknown>): { text: string; data: string } }
   const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
   
   const captcha = svgCaptcha.create({
