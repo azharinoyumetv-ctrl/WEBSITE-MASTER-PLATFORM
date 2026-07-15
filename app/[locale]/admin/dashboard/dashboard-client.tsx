@@ -33,14 +33,14 @@ function StatCard({
   const TrendIcon = trend && trend >= 0 ? TrendingUp : TrendingDown
 
   const content = (
-    <div className={cn('group relative overflow-hidden rounded-2xl border border-white bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,.07)] backdrop-blur transition-all duration-200', href && 'cursor-pointer hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(15,23,42,.12)]')}>
+    <div className={cn('group relative overflow-hidden rounded-2xl border border-white bg-white/90 p-4 sm:p-5 shadow-[0_10px_30px_rgba(15,23,42,.07)] backdrop-blur transition-all duration-200', href && 'cursor-pointer hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(15,23,42,.12)]')}>
       <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500 opacity-0 transition-opacity group-hover:opacity-100" />
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-sm font-bold text-slate-500">{label}</p>
-          <p className="mt-1 text-3xl font-black tracking-[-0.04em] text-slate-950">{value}</p>
+          <p className="text-xs sm:text-sm font-bold text-slate-500">{label}</p>
+          <p className="mt-1 text-2xl sm:text-3xl font-black tracking-[-0.04em] text-slate-950">{value}</p>
         </div>
-          <div className={cn('w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg', color)}>
+          <div className={cn('w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg', color)}>
           <Icon className="w-5 h-5 text-white" />
         </div>
       </div>
@@ -150,7 +150,7 @@ export function DashboardClient({
 
   return (
     <div className="page-container max-w-[1400px] animate-slide-up">
-      <div className="mb-7 rounded-[1.75rem] p-6 sm:p-8 text-white relative isolate overflow-hidden dagangos-aurora shadow-[0_20px_55px_rgba(2,6,23,.24)]">
+      <div className="mb-5 sm:mb-7 rounded-[1.75rem] p-5 sm:p-8 text-white relative isolate overflow-hidden dagangos-aurora shadow-[0_20px_55px_rgba(2,6,23,.24)]">
         <div className="absolute inset-0 dagangos-grid opacity-40" />
         <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl dagangos-orb" />
         <div className="absolute -left-20 -bottom-28 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl dagangos-orb-delayed" />
@@ -158,10 +158,10 @@ export function DashboardClient({
           <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
             <div>
               <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-slate-100"><Sparkles className="h-3.5 w-3.5 text-emerald-300" /> DagangOS control centre</span>
-              <h2 className="mt-4 text-3xl font-black tracking-[-0.04em] sm:text-4xl">Welcome to your workspace</h2>
+              <h2 className="mt-4 text-2xl font-black tracking-[-0.04em] sm:text-4xl">Welcome to your workspace</h2>
               <p className="mt-2 text-sm text-slate-300">A clear view of the commercial and operational signals that matter today.</p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="flex w-full flex-wrap gap-2 xl:w-auto">
               <select
                 value={days}
                 onChange={(e) => router.push(`?days=${e.target.value}`)}
@@ -231,7 +231,7 @@ export function DashboardClient({
       )}
 
       {activeWidgets.kpi && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
           <StatCard label="Total Revenue" value={formatCurrency(m.revenue)} icon={CreditCard} color="bg-indigo-600" href="/admin/payments" />
           <StatCard label="Page Views" value={a.pageViews.toLocaleString()} icon={BarChart3} color="bg-blue-600" href="/admin/analytics" />
           <StatCard label="Total Orders" value={m.totalOrders} icon={ShoppingCart} color="bg-emerald-600" href="/admin/ecommerce" />
@@ -240,8 +240,8 @@ export function DashboardClient({
       )}
 
       {activeWidgets.revenueChart && (
-        <div className="rounded-2xl border border-white bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,.07)] mb-6">
-          <div className="flex items-center justify-between mb-4">
+        <div className="rounded-2xl border border-white bg-white/90 p-4 sm:p-5 shadow-[0_10px_30px_rgba(15,23,42,.07)] mb-6">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between mb-4">
             <div>
               <h3 className="text-sm font-semibold text-slate-900">Revenue &amp; Orders — Last {days} Days</h3>
               <p className="text-xs text-slate-400 mt-0.5">Daily revenue performance</p>

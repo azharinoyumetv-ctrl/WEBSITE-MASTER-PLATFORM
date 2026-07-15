@@ -334,11 +334,11 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-950 pos-grid">
+    <div className="min-h-[calc(100dvh-5rem)] lg:h-screen flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden bg-gray-950 pos-grid">
       {/* Product Grid */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="min-h-[54vh] lg:min-h-0 flex-1 flex flex-col overflow-hidden">
         {/* POS Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
               <Monitor className="w-4 h-4 text-white" />
@@ -351,9 +351,9 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-gray-400 text-xs">
+          <div className="flex w-full sm:w-auto items-center justify-between gap-2 overflow-x-auto text-gray-400 text-xs">
             {/* Drawer Actions */}
-            <div className="flex bg-gray-800 rounded-lg overflow-hidden border border-gray-700 mr-2">
+            <div className="flex flex-shrink-0 bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
               <button disabled={!activeSession} onClick={handleOpenCashDrawer} className="px-3 py-1.5 hover:bg-gray-700 disabled:opacity-50 border-r border-gray-700" title="Open Drawer">
                 <Monitor className="w-3.5 h-3.5 text-emerald-400" />
               </button>
@@ -368,12 +368,12 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
               </button>
             </div>
             
-            <button onClick={handlePrepareCloseShift} className="text-emerald-400 hover:text-emerald-300 underline font-medium mr-2 border-r border-gray-800 pr-4">Close Shift</button>
-            <div className="flex items-center gap-1.5">
+            <button onClick={handlePrepareCloseShift} className="flex-shrink-0 text-emerald-400 hover:text-emerald-300 underline font-medium sm:mr-2 sm:border-r sm:border-gray-800 sm:pr-4">Close Shift</button>
+            <div className="hidden sm:flex items-center gap-1.5">
               <Wifi className="w-3.5 h-3.5 text-emerald-400" />
               <span>Online</span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="hidden md:flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5" />
               <span className="font-mono">{time.toLocaleTimeString()}</span>
             </div>
@@ -430,7 +430,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
       </div>
 
       {/* Cart Panel */}
-      <div className="w-80 flex flex-col bg-gray-900 border-l border-gray-800">
+      <div className="w-full lg:w-80 lg:max-h-none flex flex-col bg-gray-900 border-t lg:border-t-0 lg:border-l border-gray-800">
         <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-gray-400" />

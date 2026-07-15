@@ -499,6 +499,55 @@
   color: white;
 }
 
+/* Small-screen admin ergonomics: prevent dense screens from becoming cramped
+   while leaving the larger desktop layouts unchanged. */
+@media (max-width: 639px) {
+  .page-container {
+    padding: 1rem;
+  }
+
+  .section-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .section-header > *:last-child {
+    max-width: 100%;
+  }
+
+  .section-title {
+    font-size: 1.125rem;
+  }
+
+  .section-desc {
+    line-height: 1.45;
+  }
+
+  .stat-card {
+    padding: 1rem;
+  }
+
+  .stat-value {
+    font-size: 1.5rem;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 0.65rem 0.75rem;
+    font-size: 0.75rem;
+  }
+
+  .data-table th {
+    white-space: nowrap;
+  }
+
+  .btn {
+    min-height: 2.75rem;
+  }
+}
+
 /* DagangOS storefront motion system */
 @keyframes dagangos-drift {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
