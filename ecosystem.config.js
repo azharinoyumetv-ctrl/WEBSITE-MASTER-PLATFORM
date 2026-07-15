@@ -1,8 +1,18 @@
+<<<<<<< Updated upstream
 function stripQuotes(val) {
   if (typeof val === 'string') {
     return val.replace(/^["']|["']$/g, '')
   }
   return val
+=======
+// Strip leading/trailing literal quotes injected by secret managers.
+// Some injectors wrap values as: DATABASE_URL="postgresql://..."
+// The outer quotes become part of the string value, producing an invalid URL
+// that Prisma can't parse -> corrupted hostname -> EAI_AGAIN at runtime.
+function stripQuotes(val) {
+  if (typeof val !== 'string') return val
+  return val.replace(/^["']|["']$/g, '')
+>>>>>>> Stashed changes
 }
 
 module.exports = {
