@@ -1,8 +1,10 @@
 export interface Addon {
   key: string
   name: string
+  /** One-time implementation price in IDR. */
   price: number
   desc: string
+  priceNote?: string
 }
 
 export interface PackageOption {
@@ -16,61 +18,74 @@ export interface PackageOption {
 export const packages: Record<string, PackageOption> = {
   landing_page: {
     key: 'landing_page',
-    name: 'Landing Page',
-    price: 2500000,
-    desc: 'Single-page highly optimized for conversions',
+    name: 'Launch Website',
+    price: 3500000,
+    desc: 'One-time conversion-focused website deployment',
     requirementsFields: ['companyName', 'contactEmail', 'projectDescription', 'timeline', 'designPreferences'],
   },
   company_profile: {
     key: 'company_profile',
     name: 'Company Profile',
-    price: 4000000,
-    desc: 'Professional corporate presence with dynamic pages',
+    price: 6000000,
+    desc: 'One-time professional corporate web presence',
     requirementsFields: ['companyName', 'contactEmail', 'companyInfo', 'teamSize', 'pagesNeeded', 'brandAssets', 'timeline'],
   },
   business_website: {
     key: 'business_website',
     name: 'Business Website + Admin',
-    price: 8000000,
-    desc: 'Full CMS with secure tenant dashboard',
+    price: 12000000,
+    desc: 'One-time business website and admin workspace deployment',
     requirementsFields: ['companyName', 'contactEmail', 'projectDescription', 'adminUsers', 'contentTypes', 'integrations', 'timeline'],
   },
   ecommerce: {
     key: 'ecommerce',
     name: 'E-Commerce Platform',
-    price: 15000000,
-    desc: 'Complete storefront with cart and payment gateways',
+    price: 22000000,
+    desc: 'One-time commerce platform deployment with storefront and payments',
     requirementsFields: ['companyName', 'contactEmail', 'productCount', 'paymentGateways', 'shippingNeeds', 'inventorySystem', 'timeline'],
   },
   restaurant: {
     key: 'restaurant',
     name: 'Restaurant System',
-    price: 20000000,
-    desc: 'Menu, tables, booking calendar, and staff queues',
+    price: 28000000,
+    desc: 'One-time restaurant system deployment for menus, bookings, and operations',
     requirementsFields: ['companyName', 'contactEmail', 'menuItems', 'tableCount', 'reservationNeeds', 'kitchenDisplay', 'timeline'],
   },
   retail_pos: {
     key: 'retail_pos',
     name: 'Retail POS + Website',
-    price: 25000000,
-    desc: 'Unified online store and offline retail browser POS',
+    price: 35000000,
+    desc: 'One-time online store and browser POS deployment',
     requirementsFields: ['companyName', 'contactEmail', 'storeLocations', 'productTypes', 'paymentMethods', 'staffCount', 'timeline'],
   },
   custom: {
     key: 'custom',
     name: 'Custom Platform',
-    price: 30000000,
-    desc: 'Enterprise bespoke solutions',
+    price: 45000000,
+    desc: 'Starting price for a bespoke self-hosted business platform',
     requirementsFields: ['companyName', 'contactEmail', 'detailedRequirements', 'budget', 'timeline'],
   },
 }
 
 export const addonsList: Addon[] = [
-  { key: 'ai', name: 'AI Copywriter Suite', price: 250000, desc: 'LLM generated descriptions' },
-  { key: 'booking', name: 'Booking Calendar Scheduler', price: 500000, desc: 'Appointments & rosters' },
-  { key: 'crm', name: 'CRM & Customer Timelines', price: 400000, desc: 'Spend tracking log' },
-  { key: 'api', name: 'Developer Webhooks Portal', price: 750000, desc: 'External sync keys' },
+  { key: 'ai', name: 'AI Copywriter Integration (BYOK)', price: 1500000, desc: 'Bring your own provider API key. No DagangOS AI markup or lock-in.' },
+  { key: 'booking', name: 'Booking & Scheduling Module', price: 3000000, desc: 'Appointments, reservations, and operational scheduling.' },
+  { key: 'crm', name: 'CRM & Customer Timeline', price: 3500000, desc: 'Customer history, relationship management, and follow-up context.' },
+  { key: 'api', name: 'Developer API & Webhook Portal', price: 4000000, desc: 'Developer keys and controlled external-system integration.' },
+  { key: 'whatsapp', name: 'WhatsApp Business Integration', price: 1500000, desc: 'Tenant-owned Meta WhatsApp Business integration and templates.' },
+  { key: 'payment_gateway', name: 'Payment Gateway Setup', price: 1000000, desc: 'Setup and verification for one payment gateway.', priceNote: 'per gateway' },
+  { key: 'data_migration', name: 'Initial Product/Data Migration', price: 1000000, desc: 'Structured import and validation of the first product batch.', priceNote: 'per 100 products' },
+  { key: 'admin_workflow', name: 'Extra Admin/User Workflow', price: 1500000, desc: 'One additional approval, staff, or operational workflow.' },
+  { key: 'custom_report', name: 'Custom Report/Dashboard', price: 2500000, desc: 'A tailored operational report or dashboard.', priceNote: 'starting at' },
 ]
+
+export const addonModuleMap: Record<string, string> = {
+  ai: 'ai_module',
+  booking: 'booking_module',
+  crm: 'crm_module',
+  api: 'api_module',
+  whatsapp: 'notification_module',
+}
 
 export const requirementFieldLabels: Record<string, { label: string; placeholder?: string; type?: string }> = {
   companyName: { label: 'Company / Personal Name', placeholder: 'Your name or business name' },

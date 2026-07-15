@@ -149,7 +149,6 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
   if (slug === 'products' || slug === 'shop') {
     const label = slug === 'shop' ? t('shop') : t('products')
     const sampleProducts = (t.raw('shop_products') as any[]) || []
-    const addons = (t.raw('shop_addons') as any[]) || []
 
     return (
       <div className="min-h-screen bg-[#f7fafc]">
@@ -173,6 +172,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {sampleProducts.map((product, index) => {
               const packageKey = Object.keys(packages)[index] || 'landing_page'
+              const pkg = packages[packageKey]
               return (
               <div key={product.name} className="relative overflow-hidden bg-white rounded-[1.5rem] p-8 border border-slate-200 shadow-[0_16px_45px_rgba(15,23,42,.08)] hover:-translate-y-1 hover:shadow-xl transition-all flex flex-col justify-between">
                 <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500" />
@@ -182,9 +182,9 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
                       {product.badge}
                     </span>
                   </div>
-                  <h3 className="text-2xl font-bold text-slate-900 mb-2">{product.name}</h3>
-                  <p className="text-slate-500 text-sm mb-4 leading-relaxed">{product.desc}</p>
-                  <p className="text-3xl font-extrabold mb-6" style={{ color: primaryColor }}>{product.price}</p>
+                  <h3 className="text-2xl font-bold text-slate-900 mb-2">{pkg.name}</h3>
+                  <p className="text-slate-500 text-sm mb-4 leading-relaxed">{pkg.desc}</p>
+                  <p className="text-3xl font-extrabold mb-6" style={{ color: primaryColor }}>{pkg.key === 'custom' ? 'Starting at ' : ''}{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price)}</p>
                   
                   {/* Features list */}
                   <div className="border-t border-slate-100 pt-6 mb-8">
@@ -217,17 +217,14 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
           <h2 className="text-3xl font-bold text-slate-900 mb-4 text-center">{t('addons_title')}</h2>
           <p className="text-center text-slate-500 mb-12">{t('addons_subtitle')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {addons.map((addon, index) => {
-              const addonKey = addonsList[index]?.key
-              const href = addonKey
-                ? `/project-setup?package=landing_page&addons=${addonKey}`
-                : '/project-setup'
+            {addonsList.map((addon) => {
+              const href = `/project-setup?package=landing_page&addons=${addon.key}`
               return (
               <div key={addon.name} className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-[0_16px_45px_rgba(15,23,42,.06)] flex flex-col justify-between transition hover:-translate-y-0.5 hover:shadow-lg">
                 <div>
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-lg font-bold text-slate-900">{addon.name}</h3>
-                    <span className="text-sm font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{addon.price}</span>
+                    <span className="text-sm font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.price)}{addon.priceNote ? `, ${addon.priceNote}` : ''}</span>
                   </div>
                   <p className="text-slate-600 text-sm leading-relaxed">{addon.desc}</p>
                 </div>

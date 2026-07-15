@@ -11,6 +11,7 @@ import { formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { createTenant } from '@/lib/actions/tenant'
 import { useLocale } from 'next-intl'
+import { addonsList, packages } from '@/lib/constants/packages'
 
 const PLAN_CONFIG = {
   core: { label: 'Core', icon: Zap, color: 'text-slate-600', bg: 'bg-slate-100' },
@@ -158,7 +159,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
               <tr>
                 <th>Tenant</th>
                 <th>Domain</th>
-                <th>Plan</th>
+                <th>Deployment</th>
                 <th>Status</th>
                 <th>Created</th>
                 <th className="text-right">Actions</th>
@@ -196,7 +197,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                     <td>
                       <div className={cn('flex items-center gap-1.5 w-fit px-2.5 py-1 rounded-full text-xs font-medium', plan.bg, plan.color)}>
                         <plan.icon className="w-3 h-3" />
-                        {plan.label}
+                        {plan.label} deployment
                       </div>
                     </td>
                     <td>
@@ -290,24 +291,15 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                   value={formData.packageKey}
                   onChange={(e) => setFormData({ ...formData, packageKey: e.target.value })}
                 >
-                  <option value="landing_page">Landing Page Package (Rp 2.500.000)</option>
-                  <option value="company_profile">Company Profile Package (Rp 4.000.000)</option>
-                  <option value="business_website">Business Website + Admin (Rp 8.000.000)</option>
-                  <option value="ecommerce">E-Commerce Platform (Rp 15.000.000)</option>
-                  <option value="restaurant">Restaurant System (Rp 20.000.000)</option>
-                  <option value="retail_pos">Retail POS + Website (Rp 25.000.000)</option>
-                  <option value="custom">Custom Business Platform (Rp 30.000.000+)</option>
+                  {Object.values(packages).map((pkg) => (
+                    <option key={pkg.key} value={pkg.key}>{pkg.name} ({new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price)}{pkg.key === 'custom' ? '+' : ''})</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="form-label">Add-ons (Optional)</label>
                 <div className="space-y-2 mt-1.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  {[
-                    { key: 'ai', label: 'AI Copywriter Suite (+Rp 250k/mo)' },
-                    { key: 'booking', label: 'Booking & Scheduling (+Rp 500k/mo)' },
-                    { key: 'crm', label: 'CRM & Timelines (+Rp 400k/mo)' },
-                    { key: 'api', label: 'Developer API Webhooks (+Rp 750k/mo)' },
-                  ].map(addon => (
+                  {addonsList.map(addon => (
                     <label key={addon.key} className="flex items-center gap-2 text-sm text-slate-700 font-normal">
                       <input 
                         type="checkbox" 
@@ -315,12 +307,12 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                         onChange={(e) => {
                           const list = e.target.checked 
                             ? [...formData.addons, addon.key]
-                            : formData.addons.filter((k: string) => k !== addon.key)
+                            : formData.addons.filter((item) => item !== addon.key)
                           setFormData({ ...formData, addons: list })
                         }}
                         className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" 
                       />
-                      <span>{addon.label}</span>
+                      <span>{addon.name} ({new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.price)}{addon.priceNote ? `, ${addon.priceNote}` : ''})</span>
                     </label>
                   ))}
                 </div>

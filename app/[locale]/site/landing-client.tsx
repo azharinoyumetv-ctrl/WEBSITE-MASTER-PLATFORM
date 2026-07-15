@@ -143,7 +143,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                     <p className="font-bold text-sm text-slate-900">{pkg.name}</p>
                     <p className="text-xs text-slate-500 mt-1">{pkg.desc}</p>
                     <p className="text-sm font-semibold mt-2" style={{ color: primaryColor }}>
-                      {pkg.price > 0 ? formatRp(pkg.price) : t('custom_quote')}
+                      {pkg.key === 'custom' ? 'Starting at ' : ''}{pkg.price > 0 ? formatRp(pkg.price) : t('custom_quote')} <span className="text-xs font-medium text-slate-500">one-time</span>
                     </p>
                   </button>
                 ))}
@@ -178,7 +178,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                         <p className="text-slate-500 text-xs">{addon.desc}</p>
                       </div>
                     </div>
-                    <span className="text-sm font-semibold animate-pulse" style={{ color: primaryColor }}>{formatRp(addon.price)}</span>
+                    <span className="text-sm font-semibold" style={{ color: primaryColor }}>{formatRp(addon.price)} <span className="text-xs font-medium text-slate-500">one-time</span></span>
                   </div>
                 ))}
               </div>
@@ -204,7 +204,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                 return (
                   <div key={key} className="flex justify-between text-xs">
                     <span>{addon?.name}</span>
-                    <span className="font-semibold text-slate-900">{formatRp(addon?.price || 0)}</span>
+                    <span className="font-semibold text-slate-900">{formatRp(addon?.price || 0)} one-time</span>
                   </div>
                 )
               })}
@@ -218,6 +218,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-xl leading-relaxed mb-4">
               {t('infra_note')}
             </div>
+            <p className="mb-4 text-xs leading-relaxed text-slate-500">Data and infrastructure remain under the client&apos;s control. Source-code/IP transfer is a separately quoted enterprise option.</p>
 
             <a
               href={HOSTINGER_REFERRAL_URL}

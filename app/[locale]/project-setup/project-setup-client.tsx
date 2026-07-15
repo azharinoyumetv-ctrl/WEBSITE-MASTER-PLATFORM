@@ -148,7 +148,7 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
           </div>
 
           <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_16px_45px_rgba(15,23,42,.08)] space-y-6">
-            <div><p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Step 02</p><h2 className="mt-2 text-2xl font-black text-slate-950">Add-ons</h2></div>
+            <div><p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Step 02</p><h2 className="mt-2 text-2xl font-black text-slate-950">One-time implementation add-ons</h2><p className="mt-1 text-xs text-slate-500">Selected integrations are implemented with your platform; they are not recurring subscriptions.</p></div>
             <div className="grid gap-4">
               {addonsList.map((addon: Addon) => {
                 const selected = enabledAddons.includes(addon.key)

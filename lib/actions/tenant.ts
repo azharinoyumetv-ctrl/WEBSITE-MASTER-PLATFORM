@@ -7,6 +7,7 @@ import { requireSuperAdmin } from "@/lib/rbac"
 import { dispatchNotification } from '@/lib/actions/notifications'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
+import { addonModuleMap, addonsList } from '@/lib/constants/packages'
 
 export async function getTenants() {
   try {
@@ -83,14 +84,16 @@ export async function createTenant(data: { companyName: string, subdomain: strin
 
     const enabledModules = new Set(packageModuleMap[packageKey] || packageModuleMap.landing_page)
     
-    // Add custom addons
-    if (data.addons) {
-      data.addons.forEach(addon => {
-        if (addon === 'ai') enabledModules.add('ai_module')
-        if (addon === 'booking') enabledModules.add('booking_module')
-        if (addon === 'crm') enabledModules.add('crm_module')
-        if (addon === 'api') enabledModules.add('api_module')
-      })
+    const selectedAddons = Array.from(new Set(data.addons || []))
+    const hasInvalidAddon = selectedAddons.some(key => !addonsList.some(addon => addon.key === key))
+    if (hasInvalidAddon) {
+      await prisma.systemTenant.delete({ where: { id: tenant.id } })
+      return { success: false, error: 'One or more selected add-ons are invalid.' }
+    }
+
+    for (const addonKey of selectedAddons) {
+      const moduleKey = addonModuleMap[addonKey]
+      if (moduleKey) enabledModules.add(moduleKey)
     }
 
     // Enable modules in database
@@ -221,6 +224,7 @@ export async function createTenant(data: { companyName: string, subdomain: strin
         },
       },
     })
+
     const owner = await prisma.user.create({
       data: {
         tenantId: tenant.id,

@@ -8,7 +8,7 @@ import {
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig, getWebsiteConfigSnapshots, restoreWebsiteConfigSnapshot, createTempAiSecretToken } from '@/lib/actions/website'
-import { generateBillingInvoice, getBillingInvoices } from '@/lib/actions/billing'
+import { getBillingInvoices } from '@/lib/actions/billing'
 import { exportTenantData, importTenantData, getAuditLogsForExport, runTenantIsolationAudit } from '@/lib/actions/backup'
 
 export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig, tenantId }: { initialWebsite: any, initialTenant: any, initialAiConfig?: any, tenantId: string }) {
@@ -18,7 +18,6 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
   const [snapshots, setSnapshots] = useState<any[]>([])
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false)
   const [diffSnapshot, setDiffSnapshot] = useState<any>(null)
-  const [billingSetupError, setBillingSetupError] = useState('')
   const [pendingTab, setPendingTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history' | 'security' | null>(null)
   const [invoices, setInvoices] = useState<any[]>([])
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false)
@@ -355,16 +354,6 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
 
   const [isSaving, setIsSaving] = useState(false)
 
-  const getPlanActionLabel = (plan: 'core' | 'professional' | 'enterprise') => {
-    const currentPlan = initialTenant?.plan || 'core'
-    const planRank: Record<string, number> = { core: 0, professional: 1, enterprise: 2, agency: 3 }
-
-    if (currentPlan === plan) return 'Active'
-    return (planRank[plan] ?? 0) < (planRank[currentPlan] ?? 0)
-      ? `Downgrade to ${plan}`
-      : `Upgrade to ${plan}`
-  }
-
   const handleSave = async () => {
     setIsSaving(true)
     let res: any = { success: true }
@@ -390,35 +379,6 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
     } else {
       const errMsg = res.error || aiRes.error || paymentRes.error || 'Failed to save settings'
       toast.error(errMsg.toString())
-    }
-  }
-
-  const handleUpgradePlan = async (planId: 'core' | 'professional' | 'enterprise') => {
-    try {
-      const currentPlan = initialTenant?.plan || 'core'
-      const planRank: Record<string, number> = { core: 0, professional: 1, enterprise: 2, agency: 3 }
-      if ((planRank[planId] ?? 0) < (planRank[currentPlan] ?? 0)) {
-        toast.success(`Downgrade to ${planId} will be reviewed before the next billing period. No invoice was created.`)
-        return
-      }
-
-      setIsSaving(true)
-      setBillingSetupError('')
-      const res = await generateBillingInvoice(tenantId, planId)
-      if (res.success && res.invoiceUrl) {
-        window.location.href = res.invoiceUrl
-      } else if (res.success && !res.invoiceUrl) {
-        toast.success(res.message || 'Plan is free.')
-      } else if (res.error === "BILLING_NOT_CONFIGURED") {
-        setBillingSetupError(res.message || '')
-        toast.error('Billing setup required.')
-      } else {
-        toast.error(res.error || 'Failed to generate invoice')
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Error occurred')
-    } finally {
-      setIsSaving(false)
     }
   }
 
@@ -1178,47 +1138,22 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
               <div className="card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-slate-400" /> Subscription Plans
+                    <CreditCard className="w-4 h-4 text-slate-400" /> DagangOS Freedom License
                   </h3>
-                  <span className="badge badge-success uppercase tracking-wider">{initialTenant?.plan || 'core'}</span>
+                  <span className="badge badge-success uppercase tracking-wider">Perpetual</span>
                 </div>
                 
-                {billingSetupError && (
-                  <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <h4 className="text-amber-800 font-semibold mb-1">Billing Not Configured</h4>
-                    <p className="text-sm text-amber-700">{billingSetupError}</p>
-                    <p className="text-xs text-amber-600 mt-2">To fix this, please provide XENDIT_SECRET_KEY or MIDTRANS_SERVER_KEY in your environment variables.</p>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                  {['core', 'professional', 'enterprise'].map((plan) => (
-                    <div key={plan} className={cn("border rounded-xl p-6 relative flex flex-col", (initialTenant?.plan || 'core') === plan ? "border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/10" : "border-slate-200")}>
-                      {(initialTenant?.plan || 'core') === plan && (
-                         <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] uppercase font-bold px-2 py-1 rounded-bl-lg rounded-tr-xl">Current</div>
-                      )}
-                      <h4 className="text-lg font-bold capitalize mb-2">{plan}</h4>
-                      <p className="text-sm text-slate-500 mb-6 flex-1">
-                        {plan === 'core' && 'Basic features for starting out.'}
-                        {plan === 'professional' && 'Advanced features and limits.'}
-                        {plan === 'enterprise' && 'Full access, priority support.'}
-                      </p>
-                      <button 
-                        onClick={() => handleUpgradePlan(plan as any)} 
-                        disabled={isSaving || (initialTenant?.plan || 'core') === plan} 
-                        className={cn("btn w-full justify-center", plan === 'professional' ? 'btn-primary' : 'btn-secondary')}
-                      >
-                        {getPlanActionLabel(plan as 'core' | 'professional' | 'enterprise')}
-                      </button>
-                    </div>
-                  ))}
+                <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50/70 p-5">
+                  <h4 className="text-base font-bold text-emerald-950">Your deployed platform is not a subscription tier.</h4>
+                  <p className="mt-2 text-sm leading-relaxed text-emerald-900">DagangOS grants a perpetual, transferable self-hosted license for the deployed platform. Your business owns and controls its data, domain, VPS, and infrastructure. There is no mandatory platform renewal or transaction commission.</p>
+                  <p className="mt-3 text-xs leading-relaxed text-emerald-800">Optional maintenance, managed VPS administration, backup management, and priority support are separate services. Source-code and IP transfer, when required, is quoted separately.</p>
                 </div>
               </div>
 
               {/* Invoices List */}
               <div className="card p-6">
                 <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <Save className="w-4 h-4 text-slate-400" /> Billing Invoice History
+                  <Save className="w-4 h-4 text-slate-400" /> Deployment & Service Invoice History
                 </h3>
                 {isLoadingInvoices ? (
                   <div className="py-4 text-sm text-slate-500 flex items-center gap-2">

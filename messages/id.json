@@ -168,10 +168,10 @@
       }
     ],
     "shop_addons": [
-      { "name": "AI Copywriter", "price": "Rp 250.000 /bln", "desc": "Pembuatan deskripsi produk dan naskah bertenaga AI di playground." },
-      { "name": "Kalender Penjadwalan & Pemesanan", "price": "Rp 500.000 /bln", "desc": "Tambahkan janji temu, reservasi ruangan, dan daftar staf." },
-      { "name": "Modul CRM & Linimasa", "price": "Rp 400.000 /bln", "desc": "Kelola akun klien, analitik pengeluaran, dan log riwayat transaksi." },
-      { "name": "Portal Webhook API Pengembang", "price": "Rp 750.000 /bln", "desc": "Buat webhook kustom dan hasilkan kunci API untuk aplikasi eksternal." }
+      { "name": "Integrasi AI Copywriter", "price": "Rp 1.500.000 sekali bayar", "desc": "Gunakan API key penyedia sendiri tanpa markup atau penguncian AI DagangOS." },
+      { "name": "Modul Pemesanan & Penjadwalan", "price": "Rp 3.000.000 sekali bayar", "desc": "Janji temu, reservasi, dan penjadwalan operasional." },
+      { "name": "CRM & Linimasa Pelanggan", "price": "Rp 3.500.000 sekali bayar", "desc": "Riwayat pelanggan, pengelolaan relasi, dan konteks tindak lanjut." },
+      { "name": "Portal API & Webhook Pengembang", "price": "Rp 4.000.000 sekali bayar", "desc": "Kunci pengembang dan integrasi sistem eksternal yang terkontrol." }
     ]
   },
   "Auth": {
