@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { notFound } from 'next/navigation'
 import { Metadata } from 'next'
 import { getPublicWebsiteConfig } from '@/lib/actions/website'
-import { ProjectSetupClient } from './project-setup-client'
+import ProjectSetupClient from './project-setup-client'
 
 export async function generateMetadata(): Promise<Metadata> {
   const headersList = await headers()

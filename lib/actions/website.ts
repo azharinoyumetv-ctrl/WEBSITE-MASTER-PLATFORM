@@ -30,6 +30,33 @@ export async function getPublicWebsiteConfig(tenantDomain: string) {
     })
 
     if (!tenant || !tenant.website || !tenant.website.isActive) {
+      if (tenantDomain === 'default') {
+        const fallbackTenant = tenant || await prisma.systemTenant.findFirst({
+          where: { status: 'active' },
+          orderBy: { createdAt: 'asc' }
+        })
+
+        if (fallbackTenant) {
+          return {
+            success: true,
+            website: {
+              tenantId: fallbackTenant.id,
+              siteTitle: fallbackTenant.companyName || 'Website Master Platform',
+              themeConfig: { colors: { primary: '#4f46e5' } },
+              globalSeoMetadata: { keywords: [], description: '' },
+              faviconUrl: null,
+              logoUrl: null,
+              isActive: true,
+              xenditEnabled: false,
+              midtransEnabled: false,
+              dokuEnabled: false
+            },
+            tenantId: fallbackTenant.id,
+            tenant: fallbackTenant
+          }
+        }
+      }
+
       return { success: false, error: 'Website not found or inactive' }
     }
 

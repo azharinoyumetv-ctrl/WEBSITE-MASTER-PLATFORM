@@ -67,7 +67,7 @@ export default async function middleware(request: NextRequest) {
 
   const isSecure = process.env.NEXTAUTH_URL?.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https'
   const hostname = request.headers.get('host') || ''
-  const targetTenantId = getTenantFromHost(hostname)
+  const hostTenantId = getTenantFromHost(hostname)
 
   const nextAction = request.headers.get('next-action')
   const referer = request.headers.get('referer') || ''
@@ -78,7 +78,7 @@ export default async function middleware(request: NextRequest) {
     !pathname.includes('/auth/login')
   ) || isProtectedAction
 
-  const token = (targetTenantId !== 'default' || isProtected)
+  const token = (hostTenantId !== 'default' || isProtected)
     ? await getToken({ 
         req: request,
         secret: process.env.NEXTAUTH_SECRET,
@@ -87,12 +87,12 @@ export default async function middleware(request: NextRequest) {
     : null
 
   // 1. Cross-tenant routing validation if user has active session
-  if (token && targetTenantId !== 'default') {
+  if (token && hostTenantId !== 'default') {
     const userRoles = (token.roles as string[]) || []
     const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super-admin')
     
-    if (token.tenantId !== targetTenantId && !isSuperAdmin) {
-      console.warn(`Rejecting cross-tenant access from tenant ${token.tenantId} to target ${targetTenantId}`);
+    if (token.tenantId !== hostTenantId && !isSuperAdmin) {
+      console.warn(`Rejecting cross-tenant access from tenant ${token.tenantId} to target ${hostTenantId}`);
       if (request.headers.has('next-action') || pathname.startsWith('/api')) {
         return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized tenant access' }, { status: 403 }))
       }
@@ -113,7 +113,7 @@ export default async function middleware(request: NextRequest) {
       const isPlatformOwner = userRoles.some(r => r.toLowerCase() === 'platform_owner' || r.toLowerCase() === 'platform owner')
       const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super-admin')
       
-      if (hasAnyRole && (token.tenantId === targetTenantId || isPlatformOwner || isSuperAdmin)) {
+      if (hasAnyRole && (hostTenantId === 'default' || token.tenantId === hostTenantId || isPlatformOwner || isSuperAdmin)) {
         isAuthorized = true
       }
     }
@@ -142,10 +142,10 @@ export default async function middleware(request: NextRequest) {
   }
 
   // 3. Run our routing logic (which extracts tenant and locale)
-  return applySecurityHeaders(handleRouting(request))
+  return applySecurityHeaders(handleRouting(request, token))
 }
 
-function handleRouting(request: NextRequest) {
+function handleRouting(request: NextRequest, token?: Awaited<ReturnType<typeof getToken>> | null) {
   const url = request.nextUrl
   const hostname = request.headers.get('host') || ''
   const pathname = url.pathname
@@ -162,6 +162,8 @@ function handleRouting(request: NextRequest) {
   let tenantId = 'default'
   if (isPublicSite || pathname.startsWith('/api')) {
     tenantId = getTenantFromHost(hostname)
+  } else if ((token as any)?.tenantId) {
+    tenantId = String((token as any).tenantId)
   }
 
   const requestHeaders = new Headers(request.headers)
@@ -196,6 +198,7 @@ function handleRouting(request: NextRequest) {
       pathWithoutLocale === '/site' || 
       pathWithoutLocale.startsWith('/site/') ||
       pathWithoutLocale.startsWith('/checkout') ||
+      pathWithoutLocale.startsWith('/project-setup') ||
       pathWithoutLocale.startsWith('/orders') ||
       pathWithoutLocale === '/shop' ||
       pathWithoutLocale === '/about' ||

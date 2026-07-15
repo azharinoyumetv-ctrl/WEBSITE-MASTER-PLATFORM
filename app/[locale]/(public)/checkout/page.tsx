@@ -20,6 +20,10 @@ export default async function CheckoutPage() {
   const tenantDomain = headersList.get('x-tenant-id') || 'default'
   const websiteRes = await getPublicWebsiteConfig(tenantDomain)
 
+  if (tenantDomain === 'default') {
+    redirect('/project-setup')
+  }
+
   if (!websiteRes.success || !websiteRes.website) {
     return (
       <div className="min-h-screen bg-slate-50 py-20">

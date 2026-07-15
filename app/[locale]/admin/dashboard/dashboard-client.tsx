@@ -17,7 +17,7 @@ import { InventoryAlertsCard } from './inventory-alerts-card'
 import { ModuleStatusCard } from '../module-status-card'
 import { AuditLogCard } from './audit-log-card'
 import toast from 'react-hot-toast'
-import { ModuleItem } from '../admin-types'
+import type { ModuleItem, MonitoringStatus } from '../admin-types'
 
 function StatCard({
   label, value, trend, trendLabel, icon: Icon, color, href
@@ -76,11 +76,7 @@ type DashboardProps = {
     conversions: number
     dailyData: Array<{ date: string; revenue: number; orders: number; pageViews?: number; conversions?: number }>
   }
-  monitoringData?: {
-    systemStatus?: string
-    nodes?: Array<{ service: string; status: string; latency: string; uptime: string }>
-    alertHistory?: Array<{ id: string }>
-  } | null
+  monitoringData?: MonitoringStatus | null
   metricsError?: string | null
   analyticsError?: string | null
   initialWidgets?: Record<string, boolean> | null

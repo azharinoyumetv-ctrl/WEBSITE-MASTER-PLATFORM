@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ArrowRight, CheckCircle2, Calculator, Package, Loader2, AlertCircle } from 'lucide-react'
+import { ArrowRight, Calculator, Loader2 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
-import { packages, addonsList, type Addon, type PackageOption } from '@/lib/constants/packages'
+import { packages, addonsList, requirementFieldLabels, type Addon, type PackageOption } from '@/lib/constants/packages'
 
 type CheckoutErrors = Partial<Record<'package' | 'contactEmail' | string, string>>;
 
@@ -12,9 +12,10 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
   const router = useRouter()
   const search = useSearchParams()
   const preselectedPackage = search.get('package') || 'landing_page'
+  const preselectedAddons = search.get('addons')?.split(',').filter(Boolean) || []
 
   const [selectedPackage, setSelectedPackage] = useState<string>(preselectedPackage)
-  const [enabledAddons, setEnabledAddons] = useState<string[]>([])
+  const [enabledAddons, setEnabledAddons] = useState<string[]>(preselectedAddons)
   const [requirements, setRequirements] = useState<Record<string, string>>({})
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [errors, setErrors] = useState<CheckoutErrors>({})
@@ -171,8 +172,7 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
           </p>
           <div className="grid md:grid-cols-2 gap-4">
             {pkg.requirementsFields.map(field => {
-              const meta = (pkg as any).requirementFieldLabels?.[field] || {}
-              const inputType = meta.type || 'text'
+              const meta = requirementFieldLabels[field] || {}
               return (
                 <div key={field} className={field === 'detailedRequirements' || field === 'projectDescription' ? 'md:col-span-2' : ''}>
                   <label className="block text-sm font-semibold text-slate-700 mb-2">
