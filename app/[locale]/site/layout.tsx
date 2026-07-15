@@ -76,11 +76,11 @@ export default async function SiteLayout({
   const isCompanyStorefront = tenantDomain === 'default'
 
   const navigationTree = [
-    { label: t('home'), target: '/' },
-    { label: t('about'), target: '/about' },
-    { label: t('catalog'), target: '/catalog' },
-    { label: t('shop'), target: '/shop' },
-    { label: t('contact'), target: '/contact' },
+    { label: t('home'), target: '/site' },
+    { label: t('about'), target: '/site/about' },
+    { label: t('catalog'), target: '/site/catalog' },
+    { label: t('shop'), target: '/site/shop' },
+    { label: t('contact'), target: '/site/contact' },
   ]
 
   return (
@@ -103,7 +103,7 @@ export default async function SiteLayout({
       />
       <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 shadow-[0_12px_36px_rgba(2,6,23,.22)] backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[4.5rem] flex items-center justify-between gap-4">
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/site" aria-label="Back to DagangOS home" title="Back to DagangOS home" className="flex items-center gap-2 rounded-xl outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">
             {logoUrl ? (
               <Image src={logoUrl} alt={website.siteTitle} className="h-10 w-10 rounded-lg object-cover" width={40} height={40} unoptimized />
             ) : isCompanyStorefront ? (
@@ -114,17 +114,6 @@ export default async function SiteLayout({
               </span>
             )}
           </Link>
-          <nav className="hidden md:flex items-center gap-1 rounded-2xl border border-white/10 bg-white/[.04] p-1.5">
-            {navigationTree.map((nav) => (
-              <Link 
-                key={nav.target} 
-                href={nav.target} 
-                className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/[.08] hover:text-white"
-              >
-                {nav.label}
-              </Link>
-            ))}
-          </nav>
           <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher variant="dark" />
             
@@ -136,6 +125,19 @@ export default async function SiteLayout({
             </Link>
           </div>
         </div>
+        <nav aria-label="Storefront navigation" className="border-t border-white/10 bg-slate-950/80">
+          <div className="max-w-7xl mx-auto flex gap-1 overflow-x-auto px-3 py-2 sm:px-6 lg:px-8 [scrollbar-width:none]">
+            {navigationTree.map((nav) => (
+              <Link
+                key={nav.target}
+                href={nav.target}
+                className="shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/[.08] hover:text-white focus-visible:bg-white/[.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              >
+                {nav.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
       </header>
 
       <main className="flex-1 bg-[#f7fafc]">
