@@ -4,7 +4,9 @@ import { getToken } from 'next-auth/jwt'
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    // Public files must bypass locale routing; otherwise images such as the
+    // company logo are redirected to a non-existent localized path.
+    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\..*).*)',
   ],
 }
 
