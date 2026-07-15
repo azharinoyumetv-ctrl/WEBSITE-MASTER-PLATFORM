@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import crypto from 'crypto'
+import * as crypto from 'crypto'
 
 const REPLAY_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
 
@@ -16,9 +16,11 @@ const REPLAY_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
 export async function validateV1Request(req: Request): Promise<NextResponse | null> {
   const secret = process.env.CONTROL_PLANE_SECRET
   if (!secret) {
-    // If not configured, allow through but log loudly
-    console.warn('[v1-auth] CONTROL_PLANE_SECRET is not set — /api/v1 routes are unprotected!')
-    return null
+    console.error('[v1-auth] CONTROL_PLANE_SECRET is not set — /api/v1 routes are blocked until it is configured.')
+    return NextResponse.json(
+      { success: false, error: 'Server auth not configured' },
+      { status: 501 }
+    )
   }
 
   const timestamp = req.headers.get('x-request-timestamp')
