@@ -78,6 +78,7 @@ export default async function SiteLayout({
   const navigationTree = [
     { label: t('home'), target: '/' },
     { label: t('about'), target: '/about' },
+    { label: t('catalog'), target: '/catalog' },
     { label: t('shop'), target: '/shop' },
     { label: t('contact'), target: '/contact' },
   ]
