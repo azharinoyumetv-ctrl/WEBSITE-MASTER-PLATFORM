@@ -4,8 +4,9 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
-import { Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, CheckCircle } from 'lucide-react'
+import { AlertCircle, ArrowUpRight, CheckCircle, Eye, EyeOff, Layers3, Loader2, Lock, Mail, ShieldCheck, Sparkles } from 'lucide-react'
 import { DagangOSBrand } from '@/components/DagangOSBrand'
+import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import toast from 'react-hot-toast'
 import { useTranslations } from 'next-intl'
 
@@ -32,13 +33,13 @@ export default function LoginPage() {
         setCaptchaToken(data.token)
         setCaptchaAnswer('')
       }
-    } catch (e) {
-      console.error(e)
+    } catch (error) {
+      console.error(error)
     }
   }
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleLogin = async (event: React.FormEvent) => {
+    event.preventDefault()
     setError('')
     setIsLoading(true)
 
@@ -53,12 +54,12 @@ export default function LoginPage() {
       })
 
       if (res?.error) {
-        if (res.error === "CAPTCHA_REQUIRED" || res.error === "INVALID_CAPTCHA") {
-          setError(res.error === "INVALID_CAPTCHA" ? "Invalid CAPTCHA answer." : "Too many failed attempts. Please solve the CAPTCHA.")
+        if (res.error === 'CAPTCHA_REQUIRED' || res.error === 'INVALID_CAPTCHA') {
+          setError(res.error === 'INVALID_CAPTCHA' ? 'Invalid CAPTCHA answer.' : 'Too many failed attempts. Please solve the CAPTCHA.')
           fetchCaptcha()
-        } else if (res.error === "MFA_REQUIRED" || res.error === "INVALID_MFA") {
+        } else if (res.error === 'MFA_REQUIRED' || res.error === 'INVALID_MFA') {
           setMfaRequired(true)
-          setError(res.error === "INVALID_MFA" ? "Invalid authenticator code." : "")
+          setError(res.error === 'INVALID_MFA' ? 'Invalid authenticator code.' : '')
         } else {
           setError(res.error)
         }
@@ -67,218 +68,133 @@ export default function LoginPage() {
         router.push('/admin/dashboard')
         router.refresh()
       }
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred')
     } finally {
       setIsLoading(false)
     }
   }
 
+  const features = [t('feat_1'), t('feat_2'), t('feat_3')]
+
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900">
-      {/* Left panel */}
-      <div className="hidden lg:flex flex-1 flex-col justify-between p-12 relative">
-        {/* Background grid */}
-        <div className="absolute inset-0 bg-grid-pattern opacity-10" />
-        
-        {/* Logo */}
-        <DagangOSBrand className="relative" dark />
+    <main className="relative isolate min-h-screen overflow-hidden dagangos-aurora px-5 py-6 sm:px-8 lg:px-12">
+      <div className="absolute inset-0 dagangos-grid opacity-35" />
+      <div className="absolute -left-24 top-32 h-80 w-80 rounded-full bg-emerald-400/20 blur-3xl dagangos-orb" />
+      <div className="absolute -right-20 bottom-0 h-96 w-96 rounded-full bg-sky-400/20 blur-3xl dagangos-orb-delayed" />
 
-        {/* Hero text */}
-        <div className="relative">
-          <h1 className="text-5xl font-bold text-white leading-tight mb-6">
+      <header className="relative z-10 mx-auto flex max-w-7xl items-center justify-between">
+        <DagangOSBrand dark />
+        <LanguageSwitcher variant="dark" />
+      </header>
+
+      <div className="relative z-10 mx-auto grid min-h-[calc(100vh-104px)] max-w-7xl items-center gap-12 py-12 lg:grid-cols-[1fr_430px] lg:py-16">
+        <section className="hidden max-w-xl lg:block">
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-slate-100 backdrop-blur">
+            <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75 animate-ping" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" /></span>
+            DagangOS workspace
+          </div>
+          <h1 className="mt-7 text-5xl font-black leading-[0.98] tracking-[-0.05em] text-white xl:text-6xl">
             {t('hero_title_1')}<br />
-            at{' '}
-            <span className="bg-gradient-to-r from-indigo-400 to-blue-400 bg-clip-text text-transparent">
-              {t('hero_title_2')}
-            </span>
+            <span className="bg-gradient-to-r from-emerald-300 via-cyan-200 to-sky-400 bg-clip-text text-transparent">{t('hero_title_2')}</span>
           </h1>
-          <p className="text-slate-400 text-lg max-w-md leading-relaxed">
-            {t('hero_desc')}
-          </p>
+          <p className="mt-6 max-w-lg text-lg leading-relaxed text-slate-300">{t('hero_desc')}</p>
 
-          {/* Feature list */}
-          <div className="mt-8 space-y-3">
-            {[
-              t('feat_1'),
-              t('feat_2'),
-              t('feat_3'),
-              t('feat_4'),
-            ].map((feature) => (
-              <div key={feature} className="flex items-center gap-3">
-                <CheckCircle className="w-4 h-4 text-emerald-400 flex-shrink-0" />
-                <span className="text-slate-300 text-sm">{feature}</span>
-              </div>
-            ))}
+          <div className="mt-9 grid gap-3">
+            {features.map((feature, index) => {
+              const Icon = index === 0 ? ShieldCheck : index === 1 ? CheckCircle : Layers3
+              return (
+                <div key={feature} className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.07] px-4 py-3 text-sm text-slate-100 backdrop-blur">
+                  <Icon className="h-5 w-5 shrink-0 text-emerald-300" />
+                  {feature}
+                </div>
+              )
+            })}
           </div>
-        </div>
+        </section>
 
-        {/* Testimonial */}
-        <div className="relative glass-dark rounded-xl p-5 max-w-md">
-          <p className="text-slate-300 text-sm leading-relaxed italic">
-            {t('testimonial')}
-          </p>
-          <div className="flex items-center gap-3 mt-3">
-            <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center">
-              <span className="text-white text-xs font-bold">FA</span>
-            </div>
+        <section className="w-full rounded-[2rem] border border-white/70 bg-white/95 p-6 shadow-2xl shadow-slate-950/35 backdrop-blur sm:p-8 animate-scale-in">
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-white text-sm font-medium">{t('testimonial_author')}</p>
-              <p className="text-slate-400 text-xs">{t('testimonial_title')}</p>
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><Sparkles className="h-3.5 w-3.5" /> Secure workspace</span>
+              <h2 className="mt-4 text-3xl font-black tracking-[-0.04em] text-slate-950">{t('welcome')}</h2>
+              <p className="mt-2 text-sm leading-relaxed text-slate-500">{t('signin_subtitle')}</p>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Right panel — Login form */}
-      <div className="flex-1 flex items-center justify-center px-6 py-12 max-w-lg lg:max-w-md">
-        <div className="w-full max-w-sm animate-slide-up">
-          {/* Mobile logo */}
-          <DagangOSBrand className="mb-8 lg:hidden" dark />
-
-          <div>
-            <h2 className="text-2xl font-bold text-white mb-1">{t('welcome')}</h2>
-            <p className="text-slate-400 text-sm">{t('signin_subtitle')}</p>
+            <div className="rounded-2xl bg-slate-950 p-3 text-emerald-300"><ShieldCheck className="h-5 w-5" /></div>
           </div>
 
           <form onSubmit={handleLogin} className="mt-8 space-y-4">
-            {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1.5">{t('email_label')}</label>
+              <label className="mb-2 block text-sm font-bold text-slate-700">{t('email_label')}</label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type="email"
                   id="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(event) => setEmail(event.target.value)}
                   placeholder="name@company.com"
                   required
-                  className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white 
-                             placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40
-                             focus:border-indigo-500/40 transition-all text-sm"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                 />
               </div>
             </div>
 
-            {/* Password */}
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="block text-sm font-medium text-slate-300">{t('password_label')}</label>
-                <Link href="/auth/forgot-password" className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
-                  {t('forgot_password')}
-                </Link>
+              <div className="mb-2 flex items-center justify-between">
+                <label className="block text-sm font-bold text-slate-700">{t('password_label')}</label>
+                <Link href="/auth/forgot-password" className="text-xs font-bold text-emerald-700 transition-colors hover:text-emerald-800">{t('forgot_password')}</Link>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   id="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(event) => setPassword(event.target.value)}
                   placeholder="••••••••"
                   required
-                  className="w-full pl-10 pr-11 py-3 bg-white/5 border border-white/10 rounded-xl text-white 
-                             placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40
-                             focus:border-indigo-500/40 transition-all text-sm"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-11 text-sm text-slate-950 placeholder:text-slate-400 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-300 transition-colors"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                <button type="button" onClick={() => setShowPassword(value => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700" aria-label={showPassword ? 'Hide password' : 'Show password'}>
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </div>
 
-            {/* Error */}
-            {error && (
-              <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
-                <AlertCircle className="w-4 h-4 text-red-400 flex-shrink-0" />
-                <p className="text-sm text-red-400">{error}</p>
-              </div>
-            )}
-            
+            {error && <div className="flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700"><AlertCircle className="h-4 w-4 shrink-0" />{error}</div>}
 
-
-            {/* MFA Input */}
             {mfaRequired && (
-              <div className="animate-in fade-in slide-in-from-top-2">
-                <label className="block text-sm font-medium text-slate-300 mb-1.5">Authenticator Code</label>
+              <div className="animate-scale-in">
+                <label className="mb-2 block text-sm font-bold text-slate-700">Authenticator Code</label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
-                    type="text"
-                    value={mfaCode}
-                    onChange={(e) => setMfaCode(e.target.value)}
-                    placeholder="6-digit code"
-                    required
-                    className="w-full pl-10 pr-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white 
-                               placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40
-                               focus:border-indigo-500/40 transition-all text-sm"
-                  />
+                  <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                  <input type="text" value={mfaCode} onChange={(event) => setMfaCode(event.target.value)} placeholder="6-digit code" required className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-950 outline-none transition focus:border-emerald-400 focus:bg-white focus:ring-4 focus:ring-emerald-100" />
                 </div>
               </div>
             )}
 
-            {/* Captcha Input */}
             {captchaSvg && (
-              <div className="animate-in fade-in slide-in-from-top-2 bg-white/5 p-4 rounded-xl border border-white/10">
-                <label className="block text-sm font-medium text-slate-300 mb-2">Security Check</label>
-                <div className="flex gap-4 items-center">
-                  <div 
-                    className="bg-white rounded overflow-hidden flex-shrink-0"
-                    dangerouslySetInnerHTML={{ __html: captchaSvg }} 
-                  />
-                  <input
-                    type="text"
-                    value={captchaAnswer}
-                    onChange={(e) => setCaptchaAnswer(e.target.value)}
-                    placeholder="Type characters"
-                    required
-                    className="w-full px-4 py-2 bg-slate-900 border border-white/10 rounded-lg text-white 
-                               placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 text-sm"
-                  />
+              <div className="animate-scale-in rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <label className="mb-2 block text-sm font-bold text-slate-700">Security Check</label>
+                <div className="flex items-center gap-3">
+                  <div className="shrink-0 overflow-hidden rounded-lg bg-white" dangerouslySetInnerHTML={{ __html: captchaSvg }} />
+                  <input type="text" value={captchaAnswer} onChange={(event) => setCaptchaAnswer(event.target.value)} placeholder="Type characters" required className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-950 outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-100" />
                 </div>
               </div>
             )}
 
-            {/* Submit */}
-            <button
-              type="submit"
-              id="login-submit"
-              disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-indigo-600 hover:bg-indigo-700 
-                         disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl 
-                         transition-all duration-200 text-sm shadow-lg shadow-indigo-900/50"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>{t('btn_logging_in')}</span>
-                </>
-              ) : (
-                t('btn_login')
-              )}
+            <button type="submit" id="login-submit" disabled={isLoading} className="group flex w-full items-center justify-center gap-2 rounded-xl bg-slate-950 py-3.5 text-sm font-bold text-white shadow-lg shadow-slate-900/20 transition hover:-translate-y-0.5 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60">
+              {isLoading ? <><Loader2 className="h-4 w-4 animate-spin" />{t('btn_logging_in')}</> : <>{t('btn_login')}<ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" /></>}
             </button>
           </form>
 
-          {/* Footer */}
-          <p className="mt-6 text-center text-sm text-slate-500">
-            Need an account?{' '}
-            <Link href="/auth/register" className="text-indigo-400 hover:text-indigo-300 font-medium transition-colors">
-              Request access
-            </Link>
-          </p>
-
-          <div className="mt-8 pt-6 border-t border-white/5">
-            <p className="text-center text-xs text-slate-600">
-              Bcrypt password hashing (cost 12) · HttpOnly secure session cookies
-            </p>
+          <div className="mt-7 border-t border-slate-100 pt-5 text-center">
+            <p className="text-sm text-slate-500">Need an account? <Link href="/auth/register" className="font-bold text-emerald-700 hover:text-emerald-800">Request access</Link></p>
+            <p className="mt-3 text-xs text-slate-400">Bcrypt password hashing (cost 12) · HttpOnly secure session cookies</p>
           </div>
-        </div>
+        </section>
       </div>
-    </div>
+    </main>
   )
 }

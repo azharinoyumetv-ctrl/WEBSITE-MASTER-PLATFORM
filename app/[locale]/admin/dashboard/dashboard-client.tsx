@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import {
   TrendingUp, TrendingDown, Users, ShoppingCart, CreditCard,
   Package, Activity, AlertTriangle, CheckCircle2, ArrowRight,
-  BarChart3, Warehouse, Globe, Clock, Zap, ToggleLeft, Download, Settings
+  BarChart3, Warehouse, Globe, Clock, Zap, ToggleLeft, Download, Settings, Sparkles
 } from 'lucide-react'
 import { formatCurrency, formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import { DashboardChart } from './dashboard-chart'
@@ -33,13 +33,14 @@ function StatCard({
   const TrendIcon = trend && trend >= 0 ? TrendingUp : TrendingDown
 
   const content = (
-    <div className={cn('stat-card group', href && 'cursor-pointer hover:shadow-md transition-all duration-200')}>
+    <div className={cn('group relative overflow-hidden rounded-2xl border border-white bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,.07)] backdrop-blur transition-all duration-200', href && 'cursor-pointer hover:-translate-y-1 hover:shadow-[0_18px_38px_rgba(15,23,42,.12)]')}>
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500 opacity-0 transition-opacity group-hover:opacity-100" />
       <div className="flex items-start justify-between">
         <div>
-          <p className="stat-label">{label}</p>
-          <p className="stat-value mt-1">{value}</p>
+          <p className="text-sm font-bold text-slate-500">{label}</p>
+          <p className="mt-1 text-3xl font-black tracking-[-0.04em] text-slate-950">{value}</p>
         </div>
-        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', color)}>
+          <div className={cn('w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg', color)}>
           <Icon className="w-5 h-5 text-white" />
         </div>
       </div>
@@ -50,7 +51,7 @@ function StatCard({
         </div>
       )}
       {href && (
-        <div className="flex items-center gap-1 text-xs text-slate-400 group-hover:text-indigo-600 transition-colors">
+        <div className="flex items-center gap-1 text-xs font-bold text-slate-400 group-hover:text-emerald-700 transition-colors">
           <span>View details</span>
           <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
         </div>
@@ -148,43 +149,46 @@ export function DashboardClient({
   }
 
   return (
-    <div className="page-container animate-slide-up">
-      <div className="mb-6 bg-gradient-to-r from-indigo-600 via-indigo-700 to-blue-700 rounded-2xl p-6 text-white relative overflow-hidden">
-        <div className="absolute inset-0 bg-grid-pattern opacity-20" />
+    <div className="page-container max-w-[1400px] animate-slide-up">
+      <div className="mb-7 rounded-[1.75rem] p-6 sm:p-8 text-white relative isolate overflow-hidden dagangos-aurora shadow-[0_20px_55px_rgba(2,6,23,.24)]">
+        <div className="absolute inset-0 dagangos-grid opacity-40" />
+        <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-sky-400/20 blur-3xl dagangos-orb" />
+        <div className="absolute -left-20 -bottom-28 h-72 w-72 rounded-full bg-emerald-400/20 blur-3xl dagangos-orb-delayed" />
         <div className="relative">
-          <div className="flex items-start justify-between">
+          <div className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
             <div>
-              <h2 className="text-xl font-bold">Welcome to Dashboard 👋</h2>
-              <p className="text-indigo-200 text-sm mt-1">Here&apos;s what&apos;s happening with your platform today.</p>
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-slate-100"><Sparkles className="h-3.5 w-3.5 text-emerald-300" /> DagangOS control centre</span>
+              <h2 className="mt-4 text-3xl font-black tracking-[-0.04em] sm:text-4xl">Welcome to your workspace</h2>
+              <p className="mt-2 text-sm text-slate-300">A clear view of the commercial and operational signals that matter today.</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <select
                 value={days}
                 onChange={(e) => router.push(`?days=${e.target.value}`)}
-                className="bg-white/10 border border-white/20 text-white text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-white/50 [&>option]:text-slate-900"
+                className="bg-white/10 border border-white/20 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-300 [&>option]:text-slate-900"
               >
                 <option value="7">Last 7 Days</option>
                 <option value="30">Last 30 Days</option>
                 <option value="90">Last 90 Days</option>
               </select>
-              <button onClick={handleExport} className="bg-white/10 hover:bg-white/20 border border-white/20 transition-colors text-white text-sm rounded-lg px-3 py-1.5 flex items-center gap-1.5">
+              <button onClick={handleExport} className="bg-white/10 hover:bg-white/20 border border-white/20 transition-colors text-white text-sm font-bold rounded-xl px-3 py-2 flex items-center gap-1.5">
                 <Download className="w-4 h-4" /> Export
               </button>
-              <button onClick={() => setShowWidgetSettings(!showWidgetSettings)} className="bg-white/10 hover:bg-white/20 border border-white/20 transition-colors text-white text-sm rounded-lg px-3 py-1.5 flex items-center gap-1.5">
+              <button onClick={() => setShowWidgetSettings(!showWidgetSettings)} className="bg-white/10 hover:bg-white/20 border border-white/20 transition-colors text-white text-sm font-bold rounded-xl px-3 py-2 flex items-center gap-1.5">
                 <Settings className="w-4 h-4" /> Widgets
               </button>
             </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-3">
-            <div className="flex items-center gap-2 text-sm text-indigo-200">
+          <div className="mt-6 flex flex-wrap gap-3">
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[.07] px-3 py-1.5 text-sm text-slate-200">
               <CheckCircle2 className="w-4 h-4 text-emerald-300" />
               <span>Platform Active</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-indigo-200">
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[.07] px-3 py-1.5 text-sm text-slate-200">
               <Activity className="w-4 h-4 text-emerald-300" />
               <span>All systems operational</span>
             </div>
-            <div className="flex items-center gap-2 text-sm text-indigo-200">
+            <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[.07] px-3 py-1.5 text-sm text-slate-200">
               <Zap className="w-4 h-4 text-yellow-300" />
               <span>{m.modules.filter((mod) => mod.isEnabled).length} modules active</span>
             </div>
@@ -193,12 +197,12 @@ export function DashboardClient({
       </div>
 
       {showWidgetSettings && (
-        <div className="mb-6 card p-4 animate-scale-in">
+        <div className="mb-6 rounded-2xl border border-white bg-white/90 p-5 shadow-sm animate-scale-in">
           <h3 className="text-sm font-semibold mb-3">Customize Widgets</h3>
           <div className="flex flex-wrap gap-3">
             {Object.keys(activeWidgets).map((key) => (
-              <label key={key} className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-100 rounded px-3 py-1.5 hover:bg-slate-100 transition-colors">
-                <input type="checkbox" checked={activeWidgets[key]} onChange={() => toggleWidget(key)} className="rounded text-indigo-600 focus:ring-indigo-500" />
+              <label key={key} className="flex items-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 hover:bg-emerald-50 hover:border-emerald-200 transition-colors">
+                <input type="checkbox" checked={activeWidgets[key]} onChange={() => toggleWidget(key)} className="rounded text-emerald-600 focus:ring-emerald-500" />
                 <span className="text-xs font-medium capitalize">{key.replace(/([A-Z])/g, ' $1').trim()}</span>
               </label>
             ))}
@@ -236,7 +240,7 @@ export function DashboardClient({
       )}
 
       {activeWidgets.revenueChart && (
-        <div className="card p-5 mb-6">
+        <div className="rounded-2xl border border-white bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,.07)] mb-6">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="text-sm font-semibold text-slate-900">Revenue &amp; Orders — Last {days} Days</h3>

@@ -101,21 +101,23 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'h-screen flex flex-col bg-slate-900 border-r border-white/5 transition-all duration-300 ease-in-out',
+        'relative h-screen flex flex-col overflow-hidden bg-[#06142d] border-r border-white/10 transition-all duration-300 ease-in-out shadow-[18px_0_45px_rgba(2,6,23,.12)]',
         collapsed ? 'w-16' : 'w-64'
       )}
     >
+      <div className="pointer-events-none absolute -left-24 top-16 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl dagangos-orb" />
+      <div className="pointer-events-none absolute -right-24 bottom-32 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl dagangos-orb-delayed" />
       {/* Logo */}
-      <div className={cn('flex items-center h-16 border-b border-white/10 px-4', collapsed ? 'justify-center' : 'gap-3')}>
+      <div className={cn('relative flex items-center h-20 border-b border-white/10 px-4', collapsed ? 'justify-center' : 'gap-3')}>
         <DagangOSBrand compact dark showName={!collapsed} />
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
+      <nav className="relative flex-1 overflow-y-auto py-4 px-2 space-y-1">
         {navGroups.map((group) => (
           <div key={group.label} className="mb-2">
             {!collapsed && (
-              <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-widest px-3 py-1 mb-1">
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.18em] px-3 py-1.5 mb-1">
                 {group.label}
               </p>
             )}
@@ -133,11 +135,11 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
                   href={item.href}
                   title={collapsed ? translatedLabel : undefined}
                   className={cn(
-                    'flex items-center rounded-lg transition-all duration-150 mb-0.5',
+                    'flex items-center rounded-xl transition-all duration-200 mb-1',
                     collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
                     isActive
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-                      : 'text-slate-400 hover:text-white hover:bg-white/8'
+                      ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-lg shadow-emerald-950/30'
+                      : 'text-slate-400 hover:text-white hover:bg-white/10'
                   )}
                 >
                   <item.icon className="w-4 h-4 flex-shrink-0" />
@@ -150,16 +152,16 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-white/10 p-2 flex items-center justify-between">
+      <div className="relative border-t border-white/10 p-2 flex items-center justify-between bg-slate-950/20">
         <Link
           href="/admin/settings"
           className={cn(
-            'flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/8 transition-all duration-150 flex-1',
+            'flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-150 flex-1',
             collapsed ? 'justify-center px-2' : ''
           )}
         >
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-bold">{user?.name ? user.name.substring(0, 2).toUpperCase() : 'AD'}</span>
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-300 to-sky-400 flex items-center justify-center flex-shrink-0">
+            <span className="text-slate-950 text-xs font-black">{user?.name ? user.name.substring(0, 2).toUpperCase() : 'AD'}</span>
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
@@ -178,12 +180,12 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
           </button>
         )}
       </div>
-      <div className="border-t border-white/10 p-2">
+      <div className="relative border-t border-white/10 p-2">
         {/* Collapse toggle */}
         <button
           onClick={onToggle}
           className={cn(
-            'mt-1 w-full flex items-center justify-center rounded-lg py-2 text-slate-500 hover:text-white hover:bg-white/8 transition-all duration-150'
+            'mt-1 w-full flex items-center justify-center rounded-xl py-2 text-slate-500 hover:text-white hover:bg-white/10 transition-all duration-150'
           )}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -247,26 +249,27 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
   }
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0">
-      <div className="flex items-center gap-3">
+    <header className="relative h-20 overflow-visible bg-[#06142d] border-b border-white/10 flex items-center justify-between px-4 sm:px-6 flex-shrink-0 shadow-lg shadow-slate-950/10">
+      <div className="pointer-events-none absolute inset-0 dagangos-grid opacity-[0.12]" />
+      <div className="relative flex items-center gap-3">
         <button
           onClick={onMobileMenuToggle}
-          className="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+          className="md:hidden p-2 rounded-xl text-slate-300 hover:bg-white/10 transition-colors"
         >
           <Menu className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-base font-semibold text-slate-900">{getPageTitle()}</h1>
+          <h1 className="text-base font-bold text-white">{getPageTitle()}</h1>
           <p className="text-xs text-slate-400 hidden sm:block">{tenant?.companyName || 'DagangOS'} · {tenant?.plan || 'enterprise'} plan</p>
         </div>
       </div>
       
-      <div className="flex items-center gap-3">
-        <LanguageSwitcher />
+      <div className="relative flex items-center gap-2 sm:gap-3">
+        <LanguageSwitcher variant="dark" />
 
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:ring-2 focus:ring-indigo-500 focus:outline-none"
+          className="p-2 rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 transition-colors focus:ring-2 focus:ring-emerald-400 focus:outline-none"
           aria-label="Toggle Theme"
         >
           {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
@@ -274,8 +277,8 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
 
         {/* Status indicator */}
         <div className={cn(
-          "hidden sm:flex items-center gap-2 px-3 py-1.5 border rounded-full",
-          sysStatus === 'operational' ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"
+          "hidden xl:flex items-center gap-2 px-3 py-1.5 border rounded-full",
+          sysStatus === 'operational' ? "bg-emerald-400/10 border-emerald-300/20" : "bg-amber-400/10 border-amber-300/20"
         )}>
           <div className={cn(
             "w-1.5 h-1.5 rounded-full animate-pulse",
@@ -283,7 +286,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
           )} />
           <span className={cn(
             "text-xs font-medium",
-            sysStatus === 'operational' ? "text-emerald-700" : "text-amber-700"
+            sysStatus === 'operational' ? "text-emerald-200" : "text-amber-200"
           )}>
             {sysStatus === 'operational' ? 'All Systems Operational' : 'Active Incidents'}
           </span>
@@ -293,7 +296,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
         <div className="relative">
           <button 
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+            className="relative p-2 rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 transition-colors"
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
@@ -306,7 +309,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
           {isDropdownOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50 overflow-hidden">
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden">
                 <div className="p-3 border-b border-slate-100 font-medium text-sm">Recent Notifications</div>
                 <div className="max-h-64 overflow-y-auto">
                   {recentAlerts.length > 0 ? (
@@ -334,7 +337,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
         <Link
           href="/site"
           target="_blank"
-          className="hidden sm:flex items-center gap-2 btn btn-secondary btn-sm"
+          className="hidden sm:flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-white/15"
         >
           <Globe className="w-3.5 h-3.5" />
           <span>View Site</span>
@@ -417,7 +420,7 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
   })).filter(group => group.items.length > 0)
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-[#edf4f8] dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden">
       <a 
         href="#main-content" 
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-white dark:focus:bg-slate-800 focus:text-indigo-600 dark:focus:text-indigo-400 focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
@@ -449,7 +452,7 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         <TopBar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} tenant={tenant} theme={theme} toggleTheme={toggleTheme} />
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none bg-slate-50 dark:bg-slate-900">
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none bg-[radial-gradient(circle_at_90%_0%,rgba(56,189,248,.13),transparent_25%),radial-gradient(circle_at_15%_15%,rgba(16,185,129,.08),transparent_20%),#edf4f8] dark:bg-slate-900">
           {!mounted ? (
             <div className="p-6 space-y-6 animate-pulse">
               <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-1/4" />
