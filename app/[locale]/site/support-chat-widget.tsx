@@ -41,7 +41,14 @@ export function SupportChatWidget() {
       const response = await fetch('/api/support-chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, conversationId: 'storefront' }),
+        body: JSON.stringify({
+          message,
+          conversationId: 'storefront',
+          messages: [...messages, visitorMessage].map(item => ({
+            role: item.author === 'visitor' ? 'user' : 'assistant',
+            content: item.text,
+          })),
+        }),
       })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload.error || 'Support chat is temporarily unavailable.')
