@@ -12,7 +12,7 @@ type ChatMessage = {
 const initialMessage: ChatMessage = {
   id: 'welcome',
   author: 'assistant',
-  text: 'Hi — I’m the DagangOS support assistant. How can we help with your project?',
+  text: 'Hi — I can answer public questions about DagangOS packages and guide you through Project Setup. I cannot access accounts or perform changes.',
 }
 
 export function SupportChatWidget() {
@@ -77,7 +77,7 @@ export function SupportChatWidget() {
             <div className="relative flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-black text-white">DagangOS support</p>
-                <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald-200"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" /> Secure internal chat</p>
+                <p className="mt-1 flex items-center gap-1.5 text-xs text-emerald-200"><span className="h-1.5 w-1.5 rounded-full bg-emerald-300" /> Read-only, scoped support</p>
               </div>
               <button type="button" onClick={() => setOpen(false)} aria-label="Close support chat" className="rounded-xl p-2 text-slate-300 transition hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
             </div>

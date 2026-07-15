@@ -1,4 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createHmac } from 'crypto'
+import {
+  assessSupportChatMessage,
+  isSafeSupportReply,
+  OUT_OF_SCOPE_REPLY,
+  SUPPORT_CHAT_POLICY_VERSION,
+  SUPPORT_CHAT_SCOPE,
+} from '@/lib/support-chat-policy'
 
 export const runtime = 'nodejs'
 
@@ -29,6 +37,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Please enter a message up to 2,000 characters.' }, { status: 400 })
   }
 
+  const assessment = assessSupportChatMessage(message)
+  if (!assessment.allowed) {
+    return NextResponse.json({ success: true, reply: assessment.reply, policyBlocked: true })
+  }
+
   const webhookUrl = process.env.HERMES_CHAT_WEBHOOK_URL
   const apiKey = process.env.HERMES_CHAT_API_KEY
   if (!webhookUrl || !apiKey) {
@@ -39,20 +52,31 @@ export async function POST(request: NextRequest) {
   const timeout = setTimeout(() => controller.abort(), 12_000)
 
   try {
+    const event = {
+      event: 'support_message',
+      source: 'storefront',
+      conversationId,
+      message: assessment.normalized,
+      occurredAt: new Date().toISOString(),
+      policy: {
+        version: SUPPORT_CHAT_POLICY_VERSION,
+        enforced: true,
+        ...SUPPORT_CHAT_SCOPE,
+      },
+    }
+    const serializedEvent = JSON.stringify(event)
+    const signature = createHmac('sha256', apiKey).update(serializedEvent).digest('hex')
+
     const response = await fetch(webhookUrl, {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'User-Agent': 'DagangOS-Support-Relay/1.0',
+        'X-DagangOS-Policy-Version': SUPPORT_CHAT_POLICY_VERSION,
+        'X-DagangOS-Signature': `sha256=${signature}`,
       },
-      body: JSON.stringify({
-        event: 'support_message',
-        source: 'storefront',
-        conversationId,
-        message,
-        occurredAt: new Date().toISOString(),
-      }),
+      body: serializedEvent,
       signal: controller.signal,
       cache: 'no-store',
     })
@@ -62,8 +86,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Support chat is temporarily unavailable. Please try again shortly.' }, { status: 502 })
     }
 
-    const payload = await response.json().catch(() => ({})) as { reply?: unknown }
-    return NextResponse.json({ success: true, reply: typeof payload.reply === 'string' ? payload.reply.slice(0, 4000) : undefined })
+    const payload = await response.json().catch(() => ({})) as { reply?: unknown, policyVersion?: unknown, policyAccepted?: unknown }
+    const reply = typeof payload.reply === 'string' ? payload.reply.slice(0, 4000) : undefined
+
+    // Hermes must explicitly acknowledge the currently enforced policy before
+    // its answer can reach a visitor. An older or misconfigured integration
+    // therefore fails closed instead of silently widening the agent's scope.
+    if (payload.policyVersion !== SUPPORT_CHAT_POLICY_VERSION || payload.policyAccepted !== true || (reply && !isSafeSupportReply(reply))) {
+      console.error('Hermes support webhook returned an untrusted policy response')
+      return NextResponse.json({ success: true, reply: OUT_OF_SCOPE_REPLY, policyBlocked: true })
+    }
+
+    return NextResponse.json({ success: true, reply })
   } catch (error) {
     console.error('Hermes support webhook request failed', { name: error instanceof Error ? error.name : 'unknown' })
     return NextResponse.json({ error: 'Support chat is temporarily unavailable. Please try again shortly.' }, { status: 502 })
