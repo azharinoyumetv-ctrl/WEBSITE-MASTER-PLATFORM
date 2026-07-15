@@ -4,15 +4,19 @@ import { useState } from 'react'
 import { ShoppingCart, Search, Filter, Package, Eye, TrendingUp, DollarSign, AlertCircle, CheckCircle2, Clock, XCircle, Truck, Loader2, Download } from 'lucide-react'
 import { formatCurrency, formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { updateOrderStatus, bulkUpdateOrderStatus } from '@/lib/actions/ecommerce'
+import { updateOrderStatus, bulkUpdateOrderStatus, advanceProjectOrderStatus } from '@/lib/actions/ecommerce'
 import { OrderStatus } from '@prisma/client'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 const STATUS_ACTIONS: Record<string, OrderStatus[]> = {
-  pending: ['paid', 'cancelled'],
-  paid: ['processing'],
-  processing: ['shipped', 'cancelled'],
-  shipped: ['completed'],
+  pending: ['pending_requirements', 'paid', 'cancelled'],
+  pending_requirements: ['quoted', 'cancelled'],
+  quoted: ['awaiting_payment', 'cancelled'],
+  awaiting_payment: ['pending_fulfillment', 'paid', 'cancelled'],
+  paid: ['pending_fulfillment', 'processing', 'cancelled'],
+  pending_fulfillment: ['processing', 'completed', 'cancelled'],
+  processing: ['shipped', 'completed', 'cancelled'],
+  shipped: ['completed', 'cancelled'],
   completed: [],
   cancelled: [],
 }
@@ -29,6 +33,8 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
   const [selectedOrdersIds, setSelectedOrdersIds] = useState<string[]>([])
   const [isUpdating, setIsUpdating] = useState(false)
   const [receiptUrlInput, setReceiptUrlInput] = useState('')
+  const [fulfillmentNote, setFulfillmentNote] = useState('')
+  const [notesExpanded, setNotesExpanded] = useState(false)
 
   const updateFilters = (key: string, val: string | null) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -43,6 +49,8 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
   const handleSelectOrder = (order: any) => {
     setSelectedOrder(order)
     setReceiptUrlInput(order.receiptUrl || '')
+    setFulfillmentNote('')
+    setNotesExpanded(false)
   }
 
   const filtered = orders.filter(o => {
@@ -71,6 +79,24 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
       toast.success(`Order status updated to ${newStatus}`)
     } else {
       toast.error(res.error || 'Failed to update order status')
+    }
+  }
+
+  const advanceProjectStatus = async (orderId: string, newStatus: OrderStatus) => {
+    setIsUpdating(true)
+    const res = await advanceProjectOrderStatus(tenantId, orderId, newStatus, fulfillmentNote || undefined)
+    setIsUpdating(false)
+
+    if (res.success) {
+      const updatedNotes = (res as any).order?.notes ?? selectedOrder?.notes
+      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, orderStatus: newStatus, notes: updatedNotes } : o))
+      if (selectedOrder?.id === orderId) {
+        setSelectedOrder((prev: any) => prev ? { ...prev, orderStatus: newStatus, notes: updatedNotes } : prev)
+      }
+      setFulfillmentNote('')
+      toast.success(`Project order advanced to ${newStatus}`)
+    } else {
+      toast.error(res.error || 'Failed to advance project order')
     }
   }
 
@@ -161,15 +187,23 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
                 setFilterStatus(e.target.value)
                 updateFilters('status', e.target.value)
               }} 
-              className="form-select w-36 focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
+              className="form-select w-44 focus:ring-2 focus:ring-indigo-500 focus:outline-none" 
               id="order-status-filter"
             >
               <option value="all">All Orders</option>
-              <option value="pending">Pending</option>
-              <option value="paid">Paid</option>
-              <option value="processing">Processing</option>
-              <option value="shipped">Shipped</option>
-              <option value="completed">Completed</option>
+              <optgroup label="Project Orders">
+                <option value="pending">Pending</option>
+                <option value="pending_requirements">Pending Requirements</option>
+                <option value="quoted">Quoted</option>
+                <option value="awaiting_payment">Awaiting Payment</option>
+                <option value="pending_fulfillment">Pending Fulfillment</option>
+              </optgroup>
+              <optgroup label="Fulfillment">
+                <option value="paid">Paid</option>
+                <option value="processing">Processing</option>
+                <option value="shipped">Shipped</option>
+                <option value="completed">Completed</option>
+              </optgroup>
               <option value="cancelled">Cancelled</option>
             </select>
             {selectedOrdersIds.length > 0 && (
@@ -321,6 +355,39 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
                 </div>
               )}
 
+              {/* Notes / Requirements Viewer */}
+              {selectedOrder.notes && (
+                <div className="border-t border-slate-100 pt-3 mb-4">
+                  <button
+                    onClick={() => setNotesExpanded(p => !p)}
+                    className="flex items-center justify-between w-full text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2"
+                  >
+                    <span>Requirements / Notes</span>
+                    <span className="text-slate-400">{notesExpanded ? '▲' : '▼'}</span>
+                  </button>
+                  {notesExpanded && (() => {
+                    let parsed: any = null
+                    try { parsed = JSON.parse(selectedOrder.notes) } catch {}
+                    if (Array.isArray(parsed)) {
+                      return (
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {parsed.map((entry: any, i: number) => (
+                            <div key={i} className="bg-slate-50 rounded-lg p-2 text-xs">
+                              <div className="flex justify-between text-slate-400 mb-1">
+                                <span className="font-mono">{entry.status}</span>
+                                <span>{new Date(entry.ts).toLocaleString()}</span>
+                              </div>
+                              <p className="text-slate-700">{entry.note}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )
+                    }
+                    return <pre className="text-xs bg-slate-50 rounded p-2 overflow-x-auto max-h-36 text-slate-600 whitespace-pre-wrap">{selectedOrder.notes}</pre>
+                  })()}
+                </div>
+              )}
+
               {/* Actions */}
               <div className="border-t border-slate-100 pt-3 space-y-3">
                 {selectedOrder.orderStatus !== 'cancelled' && (
@@ -347,18 +414,38 @@ export function EcommerceClient({ initialOrders, tenantId, baseCurrency = 'USD' 
 
                 {STATUS_ACTIONS[selectedOrder.orderStatus]?.length > 0 && (
                   <div>
+                    {/* Fulfillment note input for project-order transitions */}
+                    {['pending', 'pending_requirements', 'quoted', 'awaiting_payment'].includes(selectedOrder.orderStatus) && (
+                      <div className="mb-3">
+                        <label className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 block">Fulfillment Note</label>
+                        <textarea
+                          rows={2}
+                          value={fulfillmentNote}
+                          onChange={e => setFulfillmentNote(e.target.value)}
+                          placeholder="Optional note for this status change..."
+                          className="form-input text-xs w-full"
+                        />
+                      </div>
+                    )}
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Update Status</p>
                     <div className="space-y-2">
                       {STATUS_ACTIONS[selectedOrder.orderStatus].map((next: string) => (
                         <button
                           key={next}
                           disabled={isUpdating}
-                          onClick={() => advanceStatus(selectedOrder.id, next as OrderStatus)}
+                          onClick={() => {
+                            const isProjectStatus = ['pending_requirements', 'quoted', 'awaiting_payment', 'pending_fulfillment'].includes(next)
+                            if (isProjectStatus) {
+                              advanceProjectStatus(selectedOrder.id, next as OrderStatus)
+                            } else {
+                              advanceStatus(selectedOrder.id, next as OrderStatus)
+                            }
+                          }}
                           className={cn('btn btn-sm w-full capitalize flex justify-center items-center', next === 'cancelled' ? 'btn-danger' : 'btn-primary')}
                           id={`order-status-${next}`}
                         >
                           {isUpdating && <Loader2 className="w-3 h-3 animate-spin mr-2" />}
-                          Mark as {next}
+                          Mark as {next.replace(/_/g, ' ')}
                         </button>
                       ))}
                     </div>

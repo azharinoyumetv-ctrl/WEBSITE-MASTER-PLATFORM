@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import { getPublicWebsiteConfig } from '@/lib/actions/website'
 import { generateCheckoutNonce } from '@/lib/crypto'
 import { getCatalogItems } from '@/lib/actions/catalog'

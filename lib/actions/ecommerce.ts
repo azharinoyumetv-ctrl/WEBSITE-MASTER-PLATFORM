@@ -228,3 +228,78 @@ export async function getUserOrders(tenantId: string, email: string) {
     return { success: false, error: error.message }
   }
 }
+
+/**
+ * Advance a project-setup order through its lifecycle and optionally
+ * append a fulfillment note (timestamped) to the order notes JSON array.
+ */
+export async function advanceProjectOrderStatus(
+  tenantId: string,
+  orderId: string,
+  newStatus: OrderStatus,
+  fulfillmentNote?: string
+) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'orders', 'write')
+
+    const current = await prisma.tenantOrder.findUnique({
+      where: { id: orderId, tenantId }
+    })
+    if (!current) throw new Error('Order not found')
+
+    // Build updated notes: parse existing JSON array or start fresh
+    let notesArray: Array<{ ts: string; status: string; note: string }> = []
+    try {
+      if (current.notes) {
+        const parsed = JSON.parse(current.notes)
+        if (Array.isArray(parsed)) notesArray = parsed
+      }
+    } catch {
+      // Legacy plain-text note — wrap it
+      if (current.notes) {
+        notesArray = [{ ts: new Date().toISOString(), status: current.orderStatus, note: current.notes }]
+      }
+    }
+
+    if (fulfillmentNote?.trim()) {
+      notesArray.push({
+        ts: new Date().toISOString(),
+        status: newStatus,
+        note: fulfillmentNote.trim(),
+      })
+    }
+
+    const validTransitions: Record<OrderStatus, OrderStatus[]> = {
+      pending: ['pending_requirements', 'paid', 'cancelled'],
+      pending_requirements: ['quoted', 'cancelled'],
+      quoted: ['awaiting_payment', 'cancelled'],
+      awaiting_payment: ['pending_fulfillment', 'paid', 'cancelled'],
+      paid: ['pending_fulfillment', 'processing', 'cancelled'],
+      pending_fulfillment: ['processing', 'shipped', 'completed', 'cancelled'],
+      processing: ['shipped', 'completed', 'cancelled'],
+      shipped: ['completed', 'cancelled'],
+      completed: [],
+      cancelled: [],
+    }
+
+    const allowed = validTransitions[current.orderStatus] || []
+    if (!allowed.includes(newStatus)) {
+      throw new Error(`Invalid transition from ${current.orderStatus} to ${newStatus}`)
+    }
+
+    const updated = await prisma.tenantOrder.update({
+      where: { id: orderId, tenantId },
+      data: {
+        orderStatus: newStatus,
+        notes: JSON.stringify(notesArray),
+      },
+    })
+
+    revalidatePath('/admin/ecommerce')
+    return { success: true, order: updated }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}

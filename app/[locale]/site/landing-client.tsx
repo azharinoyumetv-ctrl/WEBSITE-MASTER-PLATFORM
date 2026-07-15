@@ -3,29 +3,13 @@
 import { useState } from 'react'
 import { CheckCircle2, ChevronRight, Calculator, Monitor, Play, RefreshCw } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { packages, addonsList } from '@/lib/constants/packages'
 
 export function LandingClient({ primaryColor }: { primaryColor: string }) {
   const t = useTranslations('Storefront')
   const [selectedPackage, setSelectedPackage] = useState('landing_page')
   const [enabledAddons, setEnabledAddons] = useState<string[]>([])
   const [previewMode, setPreviewMode] = useState('landing_page')
-
-  const packages: Record<string, { name: string, price: number, desc: string }> = {
-    landing_page: { name: 'Landing Page', price: 2500000, desc: 'Single-page highly optimized for conversions' },
-    company_profile: { name: 'Company Profile', price: 4000000, desc: 'Professional corporate presence with dynamic pages' },
-    business_website: { name: 'Business Website + Admin', price: 8000000, desc: 'Full CMS with secure tenant dashboard' },
-    ecommerce: { name: 'E-Commerce Platform', price: 15000000, desc: 'Complete storefront with cart and payment gateways' },
-    restaurant: { name: 'Restaurant System', price: 20000000, desc: 'Menu, tables, booking calendar, and staff queues' },
-    retail_pos: { name: 'Retail POS + Website', price: 25000000, desc: 'Unified online store and offline retail browser POS' },
-    custom: { name: 'Custom Platform', price: 30000000, desc: 'Enterprise bespoke solutions' },
-  }
-
-  const addonsList = [
-    { key: 'ai', name: 'AI Copywriter Suite', price: 250000, desc: 'LLM generated descriptions' },
-    { key: 'booking', name: 'Booking Calendar Scheduler', price: 500000, desc: 'Appointments & rosters' },
-    { key: 'crm', name: 'CRM & Customer Timelines', price: 400000, desc: 'Spend tracking log' },
-    { key: 'api', name: 'Developer Webhooks Portal', price: 750000, desc: 'External sync keys' },
-  ]
 
   const toggleAddon = (key: string) => {
     if (enabledAddons.includes(key)) {
@@ -161,7 +145,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                         <p className="text-slate-500 text-xs">{addon.desc}</p>
                       </div>
                     </div>
-                    <span className="text-sm font-semibold animate-pulse" style={{ color: primaryColor }}>{formatRp(addon.price)} /mo</span>
+                    <span className="text-sm font-semibold animate-pulse" style={{ color: primaryColor }}>{formatRp(addon.price)}</span>
                   </div>
                 ))}
               </div>
@@ -186,7 +170,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                 return (
                   <div key={key} className="flex justify-between text-xs">
                     <span>{addon?.name}</span>
-                    <span className="font-semibold text-slate-900">{formatRp(addon?.price || 0)} /mo</span>
+                    <span className="font-semibold text-slate-900">{formatRp(addon?.price || 0)}</span>
                   </div>
                 )
               })}
@@ -206,7 +190,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
               className="block text-center py-3.5 text-white font-bold rounded-xl transition-opacity hover:opacity-90 shadow-lg text-sm w-full"
               style={{ backgroundColor: primaryColor }}
             >
-              {t('order_platform')}
+              Mulai Proyek
             </a>
           </div>
 

@@ -1,10 +1,13 @@
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
 function stripQuotes(val) {
   if (typeof val === 'string') {
     return val.replace(/^["']|["']$/g, '')
   }
   return val
 =======
+=======
+>>>>>>> Stashed changes
 // Strip leading/trailing literal quotes injected by secret managers.
 // Some injectors wrap values as: DATABASE_URL="postgresql://..."
 // The outer quotes become part of the string value, producing an invalid URL
@@ -12,6 +15,9 @@ function stripQuotes(val) {
 function stripQuotes(val) {
   if (typeof val !== 'string') return val
   return val.replace(/^["']|["']$/g, '')
+<<<<<<< Updated upstream
+>>>>>>> Stashed changes
+=======
 >>>>>>> Stashed changes
 }
 
