@@ -25,6 +25,23 @@ The relay calls the OpenAI-compatible `POST /v1/chat/completions` interface usin
 
 Client-provided assistant history is deliberately discarded because a visitor can forge it. Only policy-checked visitor messages are forwarded as context.
 
+## Mandatory Hermes isolation
+
+Hermes' API server normally exposes its full agent toolset. A system prompt alone
+does **not** remove those capabilities. The public DagangOS endpoint must run
+with an explicit, empty API-platform toolset in `/root/.hermes/config.yaml`:
+
+```yaml
+platform_toolsets:
+  api_server: []
+```
+
+`[]` must be a YAML list, not the quoted string `'[]'`. After restarting
+`hermes-gateway.service`, verify the authenticated `GET /v1/toolsets` response
+contains zero entries where `enabled` is `true`. Do not enable terminal, file,
+browser, web, memory, delegation, cron, skills, MCP, or any other toolset for
+this public API platform.
+
 ## Hermes response
 
 Hermes must return a standard OpenAI-compatible completion. The platform fails closed and displays the scope refusal when the completion is missing or claims an external action was performed.
