@@ -1,17 +1,21 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import prisma from '@/lib/prisma'
 import { validateV1Request } from '@/lib/v1-auth'
+
+const tenantIdSchema = z.string().uuid()
 
 export async function GET(req: Request, { params }: { params: { tenantId: string } }) {
   const authError = await validateV1Request(req)
   if (authError) return authError
 
   try {
-    const { tenantId } = params
-
-    if (!tenantId) {
-      return NextResponse.json({ success: false, error: 'Missing tenantId' }, { status: 400 })
+    const parsedTenantId = tenantIdSchema.safeParse(params.tenantId)
+    if (!parsedTenantId.success) {
+      return NextResponse.json({ success: false, error: 'Invalid tenantId' }, { status: 400 })
     }
+
+    const tenantId = parsedTenantId.data
 
     const entitlement = await prisma.tenantEntitlement.findFirst({
       where: { tenantId },

@@ -26,7 +26,12 @@ export default async function SiteLayout({
   let website: any = null
   let tenant: any = null
 
-  if (tenantDomain === 'default') {
+  if (res.success && res.website && res.tenant) {
+    website = res.website
+    tenant = res.tenant
+  } else if (tenantDomain === 'default') {
+    // Keep the platform marketing site available if the database is briefly
+    // unavailable, but prefer the resolved active tenant whenever possible.
     website = {
       siteTitle: 'Website Master Platform',
       themeConfig: { colors: { primary: '#4F46E5', secondary: '#10B981', background: '#FFFFFF', text: '#0F172A', accent: '#F59E0B' } }
@@ -38,18 +43,14 @@ export default async function SiteLayout({
       customDomain: null
     }
   } else {
-    if (!res.success || !res.website || !res.tenant) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">Site Not Found</h1>
-            <p className="text-slate-500">This website is currently inactive or does not exist.</p>
-          </div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Site Not Found</h1>
+          <p className="text-slate-500">This website is currently inactive or does not exist.</p>
         </div>
-      )
-    }
-    website = res.website
-    tenant = res.tenant
+      </div>
+    )
   }
   
   // Parse theme configuration

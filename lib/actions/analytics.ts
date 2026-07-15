@@ -1,12 +1,20 @@
 'use server'
 
 import prisma from "@/lib/prisma"
+import { getAuthenticatedUser, requirePermission } from "@/lib/rbac"
 
 
 export async function getAnalytics(tenantId: string, rangeDays: number = 7) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'analytics', 'read')
+
+    const safeRangeDays = Number.isFinite(rangeDays)
+      ? Math.max(1, Math.min(365, Math.floor(rangeDays)))
+      : 7
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - rangeDays)
+    startDate.setDate(startDate.getDate() - safeRangeDays)
 
     const dailySummaries = await prisma.tenantAnalyticsDailySummary.findMany({
       where: {
@@ -191,8 +199,15 @@ export async function recordAnalyticsEvent(
  */
 export async function backfillAnalyticsSummaries(tenantId: string, days: number = 7) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'analytics', 'write')
+
+    const safeDays = Number.isFinite(days)
+      ? Math.max(1, Math.min(365, Math.floor(days)))
+      : 7
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
+    startDate.setDate(startDate.getDate() - safeDays)
 
     // Fetch all orders in range — aggregate in-code by day for accuracy
     const orders = await prisma.tenantOrder.findMany({
@@ -240,7 +255,7 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
       metricValue: number
     }> = []
 
-    for (let i = 0; i < days; i++) {
+    for (let i = 0; i < safeDays; i++) {
       const date = new Date()
       date.setDate(date.getDate() - i)
       const dayStr = date.toISOString().split('T')[0]
@@ -314,8 +329,6 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
     return { success: false, error: error.message }
   }
 }
-
-import { getAuthenticatedUser, requirePermission } from "@/lib/rbac"
 
 export async function getReportSchedules(tenantId: string) {
   try {

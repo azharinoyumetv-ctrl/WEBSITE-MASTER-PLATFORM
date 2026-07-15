@@ -7,6 +7,7 @@ import ReactMarkdown from 'react-markdown'
 import { AboutClient } from '../about-client'
 import { ContactClient } from '../contact-client'
 import { getTranslations } from 'next-intl/server'
+import { addonsList, packages } from '@/lib/constants/packages'
 
 export async function generateMetadata({ params }: { params: { slug?: string[] } }) {
   const headersList = headers()
@@ -157,7 +158,9 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
         <section className="py-16 max-w-7xl mx-auto px-6 md:px-8">
           <h2 className="text-3xl font-bold text-slate-900 mb-12 text-center">{t('choose_package')}</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {sampleProducts.map((product) => (
+            {sampleProducts.map((product, index) => {
+              const packageKey = Object.keys(packages)[index] || 'landing_page'
+              return (
               <div key={product.name} className="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
                 <div>
                   <div className="flex items-start justify-between mb-4">
@@ -184,14 +187,15 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
                 </div>
 
                 <a 
-                  href="/checkout"
+                  href={`/project-setup?package=${packageKey}`}
                   className="block text-center py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 w-full"
                   style={{ backgroundColor: primaryColor }}
                 >
                   {t('get_started')}
                 </a>
               </div>
-            ))}
+              )
+            })}
           </div>
         </section>
 
@@ -200,7 +204,12 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
           <h2 className="text-3xl font-bold text-slate-900 mb-4 text-center">{t('addons_title')}</h2>
           <p className="text-center text-slate-500 mb-12">{t('addons_subtitle')}</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            {addons.map((addon) => (
+            {addons.map((addon, index) => {
+              const addonKey = addonsList[index]?.key
+              const href = addonKey
+                ? `/project-setup?package=landing_page&addons=${addonKey}`
+                : '/project-setup'
+              return (
               <div key={addon.name} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex flex-col justify-between">
                 <div>
                   <div className="flex justify-between items-start mb-2">
@@ -210,10 +219,11 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
                   <p className="text-slate-600 text-sm leading-relaxed">{addon.desc}</p>
                 </div>
                 <div className="mt-4 border-t border-slate-50 pt-4 flex justify-end">
-                  <a href="/checkout" className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">{t('add_to_package')}</a>
+                  <a href={href} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">{t('add_to_package')}</a>
                 </div>
               </div>
-            ))}
+              )
+            })}
           </div>
         </section>
       </div>
@@ -238,11 +248,13 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
   let dbPage: any = null
   let primaryColor = '#4f46e5'
   let siteTitle = 'DagangOS Digital Indonesia'
+  let resolvedTenantId = ''
 
   if (tenantId) {
     const websiteRes = await getPublicWebsiteConfig(tenantId)
     if (websiteRes.success && websiteRes.website) {
       websiteConfig = websiteRes.website
+      resolvedTenantId = websiteRes.tenantId || ''
       const themeConfig = websiteConfig.themeConfig as any || {}
       const colors = themeConfig.colors || {}
       primaryColor = colors.primary || '#4f46e5'
@@ -263,7 +275,7 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
 
   // Force standard pages to use fallback templates for absolute localization
   if (['shop', 'products', 'about', 'contact'].includes(slug)) {
-    return renderFallbackPage(slug, siteTitle, primaryColor, tenantId || '', params.locale, t)
+    return renderFallbackPage(slug, siteTitle, primaryColor, resolvedTenantId, params.locale, t)
   }
 
   // If there's a DB page, render it
@@ -337,7 +349,7 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
 
   // If it's a standard page, render the built-in fallback template
   if (standardPages.includes(slug)) {
-    return renderFallbackPage(slug, siteTitle, primaryColor, tenantId || '', params.locale, t)
+    return renderFallbackPage(slug, siteTitle, primaryColor, resolvedTenantId, params.locale, t)
   }
 
   // For all other unknown pages, show 404

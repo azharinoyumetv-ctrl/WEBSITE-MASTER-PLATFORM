@@ -42,7 +42,14 @@ export async function getMonitoringStatus(tenantId: string) {
     })) : []
 
     const activeSessions = await prisma.tenantPosSession.count({ where: { status: 'open' } })
-    const activeOrders = await prisma.tenantOrder.count({ where: { orderStatus: 'pending' } })
+    const activeOrders = await prisma.tenantOrder.count({
+      where: {
+        tenantId,
+        orderStatus: {
+          in: ['pending', 'pending_requirements', 'quoted', 'awaiting_payment', 'paid', 'pending_fulfillment', 'processing', 'shipped'],
+        },
+      },
+    })
     
     return {
       success: true,

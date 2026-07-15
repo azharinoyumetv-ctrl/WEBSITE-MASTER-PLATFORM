@@ -1,44 +1,48 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { CheckCircle2, ChevronRight, Calculator, Monitor, Play, RefreshCw } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { packages, addonsList } from '@/lib/constants/packages'
+
+const PACKAGE_CALCULATOR_VERSION = 'v2'
 
 export function LandingClient({ primaryColor }: { primaryColor: string }) {
   const t = useTranslations('Storefront')
-  const [selectedPackage, setSelectedPackage] = useState('landing_page')
+  const locale = useLocale()
+  const [selectedPackage, setSelectedPackage] = useState<string>('landing_page')
   const [enabledAddons, setEnabledAddons] = useState<string[]>([])
-  const [previewMode, setPreviewMode] = useState('landing_page')
+  const [previewMode, setPreviewMode] = useState<string>('landing_page')
 
   const toggleAddon = (key: string) => {
-    if (enabledAddons.includes(key)) {
-      setEnabledAddons(enabledAddons.filter(k => k !== key))
-    } else {
-      setEnabledAddons([...enabledAddons, key])
-    }
+    setEnabledAddons(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
   }
 
-  const calculateTotal = () => {
-    const pkgPrice = packages[selectedPackage]?.price || 0
-    const addonsPrice = enabledAddons.reduce((acc, key) => {
-      const addon = addonsList.find(a => a.key === key)
-      return acc + (addon ? addon.price : 0)
-    }, 0)
+  const selectedPackageData = useMemo(() => packages[selectedPackage] || null, [selectedPackage])
+  const enabledAddonsData = useMemo(
+    () => enabledAddons.map(key => addonsList.find(addon => addon.key === key)).filter(Boolean),
+    [enabledAddons],
+  )
+  const total = useMemo(() => {
+    const pkgPrice = selectedPackageData?.price || 0
+    const addonsPrice = enabledAddonsData.reduce((acc, addon) => acc + (addon?.price || 0), 0)
     return pkgPrice + addonsPrice
-  }
+  }, [selectedPackageData, enabledAddonsData])
 
   const formatRp = (num: number) => {
     return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(num)
   }
 
-  const projectSetupHref = () => {
-    const params = new URLSearchParams({ package: selectedPackage })
+  const projectSetupHref = useMemo(() => {
+    const params = new URLSearchParams({
+      package: selectedPackage,
+      v: PACKAGE_CALCULATOR_VERSION,
+    })
     if (enabledAddons.length > 0) {
       params.set('addons', enabledAddons.join(','))
     }
-    return `/project-setup?${params.toString()}`
-  }
+    return `/${locale}/project-setup?${params.toString()}`
+  }, [selectedPackage, enabledAddons, locale])
 
   return (
     <div className="w-full bg-slate-50 min-h-screen">
@@ -73,7 +77,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
               >
                 {t('explore_packages')}
               </a>
-              <a href={projectSetupHref()} className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all text-sm">
+              <a href={projectSetupHref} className="px-8 py-4 bg-white/5 hover:bg-white/10 text-white font-bold rounded-xl border border-white/10 transition-all text-sm">
                 {t('contact_sales')}
               </a>
             </div>
@@ -178,7 +182,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
 
             <div className="flex justify-between items-baseline mb-6">
               <span className="font-bold text-slate-900">{t('total_setup_cost')}</span>
-              <span className="text-3xl font-extrabold text-slate-900">{formatRp(calculateTotal())}</span>
+              <span className="text-3xl font-extrabold text-slate-900">{formatRp(total)}</span>
             </div>
 
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-lg leading-relaxed mb-6">
@@ -186,7 +190,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             </div>
 
             <a 
-              href={projectSetupHref()}
+              href={projectSetupHref}
               className="block text-center py-3.5 text-white font-bold rounded-xl transition-opacity hover:opacity-90 shadow-lg text-sm w-full"
               style={{ backgroundColor: primaryColor }}
             >

@@ -4,11 +4,35 @@ import prisma from "@/lib/prisma"
 import { Resend } from "resend"
 import { sendWhatsAppTemplate } from "@/lib/whatsapp"
 import crypto from 'crypto'
+import { headers } from 'next/headers'
+import { z } from 'zod'
+import { resolvePublicTenantFromHost } from '@/lib/tenant-context'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+const contactFormSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  email: z.string().trim().email().max(255),
+  subject: z.string().trim().max(255),
+  message: z.string().trim().min(1).max(5000),
+  turnstileToken: z.string().trim().max(4096).nullable().optional(),
+})
+
 export async function submitContactForm(tenantId: string, data: { name: string, email: string, subject: string, message: string, turnstileToken?: string | null }) {
   try {
+    const parsed = contactFormSchema.safeParse(data)
+    if (!parsed.success) return { success: false, error: 'Please provide a valid name, email, and message.' }
+    data = parsed.data
+
+    const requestHeaders = headers()
+    const publicTenant = await resolvePublicTenantFromHost(
+      requestHeaders.get('host') || '',
+      requestHeaders.get('x-tenant-id'),
+    )
+    if (!publicTenant || publicTenant.id !== tenantId) {
+      return { success: false, error: 'This storefront is not available.' }
+    }
+
     if (process.env.TURNSTILE_SECRET_KEY && data.turnstileToken) {
       const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
         method: 'POST',
@@ -22,18 +46,7 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
         return { success: false, error: 'Security check failed. Please try again.' }
       }
     }
-    let resolvedTenantId = tenantId
-    if (tenantId === 'default') {
-      const defaultTenant = await prisma.systemTenant.findFirst({
-        where: { subdomain: 'default' }
-      })
-      if (defaultTenant) {
-        resolvedTenantId = defaultTenant.id
-      } else {
-        console.log('Contact submission received for default tenant, but default tenant is not seeded:', data)
-        return { success: true }
-      }
-    }
+    const resolvedTenantId = publicTenant.id
 
     // 1. Create or Update CRM Contact
     const [firstName, ...lastNames] = data.name.split(' ')

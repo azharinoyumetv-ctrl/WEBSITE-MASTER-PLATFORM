@@ -10,7 +10,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 const STATUS_ACTIONS: Record<string, OrderStatus[]> = {
   pending: ['pending_requirements', 'paid', 'cancelled'],
-  pending_requirements: ['quoted', 'cancelled'],
+  pending_requirements: ['quoted', 'awaiting_payment', 'cancelled'],
   quoted: ['awaiting_payment', 'cancelled'],
   awaiting_payment: ['pending_fulfillment', 'paid', 'cancelled'],
   paid: ['pending_fulfillment', 'processing', 'cancelled'],

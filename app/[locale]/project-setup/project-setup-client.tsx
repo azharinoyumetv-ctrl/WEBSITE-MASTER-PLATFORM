@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { ArrowRight, Calculator, Loader2 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
 import { packages, addonsList, requirementFieldLabels, type Addon, type PackageOption } from '@/lib/constants/packages'
@@ -9,7 +9,6 @@ import { packages, addonsList, requirementFieldLabels, type Addon, type PackageO
 type CheckoutErrors = Partial<Record<'package' | 'contactEmail' | string, string>>;
 
 export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
-  const router = useRouter()
   const search = useSearchParams()
   const preselectedPackage = search.get('package') || 'landing_page'
   const preselectedAddons = search.get('addons')?.split(',').filter(Boolean) || []
@@ -80,8 +79,18 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
         throw new Error(data.error || 'Failed to create order')
       }
 
-      toast.success('Order created successfully')
-      router.push(`/orders/${data.orderId}`)
+      const paymentResponse = await fetch('/api/project-setup/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId: data.orderId }),
+      })
+      const payment = await paymentResponse.json()
+      if (!paymentResponse.ok || !payment.success || !payment.paymentUrl) {
+        throw new Error(payment.error || 'Your project request was saved, but payment could not be started')
+      }
+
+      toast.success('Redirecting to secure payment')
+      window.location.assign(payment.paymentUrl)
     } catch (error: any) {
       toast.error(error.message || 'Something went wrong')
     } finally {
