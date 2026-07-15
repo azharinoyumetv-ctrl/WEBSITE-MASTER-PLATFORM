@@ -35,46 +35,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ result: "I've escalated your request to a human support agent. They will get back to you shortly." })
     }
 
-    let apiKey = ''
+    let apiKey = process.env.OPENAI_API_KEY || ''
     let modelName = 'gpt-4o-mini'
     let provider = 'openai'
+    let customBaseUrl = ''
 
-    if (tenantId === 'default') {
-      apiKey = process.env.OPENAI_API_KEY || ''
-      provider = 'openai'
-    } else if (tenantId) {
-      const aiConfig = await prisma.tenantAiConfiguration.findUnique({ where: { tenantId } })
-      if (aiConfig) {
+    // Every tenant, including DagangOS itself, may override the platform
+    // fallback with an encrypted provider key and a dashboard-selected model.
+    const aiConfig = tenantId
+      ? await prisma.tenantAiConfiguration.findUnique({ where: { tenantId } })
+      : null
+    if (aiConfig) {
+      const [configuredModel, configuredBaseUrl] = aiConfig.selectedModelName.split('|url:')
+      modelName = configuredModel || modelName
+      customBaseUrl = configuredBaseUrl || ''
+
+      if (aiConfig.providerKey && aiConfig.providerKey !== 'platform_managed') {
+        provider = aiConfig.providerKey
         if (aiConfig.encryptedApiSecret) {
           const decryptedKey = decrypt(aiConfig.encryptedApiSecret)
           if (decryptedKey) apiKey = decryptedKey
         }
-        if (aiConfig.selectedModelName) {
-          modelName = aiConfig.selectedModelName.split('|url:')[0]
-          if (aiConfig.selectedModelName.includes('|url:')) {
-            // we'll parse this below if custom
-            (aiConfig as any).customBaseUrl = aiConfig.selectedModelName.split('|url:')[1]
-          }
-        }
-        if (aiConfig.providerKey && aiConfig.providerKey !== 'platform_managed') {
-          provider = aiConfig.providerKey
-          if (provider === 'custom') {
-            (aiConfig as any).customBaseUrl = aiConfig.selectedModelName.split('|url:')[1]
-          }
-        }
       }
     }
 
-    // Pass customBaseUrl down to provider checks
-    const customBaseUrl = tenantId !== 'default' && provider === 'custom' 
-      ? (await prisma.tenantAiConfiguration.findUnique({ where: { tenantId } }))?.selectedModelName.split('|url:')[1] 
-      : ''
-
     let systemPrompt = 'You are a helpful AI assistant.'
     if (tenantId !== 'default') {
-      const config = await prisma.tenantAiConfiguration.findUnique({ where: { tenantId } })
-      if (config && (config as any).systemPrompt) {
-        systemPrompt = (config as any).systemPrompt
+      if (aiConfig && (aiConfig as any).systemPrompt) {
+        systemPrompt = (aiConfig as any).systemPrompt
       }
     }
 

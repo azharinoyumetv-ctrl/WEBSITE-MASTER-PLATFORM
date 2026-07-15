@@ -35,8 +35,10 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
   }
 
   return (
-    <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
-      <h2 className="text-2xl font-bold text-slate-900 mb-6">{t('send_message')}</h2>
+    <div className="relative overflow-hidden bg-white rounded-[1.75rem] p-8 shadow-[0_16px_45px_rgba(15,23,42,.08)] border border-slate-200">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500" />
+      <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Project brief</p>
+      <h2 className="mt-2 text-2xl font-black text-slate-950 mb-6">{t('send_message')}</h2>
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('full_name')} <span className="text-red-500">*</span></label>
@@ -94,8 +96,7 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
         <button 
           type="submit" 
           disabled={isSubmitting}
-          className="w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-          style={{ backgroundColor: primaryColor }}
+          className="w-full py-3 rounded-xl font-black text-slate-950 transition hover:-translate-y-0.5 disabled:opacity-50 bg-gradient-to-r from-emerald-300 to-sky-400"
         >
           {isSubmitting ? t('btn_sending') : t('btn_send')}
         </button>

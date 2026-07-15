@@ -8,6 +8,8 @@ This is a deliberately small, versioned list of remaining production work. It re
 - [ ] **Workspace invitation delivery** — configure and test the DagangOS platform SMTP gateway. Provisioning already creates a seven-day, single-use password-setup link and provides a copy-link fallback; this item closes the automated delivery verification gap.
 - [ ] **Storefront payments** — configure and verify one production payment gateway (DOKU, Xendit, or Midtrans) in the DagangOS tenant settings. Project Setup is live, but no gateway credentials are stored for the new company tenant yet.
 
+- [ ] **Hermes support-chat bridge** — configure Hermes with a real HTTPS webhook endpoint and server-side API key, or provide the Telegram bot token, chat ID, and callback design for a two-way Telegram bridge. The storefront UI and secure relay are ready; ChatGPT subscription credentials must not be used as API credentials.
+
 ## Completed
 
 - [x] **First platform owner** — the DagangOS owner account is active with `platform_owner` and `super-admin` access; its bcrypt credential and the live sign-in flow were verified.

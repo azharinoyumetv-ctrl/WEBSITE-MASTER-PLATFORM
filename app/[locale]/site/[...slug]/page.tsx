@@ -6,6 +6,7 @@ import path from 'path'
 import ReactMarkdown from 'react-markdown'
 import { AboutClient } from '../about-client'
 import { ContactClient } from '../contact-client'
+import { SupportPageClient } from '../support-page-client'
 import { getTranslations } from 'next-intl/server'
 import { addonsList, packages } from '@/lib/constants/packages'
 import { COMPANY } from '@/lib/company'
@@ -18,6 +19,7 @@ export async function generateMetadata({ params }: { params: { slug?: string[] }
   const pageLabels: Record<string, string> = {
     about: 'About Us',
     contact: 'Contact Us',
+    support: 'Support',
     products: 'Products',
     shop: 'Shop',
     catalog: 'Catalog',
@@ -41,7 +43,7 @@ export async function generateMetadata({ params }: { params: { slug?: string[] }
   }
 
   if (!pageRes.success || !pageRes.page) {
-    if (!['shop', 'products', 'about', 'contact'].includes(slug)) {
+    if (!['shop', 'products', 'about', 'contact', 'support'].includes(slug)) {
       notFound()
     }
     return { title: `${pageLabels[slug] || 'Page'} | ${siteTitle}` }
@@ -64,11 +66,13 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
 
   if (slug === 'contact') {
     return (
-      <div className="min-h-screen bg-white">
-        <section className="py-24" style={{ background: `linear-gradient(135deg, ${primaryColor}15 0%, ${primaryColor}05 100%)` }}>
-          <div className="max-w-4xl mx-auto px-6 text-center">
-            <h1 className="text-5xl font-bold mb-6" style={{ color: primaryColor }}>{t('contact_us')}</h1>
-            <p className="text-xl text-slate-600">
+      <div className="min-h-screen bg-[#f7fafc]">
+        <section className="relative isolate overflow-hidden py-24 text-white dagangos-aurora">
+          <div className="absolute inset-0 dagangos-grid opacity-35" />
+          <div className="relative max-w-4xl mx-auto px-6 text-center">
+            <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-emerald-100">DagangOS Digital Indonesia</span>
+            <h1 className="mt-6 text-5xl font-black tracking-[-0.045em] mb-6">{t('contact_us')}</h1>
+            <p className="text-xl text-slate-300">
               {t('contact_desc')}
             </p>
           </div>
@@ -77,8 +81,9 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
         <section className="py-20 max-w-6xl mx-auto px-6">
           <div className="grid md:grid-cols-2 gap-16">
             {/* Contact Info */}
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900 mb-8">{t('get_in_touch')}</h2>
+            <div className="rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-[0_16px_45px_rgba(15,23,42,.08)]">
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Direct contact</p>
+              <h2 className="mt-3 text-3xl font-black text-slate-950 mb-8">{t('get_in_touch')}</h2>
               <div className="space-y-6">
                 {[
                   { label: t('contact_email'), value: 'contact@dagangos.com', icon: '✉️' },
@@ -105,6 +110,10 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
     )
   }
 
+  if (slug === 'support') {
+    return <SupportPageClient />
+  }
+
   if (slug === 'privacy' || slug === 'terms') {
     const title = slug === 'privacy' ? t('privacy') : t('terms')
     const baseName = slug === 'privacy' ? 'Privacy_Policy' : 'Terms_of_Service'
@@ -123,13 +132,14 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
     }
 
     return (
-      <div className="min-h-screen bg-white">
-        <section className="py-24" style={{ background: `linear-gradient(135deg, ${primaryColor}15 0%, ${primaryColor}05 100%)` }}>
-          <div className="max-w-4xl mx-auto px-6 text-center">
-            <h1 className="text-5xl font-bold mb-6" style={{ color: primaryColor }}>{title}</h1>
+      <div className="min-h-screen bg-[#f7fafc]">
+        <section className="relative isolate overflow-hidden py-24 text-white dagangos-aurora">
+          <div className="absolute inset-0 dagangos-grid opacity-35" />
+          <div className="relative max-w-4xl mx-auto px-6 text-center">
+            <h1 className="text-5xl font-black tracking-[-0.045em]">{title}</h1>
           </div>
         </section>
-        <section className="py-16 max-w-4xl mx-auto px-6 prose prose-slate max-w-none prose-h1:hidden">
+        <section className="my-16 max-w-4xl mx-auto rounded-[1.75rem] border border-slate-200 bg-white px-6 py-10 prose prose-slate max-w-none prose-h1:hidden shadow-[0_16px_45px_rgba(15,23,42,.08)]">
           <ReactMarkdown>{markdownContent}</ReactMarkdown>
         </section>
       </div>
@@ -142,14 +152,16 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
     const addons = (t.raw('shop_addons') as any[]) || []
 
     return (
-      <div className="min-h-screen bg-slate-50">
-        <section className="py-24" style={{ background: `linear-gradient(135deg, ${primaryColor}15 0%, ${primaryColor}05 100%)` }}>
-          <div className="max-w-4xl mx-auto px-6 text-center">
-            <h1 className="text-5xl font-bold mb-6" style={{ color: primaryColor }}>{label} {t('plans_title')}</h1>
-            <p className="text-xl text-slate-600">
+      <div className="min-h-screen bg-[#f7fafc]">
+        <section className="relative isolate overflow-hidden py-24 text-white dagangos-aurora">
+          <div className="absolute inset-0 dagangos-grid opacity-35" />
+          <div className="relative max-w-4xl mx-auto px-6 text-center">
+            <span className="inline-flex rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-emerald-100">DagangOS launch packages</span>
+            <h1 className="mt-6 text-5xl font-black tracking-[-0.045em] mb-6">{label} {t('plans_title')}</h1>
+            <p className="text-xl text-slate-300">
               {t('plans_subtitle')}
             </p>
-            <div className="mt-4 inline-block bg-amber-50 border border-amber-200 rounded-xl px-4 py-2 text-sm text-amber-800">
+            <div className="mt-5 inline-block rounded-xl border border-amber-300/30 bg-amber-300/10 px-4 py-2 text-sm text-amber-100">
               {t('infra_note2')}
             </div>
           </div>
@@ -162,7 +174,8 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
             {sampleProducts.map((product, index) => {
               const packageKey = Object.keys(packages)[index] || 'landing_page'
               return (
-              <div key={product.name} className="bg-white rounded-2xl p-8 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between">
+              <div key={product.name} className="relative overflow-hidden bg-white rounded-[1.5rem] p-8 border border-slate-200 shadow-[0_16px_45px_rgba(15,23,42,.08)] hover:-translate-y-1 hover:shadow-xl transition-all flex flex-col justify-between">
+                <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500" />
                 <div>
                   <div className="flex items-start justify-between mb-4">
                     <span className="px-3 py-1 rounded-full text-xs font-semibold text-white" style={{ backgroundColor: primaryColor }}>
@@ -189,8 +202,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
 
                 <a 
                   href={`/project-setup?package=${packageKey}`}
-                  className="block text-center py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 w-full"
-                  style={{ backgroundColor: primaryColor }}
+                  className="block text-center py-3 rounded-xl font-black text-slate-950 transition hover:-translate-y-0.5 w-full bg-gradient-to-r from-emerald-300 to-sky-400"
                 >
                   {t('get_started')}
                 </a>
@@ -211,16 +223,16 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
                 ? `/project-setup?package=landing_page&addons=${addonKey}`
                 : '/project-setup'
               return (
-              <div key={addon.name} className="bg-white rounded-2xl p-6 border border-slate-100 shadow-sm flex flex-col justify-between">
+              <div key={addon.name} className="bg-white rounded-[1.5rem] p-6 border border-slate-200 shadow-[0_16px_45px_rgba(15,23,42,.06)] flex flex-col justify-between transition hover:-translate-y-0.5 hover:shadow-lg">
                 <div>
                   <div className="flex justify-between items-start mb-2">
                     <h3 className="text-lg font-bold text-slate-900">{addon.name}</h3>
-                    <span className="text-sm font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">{addon.price}</span>
+                    <span className="text-sm font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">{addon.price}</span>
                   </div>
                   <p className="text-slate-600 text-sm leading-relaxed">{addon.desc}</p>
                 </div>
                 <div className="mt-4 border-t border-slate-50 pt-4 flex justify-end">
-                  <a href={href} className="text-xs font-semibold text-indigo-600 hover:text-indigo-800">{t('add_to_package')}</a>
+                  <a href={href} className="text-xs font-semibold text-emerald-700 hover:text-emerald-900">{t('add_to_package')}</a>
                 </div>
               </div>
               )
@@ -242,7 +254,7 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
   const slug = params.slug ? params.slug.join('/') : 'home'
 
   // Standard pages that have built-in fallback templates
-  const standardPages = ['about', 'contact', 'products', 'shop', 'catalog', 'privacy', 'terms']
+  const standardPages = ['about', 'contact', 'support', 'products', 'shop', 'catalog', 'privacy', 'terms']
 
   // Try to get the website config & DB page
   let websiteConfig: any = null
@@ -275,7 +287,7 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
   }
 
   // Force standard pages to use fallback templates for absolute localization
-  if (['shop', 'products', 'about', 'contact'].includes(slug)) {
+  if (['shop', 'products', 'about', 'contact', 'support'].includes(slug)) {
     return renderFallbackPage(slug, siteTitle, primaryColor, resolvedTenantId, params.locale, t)
   }
 

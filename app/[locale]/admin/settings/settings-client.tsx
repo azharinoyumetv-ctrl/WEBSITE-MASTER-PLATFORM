@@ -1078,7 +1078,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       <option value="kimi">Moonshot (Kimi)</option>
                       <option value="custom">Custom (OpenAI Compatible)</option>
                     </select>
-                    <p className="text-xs text-slate-400 mt-1">If using your own API key, select the provider above.</p>
+                    <p className="text-xs text-slate-400 mt-1">Use a provider API key. ChatGPT subscriptions and browser logins cannot be used as API credentials.</p>
                   </div>
 
                   {aiData.providerKey === 'custom' && (
@@ -1145,8 +1145,8 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                         )}
                         <p className="text-xs text-slate-400 mt-1">
                           {availableModels.length > 0 
-                            ? "Select an available model from your provider." 
-                            : "Type the exact model identifier."}
+                            ? "This list was fetched directly from the configured provider; select the model to use."
+                            : "Enter an API key to fetch the live provider list, or type the exact model identifier."}
                         </p>
                       </div>
                     </>

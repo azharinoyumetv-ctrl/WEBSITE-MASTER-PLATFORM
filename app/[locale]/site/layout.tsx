@@ -8,7 +8,7 @@ import { headers } from 'next/headers'
 import { getPublicWebsiteConfig } from '@/lib/actions/website'
 import { getTranslations } from 'next-intl/server'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
-import { WhatsAppWidget } from './whatsapp-widget'
+import { SupportChatWidget } from './support-chat-widget'
 import { AnalyticsTracker } from '@/components/AnalyticsTracker'
 
 export default async function SiteLayout({
@@ -100,37 +100,36 @@ export default async function SiteLayout({
           })
         }}
       />
-      <header className="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 shadow-[0_12px_36px_rgba(2,6,23,.22)] backdrop-blur-xl">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[4.5rem] flex items-center justify-between gap-4">
           <Link href="/" className="flex items-center gap-2">
             {logoUrl ? (
               <Image src={logoUrl} alt={website.siteTitle} className="h-10 w-10 rounded-lg object-cover" width={40} height={40} unoptimized />
             ) : isCompanyStorefront ? (
-              <DagangOSBrand compact />
+              <DagangOSBrand compact dark />
             ) : (
               <span className="font-bold text-xl tracking-tight" style={{ color: primaryColor }}>
                 {website.siteTitle}
               </span>
             )}
           </Link>
-          <nav className="hidden md:flex gap-8">
+          <nav className="hidden md:flex items-center gap-1 rounded-2xl border border-white/10 bg-white/[.04] p-1.5">
             {navigationTree.map((nav) => (
               <Link 
                 key={nav.target} 
                 href={nav.target} 
-                className="text-sm font-medium text-slate-700 hover:opacity-80 transition-opacity"
+                className="rounded-xl px-3 py-2 text-sm font-semibold text-slate-300 transition hover:bg-white/[.08] hover:text-white"
               >
                 {nav.label}
               </Link>
             ))}
           </nav>
-          <div className="flex items-center gap-4">
-            <LanguageSwitcher />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <LanguageSwitcher variant="dark" />
             
             <Link 
-              href="/shop" 
-              className="hidden md:inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: primaryColor }}
+              href="/project-setup?package=landing_page&v=v2"
+              className="hidden md:inline-flex items-center rounded-xl bg-gradient-to-r from-emerald-300 to-sky-400 px-4 py-2.5 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/10 transition hover:-translate-y-0.5 hover:shadow-emerald-400/25"
             >
               {tStore('shop_now')}
             </Link>
@@ -138,18 +137,21 @@ export default async function SiteLayout({
         </div>
       </header>
 
-      <main className="flex-1 bg-white">
+      <main className="flex-1 bg-[#f7fafc]">
         {children}
       </main>
 
-      <footer className="bg-slate-900 text-slate-400 py-12">
+      <footer className="relative overflow-hidden bg-slate-950 py-14 text-slate-400">
+        <div className="absolute inset-0 dagangos-aurora opacity-35" />
+        <div className="absolute inset-0 dagangos-grid opacity-20" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="relative grid gap-10 md:grid-cols-4 mb-10">
             <div className="md:col-span-2">
-              <h3 className="text-white font-bold text-lg mb-3">{isCompanyStorefront ? COMPANY.legalName : tenant.companyName}</h3>
+              {isCompanyStorefront ? <DagangOSBrand dark /> : <h3 className="text-white font-bold text-lg mb-3">{tenant.companyName}</h3>}
               <p className="text-slate-500 text-sm leading-relaxed">
                 {tStore('footer_desc')}
               </p>
+              <Link href="/support" className="mt-5 inline-flex items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-3.5 py-2 text-xs font-bold text-emerald-100 transition hover:bg-emerald-300/20">Open internal support chat <span aria-hidden>↗</span></Link>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-3 text-sm">{tStore('quick_links')}</h4>
@@ -166,13 +168,12 @@ export default async function SiteLayout({
             <div>
               <h4 className="text-white font-semibold mb-3 text-sm">{tStore('platform')}</h4>
               <ul className="space-y-2">
-                <li><Link href="/auth/login" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('admin_login')}</Link></li>
-                <li><Link href="/shop" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('shop_now')}</Link></li>
-                <li><Link href="/contact" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('support')}</Link></li>
+                <li><Link href="/project-setup?package=landing_page&v=v2" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('shop_now')}</Link></li>
+                <li><Link href="/support" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('support')}</Link></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-slate-800 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="relative border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex flex-col md:flex-row items-center gap-4">
               <p className="text-sm">&copy; {new Date().getFullYear()} {isCompanyStorefront ? COMPANY.legalName : tenant.companyName}. {tStore('all_rights')}</p>
               <div className="flex items-center gap-3">
@@ -185,7 +186,7 @@ export default async function SiteLayout({
           </div>
         </div>
       </footer>
-      {tenantDomain === 'default' && <WhatsAppWidget />}
+      {tenantDomain === 'default' && <SupportChatWidget />}
       <AnalyticsTracker tenantId={tenant.id} />
     </div>
   )

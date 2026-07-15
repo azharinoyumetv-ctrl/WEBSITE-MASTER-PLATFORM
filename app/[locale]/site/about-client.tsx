@@ -14,10 +14,10 @@ export function AboutClient({ primaryColor, siteTitle }: { primaryColor: string,
   }, [])
 
   const stats = [
-    { label: t('stat_businesses'), value: '1,500+', icon: Globe2 },
-    { label: t('stat_modules'), value: '15+', icon: Code2 },
-    { label: t('stat_uptime'), value: '99.9%', icon: Zap },
-    { label: t('stat_volume'), value: '50B+', icon: TrendingUp },
+    { label: 'DagangOS platform', value: '1', icon: Globe2 },
+    { label: t('stat_modules'), value: '15', icon: Code2 },
+    { label: 'Tenant-ready architecture', value: 'Secure', icon: Zap },
+    { label: 'Project launch flow', value: 'Built', icon: TrendingUp },
   ]
 
   return (
