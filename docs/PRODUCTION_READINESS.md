@@ -1,0 +1,15 @@
+# DagangOS production-readiness tracker
+
+This is a deliberately small, versioned list of remaining production work. It records only real gaps; the interface must not substitute demo figures for any of them.
+
+## Open
+
+- [ ] **API request telemetry** — add a tenant-scoped request-log store and middleware/instrumentation for authenticated API traffic. Then expose request volume, latency percentiles, and failure rate in the API Portal from that data.
+- [ ] **Workspace invitation delivery** — configure and test the DagangOS platform SMTP gateway. Provisioning already creates a seven-day, single-use password-setup link and provides a copy-link fallback; this item closes the automated delivery verification gap.
+- [ ] **First platform owner** — create the real DagangOS super-admin account through the controlled owner bootstrap process. Do not use test credentials or seed users in production.
+
+## Completed
+
+- [x] Public storefront bootstrap creates the DagangOS company tenant, active website configuration, and production module records without sample data.
+- [x] Storefront analytics records persistent anonymous page-view sessions and dashboard analytics derives from recorded events and paid orders.
+- [x] API Portal synthetic traffic and monitoring uptime claims removed; visible values are now sourced from live configuration or measured checks.
