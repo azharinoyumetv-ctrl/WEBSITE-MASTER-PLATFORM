@@ -1,6 +1,15 @@
 import pg from 'pg'
+import { readFile } from 'node:fs/promises'
 
 const { Pool } = pg
+
+if (!process.env.DATABASE_URL) {
+  const envFile = await readFile(new URL('../.env', import.meta.url), 'utf8').catch(() => '')
+  const databaseUrlLine = envFile.split(/\r?\n/).find(line => line.startsWith('DATABASE_URL='))
+  if (databaseUrlLine) {
+    process.env.DATABASE_URL = databaseUrlLine.slice('DATABASE_URL='.length).trim().replace(/^['"]|['"]$/g, '')
+  }
+}
 
 if (!process.env.DATABASE_URL) {
   throw new Error('DATABASE_URL is required to reconcile production defaults.')
