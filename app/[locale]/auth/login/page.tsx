@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
-import { Globe, Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, CheckCircle } from 'lucide-react'
+import { Eye, EyeOff, Loader2, Lock, Mail, AlertCircle, CheckCircle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { useTranslations } from 'next-intl'
@@ -83,8 +84,8 @@ export default function LoginPage() {
         
         {/* Logo */}
         <div className="relative flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
-            <Globe className="w-5 h-5 text-white" />
+          <div className="w-10 h-10 rounded-xl overflow-hidden bg-white flex items-center justify-center">
+            <Image src="/dagangos-logo.jpg" alt="DagangOS" width={40} height={40} className="w-full h-full object-cover" priority />
           </div>
           <div>
             <p className="text-white font-bold text-lg leading-none">{t('logo_title')}</p>
@@ -143,8 +144,8 @@ export default function LoginPage() {
         <div className="w-full max-w-sm animate-slide-up">
           {/* Mobile logo */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center">
-              <Globe className="w-4.5 h-4.5 text-white" />
+            <div className="w-9 h-9 rounded-xl overflow-hidden bg-white flex items-center justify-center">
+              <Image src="/dagangos-logo.jpg" alt="DagangOS" width={36} height={36} className="w-full h-full object-cover" priority />
             </div>
             <p className="text-white font-bold text-lg">{t('logo_title')}</p>
           </div>

@@ -70,6 +70,7 @@ export default async function SiteLayout({
   // Generate CSS variables for theme injection
   const cssVars = generateThemeCssVars(themeConfig)
   const primaryColor = themeConfig.colors.primary
+  const logoUrl = tenant.logoUrl || (tenantDomain === 'default' ? '/dagangos-logo.jpg' : null)
 
   const navigationTree = [
     { label: t('home'), target: '/' },
@@ -91,7 +92,7 @@ export default async function SiteLayout({
             "@type": "Organization",
             "name": tenant.companyName,
             "url": `https://${website.domain || tenant.subdomain + '.' + (process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com')}`,
-            "logo": tenant.logoUrl || '',
+            "logo": logoUrl || '',
             "description": website.globalSeoMetadata?.description || ''
           })
         }}
@@ -99,8 +100,8 @@ export default async function SiteLayout({
       <header className="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
-            {tenant.logoUrl ? (
-              <Image src={tenant.logoUrl} alt={website.siteTitle} className="h-8 max-w-[150px] object-contain" width={150} height={32} unoptimized />
+            {logoUrl ? (
+              <Image src={logoUrl} alt={website.siteTitle} className="h-10 w-10 rounded-lg object-cover" width={40} height={40} unoptimized />
             ) : (
               <span className="font-bold text-xl tracking-tight" style={{ color: primaryColor }}>
                 {website.siteTitle}

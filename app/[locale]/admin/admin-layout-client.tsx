@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect } from 'react'
 import {
@@ -106,8 +107,8 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
     >
       {/* Logo */}
       <div className={cn('flex items-center h-16 border-b border-white/10 px-4', collapsed ? 'justify-center' : 'gap-3')}>
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-          <Globe className="w-4 h-4 text-white" />
+        <div className="w-8 h-8 rounded-lg overflow-hidden bg-white flex items-center justify-center flex-shrink-0">
+          <Image src="/dagangos-logo.jpg" alt="DagangOS" width={32} height={32} className="w-full h-full object-cover" priority />
         </div>
         {!collapsed && (
           <div className="overflow-hidden">
