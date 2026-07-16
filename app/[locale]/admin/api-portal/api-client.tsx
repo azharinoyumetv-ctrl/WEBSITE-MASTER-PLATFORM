@@ -22,7 +22,7 @@ const API_SCOPES = [
   { id: 'inventory:write', label: 'Write Inventory' }
 ]
 
-export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { initialKeys: any[], initialWebhooks: any[], tenantId: string }) {
+export function ApiPortalClient({ initialKeys, initialWebhooks, telemetry, tenantId }: { initialKeys: any[], initialWebhooks: any[], telemetry: any, tenantId: string }) {
   const [keys, setKeys] = useState(initialKeys)
   const [webhooks, setWebhooks] = useState(initialWebhooks)
   const [showKey, setShowKey] = useState<string | null>(null)
@@ -42,6 +42,7 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
   const activeKeys = keys.filter(key => key.isActive && (!key.expiresAt || new Date(key.expiresAt) > new Date())).length
   const activeWebhooks = webhooks.filter(webhook => webhook.isActive).length
   const deliveryFailures = webhooks.reduce((total, webhook) => total + Number(webhook.failureCount || 0), 0)
+  const errorRate = telemetry?.requestCount ? Math.round((telemetry.errorCount / telemetry.requestCount) * 1000) / 10 : null
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -351,14 +352,28 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
       <div className="card p-6 mb-6">
         <div className="border-b border-slate-100 pb-4 mb-6">
           <h3 className="text-base font-semibold text-slate-900">Developer activity</h3>
-          <p className="text-xs text-slate-500 mt-1">Live configuration and delivery health for this workspace.</p>
+          <p className="text-xs text-slate-500 mt-1">Configuration health and recorded tenant API activity from the last 30 days.</p>
         </div>
         <div className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4"><p className="text-xs font-semibold text-indigo-700">Active API keys</p><p className="mt-1 text-2xl font-black text-indigo-950">{activeKeys}</p></div>
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><p className="text-xs font-semibold text-emerald-700">Active webhook endpoints</p><p className="mt-1 text-2xl font-black text-emerald-950">{activeWebhooks}</p></div>
           <div className="rounded-xl border border-rose-100 bg-rose-50 p-4"><p className="text-xs font-semibold text-rose-700">Recorded delivery failures</p><p className="mt-1 text-2xl font-black text-rose-950">{deliveryFailures}</p></div>
         </div>
-        <p className="mt-4 text-xs leading-5 text-slate-500">Request volume, latency, and error-rate charts will appear only after request telemetry is implemented. DagangOS does not display synthetic production traffic.</p>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-sky-100 bg-sky-50 p-4"><p className="text-xs font-semibold text-sky-700">Recorded API requests</p><p className="mt-1 text-2xl font-black text-sky-950">{telemetry?.requestCount ?? 0}</p></div>
+          <div className="rounded-xl border border-violet-100 bg-violet-50 p-4"><p className="text-xs font-semibold text-violet-700">P95 latency</p><p className="mt-1 text-2xl font-black text-violet-950">{telemetry?.p95LatencyMs == null ? '—' : `${telemetry.p95LatencyMs} ms`}</p></div>
+          <div className="rounded-xl border border-amber-100 bg-amber-50 p-4"><p className="text-xs font-semibold text-amber-700">API error rate</p><p className="mt-1 text-2xl font-black text-amber-950">{errorRate == null ? '—' : `${errorRate}%`}</p></div>
+        </div>
+        {telemetry?.requestCount ? (
+          <div className="mt-5 overflow-x-auto rounded-xl border border-slate-100">
+            <table className="min-w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-500"><tr><th className="px-3 py-2 font-semibold">Route</th><th className="px-3 py-2 font-semibold">Status</th><th className="px-3 py-2 font-semibold">Latency</th><th className="px-3 py-2 font-semibold">Recorded</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {telemetry.recentRequests.map((request: any, index: number) => <tr key={`${request.route}-${request.createdAt}-${index}`} className="text-slate-700"><td className="px-3 py-2 font-mono">{request.method} {request.route}</td><td className={cn('px-3 py-2 font-semibold', request.statusCode >= 400 ? 'text-rose-600' : 'text-emerald-600')}>{request.statusCode}</td><td className="px-3 py-2">{request.latencyMs} ms</td><td className="px-3 py-2">{formatDate(request.createdAt, 'relative')}</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="mt-4 text-xs leading-5 text-slate-500">No recorded tenant API requests yet. Metrics appear only after an attributable request reaches the control plane; DagangOS does not display synthetic traffic.</p>}
       </div>
 
       {/* Edit Webhook Modal */}

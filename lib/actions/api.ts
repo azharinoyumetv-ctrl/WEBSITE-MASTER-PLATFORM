@@ -11,17 +11,42 @@ export async function getApiData(tenantId: string) {
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'api', 'read')
 
-    const keys = await prisma.tenantApiKey.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' }
-    })
-    
-    const webhooks = await prisma.tenantApiWebhook.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' }
-    })
+    const telemetrySince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const [keys, webhooks, requestLogs] = await Promise.all([
+      prisma.tenantApiKey.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.tenantApiWebhook.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' }
+      }),
+      prisma.tenantApiRequestLog.findMany({
+        where: { tenantId, createdAt: { gte: telemetrySince } },
+        orderBy: { createdAt: 'desc' },
+        take: 1000,
+        select: { route: true, method: true, statusCode: true, latencyMs: true, createdAt: true }
+      })
+    ])
 
-    return { success: true, keys, webhooks }
+    const latencies = requestLogs.map((request) => request.latencyMs).sort((a, b) => a - b)
+    const errorCount = requestLogs.filter((request) => request.statusCode >= 400).length
+    const p95Index = latencies.length > 0 ? Math.ceil(latencies.length * 0.95) - 1 : 0
+
+    return {
+      success: true,
+      keys,
+      webhooks,
+      telemetry: {
+        windowDays: 30,
+        requestCount: requestLogs.length,
+        errorCount,
+        averageLatencyMs: latencies.length ? Math.round(latencies.reduce((sum, latency) => sum + latency, 0) / latencies.length) : null,
+        p95LatencyMs: latencies.length ? latencies[p95Index] : null,
+        latestRequestAt: requestLogs[0]?.createdAt ?? null,
+        recentRequests: requestLogs.slice(0, 8)
+      }
+    }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

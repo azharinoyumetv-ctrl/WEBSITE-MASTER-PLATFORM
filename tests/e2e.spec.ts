@@ -1,5 +1,10 @@
 import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
+import crypto from 'crypto';
+
+const e2eBaseUrl = process.env.E2E_BASE_URL || 'http://localhost:4000';
+const e2ePort = new URL(e2eBaseUrl).port;
+const tenantPublicBaseUrl = `http://dagangos.localhost${e2ePort ? `:${e2ePort}` : ''}`;
 
 test.beforeAll(async () => {
   console.log('Seeding database for Playwright tests...');
@@ -173,10 +178,9 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.fill('input[type="time"]', '10:00');
     
     await page.click('#confirm-booking-btn');
-    await page.waitForTimeout(1000);
 
-    // Verify booking in list
-    await expect(page.locator('table')).toContainText('guest-booking@dagangos.com');
+    // Server actions can take a moment while the database is under a full-suite load.
+    await expect(page.locator('table')).toContainText('guest-booking@dagangos.com', { timeout: 15000 });
   });
 
   test('11. CRM Contacts & Timeline Logs', async ({ page }) => {
@@ -273,31 +277,31 @@ test.describe('Website Master Platform E2E Audit', () => {
     await expect(page.locator('table')).toContainText('e2e-catalog-test');
 
     // Verify existing e2e-catalog page on public site dynamic routing
-    await page.goto('http://dagangos.localhost:4000/e2e-catalog');
+    await page.goto(`${tenantPublicBaseUrl}/e2e-catalog`);
     await expect(page).toHaveTitle(/E2E Catalog/i);
   });
 
   test('16. Public Pages — Products & Shop (no 404)', async ({ page }) => {
     // Visit /products from public site (subdomain aware)
-    await page.goto('http://dagangos.localhost:4000/products');
+    await page.goto(`${tenantPublicBaseUrl}/products`);
     // Should not be a 404 page — should show the Products page
     await expect(page).not.toHaveTitle(/404/i);
     const body = await page.locator('body').textContent();
     expect(body).toMatch(/Landing Page|Starter|Rp|Company Profile/i);
 
-    await page.goto('http://dagangos.localhost:4000/shop');
+    await page.goto(`${tenantPublicBaseUrl}/shop`);
     await expect(page).not.toHaveTitle(/404/i);
     const shopBody = await page.locator('body').textContent();
     expect(shopBody).toMatch(/Shop|Plan|DagangOS/i);
   });
 
   test('17. Public Pages — About & Contact (no 404)', async ({ page }) => {
-    await page.goto('http://dagangos.localhost:4000/about');
+    await page.goto(`${tenantPublicBaseUrl}/about`);
     await expect(page).not.toHaveTitle(/404/i);
     const aboutBody = await page.locator('body').textContent();
     expect(aboutBody).toMatch(/About|Mission|DagangOS/i);
 
-    await page.goto('http://dagangos.localhost:4000/contact');
+    await page.goto(`${tenantPublicBaseUrl}/contact`);
     await expect(page).not.toHaveTitle(/404/i);
     const contactBody = await page.locator('body').textContent();
     expect(contactBody).toMatch(/Contact|Email|Message/i);
@@ -338,9 +342,10 @@ test.describe('Website Master Platform E2E Audit', () => {
     await midtransSecret.fill('SB-Mid-server-testkey123');
 
     await page.click('text=Save Changes');
-    await expect(page.locator('text=Settings saved successfully')).toBeVisible({ timeout: 15000 });
 
-    // Reload and verify
+    // The page reloads automatically after a successful save; assert durable data
+    // rather than a short-lived notification that can disappear during navigation.
+    await page.waitForTimeout(1000);
     await page.reload();
     await expect(page.locator('h5:has-text("Xendit") + label input[type="checkbox"]')).toBeChecked();
     await expect(page.locator('h5:has-text("Midtrans") + label input[type="checkbox"]')).toBeChecked();
@@ -360,5 +365,39 @@ test.describe('Website Master Platform E2E Audit', () => {
     const whatsappModule = page.locator('.card').filter({ hasText: 'WhatsApp Business' });
     await expect(whatsappModule).toContainText('Project add-on');
     await expect(whatsappModule.getByRole('button')).toHaveCount(0);
+  });
+
+  test('21. Control-plane API telemetry records actual final responses', async ({ page }) => {
+    const rawBody = JSON.stringify({
+      instanceId: '11111111-1111-4111-8111-111111111111',
+      licenseKey: 'e2e-control-plane-license'
+    });
+    const timestamp = String(Date.now());
+    const signature = crypto
+      .createHmac('sha256', process.env.E2E_CONTROL_PLANE_SECRET || 'e2e-control-plane-secret')
+      .update(`${timestamp}:${rawBody}`)
+      .digest('hex');
+
+    const response = await page.request.post('/api/v1/instances/validate-license', {
+      headers: {
+        'content-type': 'application/json',
+        'x-license-key': 'e2e-control-plane-license',
+        'x-request-timestamp': timestamp,
+        'x-signature': signature
+      },
+      data: rawBody
+    });
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ valid: true });
+
+    await page.goto('/auth/login');
+    await page.fill('#email', 'admin@dagangos.com');
+    await page.fill('#password', 'password123');
+    await page.click('#login-submit');
+    await page.waitForURL('**/admin/dashboard');
+    await page.goto('/admin/api-portal');
+    await expect(page.getByText('Recorded API requests')).toBeVisible();
+    await expect(page.getByText('POST /api/v1/instances/validate-license')).toBeVisible();
+    await expect(page.getByText('200', { exact: true }).last()).toBeVisible();
   });
 });

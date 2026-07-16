@@ -57,6 +57,7 @@ model SystemTenant {
   analyticsSummaries        TenantAnalyticsDailySummary[]
   apiKeys                   TenantApiKey[]
   apiWebhooks               TenantApiWebhook[]
+  apiRequestLogs            TenantApiRequestLog[]
   authCredentials           TenantAuthCredential[]
   refreshTokens             TenantRefreshToken[]
   storageFiles              TenantStorageRegistry[]
@@ -890,6 +891,22 @@ model TenantApiWebhook {
   tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
 
   @@map("tenant_api_webhooks")
+}
+
+model TenantApiRequestLog {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId   String   @map("tenant_id") @db.Uuid
+  route      String   @db.VarChar(255)
+  method     String   @db.VarChar(10)
+  statusCode Int      @map("status_code")
+  latencyMs  Int      @map("latency_ms")
+  source     String   @default("control_plane") @db.VarChar(32)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, createdAt])
+  @@map("tenant_api_request_logs")
 }
 
 // ============================================================

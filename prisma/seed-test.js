@@ -119,6 +119,17 @@ async function main() {
     }
   })
 
+  // Control-plane instance used by the API telemetry integration test.
+  await prisma.tenantInstance.create({
+    data: {
+      tenantId: tenant.id,
+      instanceId: '11111111-1111-4111-8111-111111111111',
+      instanceUrl: 'https://e2e-control-plane.dagangos.test',
+      licenseKeyHash: 'e2e-control-plane-license',
+      status: 'active'
+    }
+  })
+
   // 7.5 Create CMS Pages for standard public routes
   const cmsPages = [
     {
