@@ -42,7 +42,7 @@ export function StorefrontHeader({ labels }: StorefrontHeaderProps) {
           <LanguageSwitcher variant="dark" />
           <Link
             href="/project-setup?package=landing_page&v=v2"
-            className="hidden rounded-xl bg-gradient-to-r from-emerald-300 to-sky-400 px-4 py-2.5 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/10 transition hover:-translate-y-0.5 hover:shadow-emerald-400/25 sm:inline-flex"
+            className="dagangos-cta-gradient hidden rounded-xl px-4 py-2.5 text-sm font-black sm:inline-flex"
           >
             {labels.shopNow}
           </Link>

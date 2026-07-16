@@ -119,7 +119,7 @@ export default async function SiteLayout({
             
             <Link 
               href="/project-setup?package=landing_page&v=v2"
-              className="hidden md:inline-flex items-center rounded-xl bg-gradient-to-r from-emerald-300 to-sky-400 px-4 py-2.5 text-sm font-black text-slate-950 shadow-lg shadow-emerald-500/10 transition hover:-translate-y-0.5 hover:shadow-emerald-400/25"
+              className="dagangos-cta-gradient hidden md:inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-black"
             >
               {tStore('shop_now')}
             </Link>
@@ -154,7 +154,7 @@ export default async function SiteLayout({
               <p className="text-slate-400 text-sm leading-relaxed">
                 {tStore('footer_desc')}
               </p>
-              <Link href={`/${locale}/site/support`} className="mt-5 inline-flex items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-3.5 py-2 text-xs font-bold text-emerald-100 transition hover:bg-emerald-300/20">Open internal support chat <span aria-hidden>↗</span></Link>
+              <Link href={`/${locale}/site/support`} className="dagangos-cta-gradient mt-5 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold">Open internal support chat <span aria-hidden>↗</span></Link>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-3 text-sm">{tStore('quick_links')}</h4>

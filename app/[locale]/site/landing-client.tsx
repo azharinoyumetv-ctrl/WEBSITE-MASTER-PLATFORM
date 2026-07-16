@@ -73,7 +73,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             <div className="mt-9 flex flex-wrap gap-3">
               <a
                 href="/shop"
-                className="dagangos-play-card group inline-flex items-center gap-2 px-6 py-3.5 text-slate-950 font-bold rounded-xl bg-white shadow-[0_16px_45px_rgba(15,23,42,.35)] transition-transform hover:-translate-y-1 text-sm"
+                className="dagangos-cta-gradient dagangos-play-card group inline-flex items-center gap-2 px-6 py-3.5 font-bold rounded-xl text-sm"
               >
                 {t('explore_packages')} <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </a>
@@ -256,7 +256,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
           <p className="text-lg opacity-80 mb-8 max-w-xl mx-auto">
             {t('cta_subtitle')}
           </p>
-          <a href="/shop" className="dagangos-play-card group inline-flex items-center gap-2 px-8 py-3.5 bg-white text-slate-950 font-bold rounded-xl shadow-xl transition-transform hover:-translate-y-1">
+          <a href="/shop" className="dagangos-cta-gradient dagangos-play-card group inline-flex items-center gap-2 px-8 py-3.5 font-bold rounded-xl">
             {t('choose_price_plan')}
             <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </a>
