@@ -6,6 +6,7 @@ import { AuthProvider } from '@/components/providers'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { COMPANY } from '@/lib/company'
+import { DeploymentRecovery } from '@/components/deployment-recovery'
 
 const inter = Inter({ 
   subsets: ['latin'],
@@ -71,6 +72,7 @@ export default async function RootLayout({
       <body className={`${inter.variable} font-sans antialiased`}>
         <NextIntlClientProvider messages={messages} locale={locale}>
           <AuthProvider>
+            <DeploymentRecovery />
             {children}
           </AuthProvider>
           <Toaster

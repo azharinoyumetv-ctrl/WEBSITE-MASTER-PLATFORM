@@ -77,6 +77,15 @@ function applySecurityHeaders(res: NextResponse, csp: string) {
   return res
 }
 
+function preventAdminResponseCaching(res: NextResponse) {
+  // Admin Flight/HTML responses contain Server Action references. Serving one
+  // from a prior deployment leaves the dashboard unable to submit actions.
+  res.headers.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate')
+  res.headers.set('CDN-Cache-Control', 'no-store')
+  res.headers.set('Cloudflare-CDN-Cache-Control', 'no-store')
+  return res
+}
+
 export default async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const nonce = btoa(crypto.randomUUID())
@@ -165,7 +174,11 @@ export default async function middleware(request: NextRequest) {
   }
 
   // 3. Run our routing logic (which extracts tenant and locale)
-  return applySecurityHeaders(handleRouting(request, token, requestHeaders), csp)
+  const response = handleRouting(request, token, requestHeaders)
+  if (isProtected) {
+    preventAdminResponseCaching(response)
+  }
+  return applySecurityHeaders(response, csp)
 }
 
 function handleRouting(
