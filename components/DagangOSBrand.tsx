@@ -11,31 +11,26 @@ type DagangOSBrandProps = {
 }
 
 /**
- * DagangOS Web uses the shopping-bag mark to communicate digital commerce,
- * with the DagangOS color system retained in the accompanying wordmark.
+ * The public DagangOS Web brand is a single supplied wordmark. Its PNG has a
+ * transparent matte so it works cleanly on both light and dark product areas.
  */
 export function DagangOSBrand({ className, compact = false, dark = false, showName = true }: DagangOSBrandProps) {
   return (
-    <div className={cn('flex items-center gap-2.5 min-w-0', className)} aria-label={COMPANY.legalName}>
-      <div className="rounded-lg overflow-hidden bg-white flex items-center justify-center flex-shrink-0">
+    <div className={cn('flex min-w-0 flex-col items-start leading-none', className)} aria-label={COMPANY.legalName}>
+      <div className={cn('relative shrink-0 overflow-hidden', compact ? 'h-7 w-[7.5rem]' : 'h-12 w-[12.75rem]')}>
         <Image
-          src="/dagangos-logo.jpg"
-          alt="DagangOS"
-          width={compact ? 32 : 40}
-          height={compact ? 32 : 40}
-          className={cn(compact ? 'w-8 h-8' : 'w-10 h-10', 'object-cover scale-[1.1]')}
+          src="/dagangos-web-wordmark.png"
+          alt="DagangOS Web"
+          fill
+          sizes={compact ? '120px' : '204px'}
+          className={cn('object-cover', dark && 'brightness-[1.65] saturate-125 drop-shadow-[0_1px_1px_rgba(255,255,255,0.22)]')}
           priority
         />
       </div>
       {showName && (
-        <div className="min-w-0 leading-none">
-          <p className={cn('font-extrabold tracking-tight whitespace-nowrap', compact ? 'text-base' : 'text-lg', dark ? 'text-white' : 'text-slate-950')}>
-            Dagang<span className="text-emerald-400">O</span><span className="text-sky-400">S</span><span className="ml-1.5 text-sky-400">Web</span>
-          </p>
-          <p className={cn('mt-1 text-[10px] font-semibold tracking-[0.12em] whitespace-nowrap', dark ? 'text-slate-300' : 'text-slate-600')}>
-            Digital Indonesia
-          </p>
-        </div>
+        <p className={cn('mt-0.5 whitespace-nowrap font-semibold tracking-[0.1em]', compact ? 'text-[7px]' : 'text-[10px]', dark ? 'text-slate-300' : 'text-slate-600')}>
+          {COMPANY.legalName}
+        </p>
       )}
     </div>
   )

@@ -26,17 +26,17 @@ export const metadata: Metadata = {
     description: 'Self-hosted digital business platforms for Indonesian businesses.',
     siteName: COMPANY.legalName,
     images: [{
-      url: '/dagangos-logo.jpg',
-      width: 1254,
-      height: 1254,
-      alt: 'DagangOS Web shopping-bag logo',
+      url: '/dagangos-web-wordmark.png',
+      width: 1672,
+      height: 941,
+      alt: 'DagangOS Web',
     }],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${COMPANY.legalName} | ${COMPANY.productName}`,
     description: 'Self-hosted digital business platforms for Indonesian businesses.',
-    images: ['/dagangos-logo.jpg'],
+    images: ['/dagangos-web-wordmark.png'],
   },
   alternates: {
     canonical: 'https://store.dagangos.com',
