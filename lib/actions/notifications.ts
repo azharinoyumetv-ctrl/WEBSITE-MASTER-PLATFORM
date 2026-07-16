@@ -6,6 +6,31 @@ import { encrypt, decrypt } from '@/lib/crypto'
 import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
 import nodemailer from 'nodemailer'
 
+const SECRET_MASK = '••••••••'
+
+type EmailGatewayConfig = {
+  host?: string
+  port?: string
+  encryption?: string
+  username?: string
+  password?: string
+  fromEmail?: string
+  fromName?: string
+}
+
+function getEmailSender(config: EmailGatewayConfig) {
+  const fromEmail = config.fromEmail?.trim() || config.username?.trim()
+  if (!fromEmail) return ''
+  const fromName = config.fromName?.trim()
+  return fromName ? `${fromName} <${fromEmail}>` : fromEmail
+}
+
+function toSafeGateway<T extends { encryptedCredentials?: unknown }>(gateway: T | null, providerConfig?: Record<string, unknown>) {
+  if (!gateway) return null
+  const { encryptedCredentials: _encryptedCredentials, ...safeGateway } = gateway
+  return providerConfig ? { ...safeGateway, providerConfig } : safeGateway
+}
+
 export async function getNotificationTemplates(tenantId: string) {
   try {
     const user = await getAuthenticatedUser()
@@ -125,13 +150,16 @@ export async function getNotificationGateway(tenantId: string, channelType: stri
     
     if (gateway && gateway.encryptedCredentials) {
       const config = typeof gateway.encryptedCredentials === 'string' ? JSON.parse(gateway.encryptedCredentials) : gateway.encryptedCredentials
-      if (config.password) {
-        config.password = decrypt(config.password)
+      return {
+        success: true,
+        gateway: toSafeGateway(gateway, {
+            ...config,
+            password: config.password ? SECRET_MASK : ''
+          })
       }
-      return { success: true, gateway: { ...gateway, providerConfig: config } }
     }
     
-    return { success: true, gateway }
+    return { success: true, gateway: toSafeGateway(gateway) }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -144,7 +172,25 @@ export async function saveNotificationGateway(tenantId: string, channelType: str
     await requirePermission(user.id, tenantId, 'notifications', 'write')
 
     const secureConfig = { ...config }
-    if (secureConfig.password) {
+    const existingGateway = await prisma.tenantNotificationGateway.findUnique({
+      where: {
+        tenantId_channelType_providerName: {
+          tenantId,
+          channelType,
+          providerName
+        }
+      },
+      select: { encryptedCredentials: true }
+    })
+    const existingConfig = existingGateway?.encryptedCredentials as EmailGatewayConfig | null
+
+    if (secureConfig.password === SECRET_MASK) {
+      if (existingConfig?.password) {
+        secureConfig.password = existingConfig.password
+      } else {
+        delete secureConfig.password
+      }
+    } else if (secureConfig.password) {
       secureConfig.password = encrypt(secureConfig.password)
     }
 
@@ -170,7 +216,7 @@ export async function saveNotificationGateway(tenantId: string, channelType: str
     })
 
     revalidatePath('/admin/notifications')
-    return { success: true, gateway }
+    return { success: true, gateway: toSafeGateway(gateway) }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -248,11 +294,11 @@ async function sendWithRetryAndLog(logId: string, maxRetries = 3) {
   while (attempt < maxRetries && !success) {
     try {
       if (log.channelType === 'email') {
-        const config = gateway.encryptedCredentials as any
+        const config = gateway.encryptedCredentials as EmailGatewayConfig
         const password = config.password ? decrypt(config.password) : ''
         const transporter = nodemailer.createTransport({
           host: config.host,
-          port: parseInt(config.port, 10),
+          port: parseInt(config.port || '587', 10),
           secure: config.encryption === 'SSL' || config.port === '465',
           auth: {
             user: config.username,
@@ -265,7 +311,7 @@ async function sendWithRetryAndLog(logId: string, maxRetries = 3) {
         const html = metadata?.body || 'You have a new notification.'
 
         await transporter.sendMail({
-          from: config.username,
+          from: getEmailSender(config),
           to: log.recipient,
           subject,
           html,
@@ -368,6 +414,57 @@ export async function dispatchTestNotification(tenantId: string, templateId: str
     }
     
     return { success: true, message: `Test ${template.channelType.toUpperCase()} dispatched successfully.` }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function sendSmtpTestEmail(tenantId: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'notifications', 'write')
+
+    const gateway = await getActiveGatewayWithRouting(tenantId, 'email')
+    if (!gateway) throw new Error('Save and enable an SMTP gateway before sending a test email')
+
+    const config = gateway.encryptedCredentials as EmailGatewayConfig
+    const password = config.password ? decrypt(config.password) : ''
+    const from = getEmailSender(config)
+    if (!config.host || !config.port || !config.username || !password || !from) {
+      throw new Error('SMTP host, port, username, password, and sender email are required')
+    }
+
+    const transporter = nodemailer.createTransport({
+      host: config.host,
+      port: parseInt(config.port || '587', 10),
+      secure: config.encryption === 'SSL' || config.port === '465',
+      auth: { user: config.username, pass: password }
+    })
+
+    await transporter.verify()
+    await transporter.sendMail({
+      from,
+      to: user.email,
+      subject: 'DagangOS SMTP test successful',
+      text: 'Your DagangOS SMTP gateway is connected and can deliver transactional email.',
+      html: '<p>Your DagangOS SMTP gateway is connected and can deliver transactional email.</p>'
+    })
+
+    await prisma.tenantNotificationLog.create({
+      data: {
+        tenantId,
+        gatewayId: gateway.id,
+        recipient: user.email,
+        channelType: 'email',
+        status: 'sent',
+        sentAt: new Date(),
+        metadata: { type: 'smtp_connection_test' }
+      }
+    })
+
+    revalidatePath('/admin/notifications')
+    return { success: true, recipient: user.email }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -578,11 +675,11 @@ export async function sendOrderConfirmationEmail(tenantId: string, orderId: stri
       return { success: false, error: "No active email gateway found" }
     }
 
-    const config = gateway.encryptedCredentials as any
+    const config = gateway.encryptedCredentials as EmailGatewayConfig
     const password = config.password ? decrypt(config.password) : ''
     const transporter = nodemailer.createTransport({
       host: config.host,
-      port: parseInt(config.port, 10),
+      port: parseInt(config.port || '587', 10),
       secure: config.encryption === 'SSL' || config.port === '465',
       auth: {
         user: config.username,
@@ -642,7 +739,7 @@ export async function sendOrderConfirmationEmail(tenantId: string, orderId: stri
 
     try {
       await transporter.sendMail({
-        from: config.username,
+        from: getEmailSender(config),
         to: recipientEmail,
         subject: `Order Confirmation - #${orderId}`,
         html: emailHtml
