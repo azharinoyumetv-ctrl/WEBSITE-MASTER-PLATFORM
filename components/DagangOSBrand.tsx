@@ -11,19 +11,19 @@ type DagangOSBrandProps = {
 }
 
 /**
- * The lockup follows the supplied DagangOS Web identity: the app icon,
- * navy/white "Dagang", green "O", blue "S", and blue "Web".
+ * DagangOS Web uses the shopping-bag mark to communicate digital commerce,
+ * with the DagangOS color system retained in the accompanying wordmark.
  */
 export function DagangOSBrand({ className, compact = false, dark = false, showName = true }: DagangOSBrandProps) {
   return (
     <div className={cn('flex items-center gap-2.5 min-w-0', className)} aria-label={COMPANY.legalName}>
       <div className="rounded-lg overflow-hidden bg-white flex items-center justify-center flex-shrink-0">
         <Image
-          src="/dagangos-appicon.png"
+          src="/dagangos-logo.jpg"
           alt="DagangOS"
           width={compact ? 32 : 40}
           height={compact ? 32 : 40}
-          className={cn(compact ? 'w-8 h-8' : 'w-10 h-10', 'object-cover')}
+          className={cn(compact ? 'w-8 h-8' : 'w-10 h-10', 'object-cover scale-[1.1]')}
           priority
         />
       </div>

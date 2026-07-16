@@ -26,25 +26,25 @@ export const metadata: Metadata = {
     description: 'Self-hosted digital business platforms for Indonesian businesses.',
     siteName: COMPANY.legalName,
     images: [{
-      url: '/dagangos-web-logo.png',
-      width: 1680,
-      height: 945,
-      alt: 'DagangOS Web',
+      url: '/dagangos-logo.jpg',
+      width: 1254,
+      height: 1254,
+      alt: 'DagangOS Web shopping-bag logo',
     }],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${COMPANY.legalName} | ${COMPANY.productName}`,
     description: 'Self-hosted digital business platforms for Indonesian businesses.',
-    images: ['/dagangos-web-logo.png'],
+    images: ['/dagangos-logo.jpg'],
   },
   alternates: {
     canonical: 'https://store.dagangos.com',
   },
   icons: {
-    icon: [{ url: '/dagangos-appicon.png', type: 'image/png', sizes: '1024x1024' }],
-    shortcut: '/dagangos-appicon.png',
-    apple: [{ url: '/dagangos-appicon.png', type: 'image/png', sizes: '1024x1024' }],
+    icon: [{ url: '/dagangos-logo.jpg', type: 'image/jpeg', sizes: '1254x1254' }],
+    shortcut: '/dagangos-logo.jpg',
+    apple: [{ url: '/dagangos-logo.jpg', type: 'image/jpeg', sizes: '1254x1254' }],
   },
   manifest: '/site.webmanifest',
 }

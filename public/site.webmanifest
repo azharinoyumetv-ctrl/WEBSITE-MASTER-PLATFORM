@@ -3,9 +3,9 @@
   "short_name": "DagangOS",
   "icons": [
     {
-      "src": "/dagangos-appicon.png",
-      "sizes": "1024x1024",
-      "type": "image/png",
+      "src": "/dagangos-logo.jpg",
+      "sizes": "1254x1254",
+      "type": "image/jpeg",
       "purpose": "any maskable"
     }
   ],
