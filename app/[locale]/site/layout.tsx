@@ -101,13 +101,13 @@ export default async function SiteLayout({
           })
         }}
       />
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 shadow-[0_12px_36px_rgba(2,6,23,.22)] backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-slate-200 bg-white/95 shadow-[0_12px_36px_rgba(15,23,42,.10)] backdrop-blur-xl">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[4.5rem] flex items-center justify-between gap-4">
-          <Link href="/site" aria-label="Back to DagangOS home" title="Back to DagangOS home" className="flex items-center gap-2 rounded-xl outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">
+          <Link href="/site" aria-label="Back to DagangOS home" title="Back to DagangOS home" className="flex items-center gap-2 rounded-xl outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white">
             {logoUrl ? (
               <Image src={logoUrl} alt={website.siteTitle} className="h-10 w-10 rounded-lg object-cover" width={40} height={40} unoptimized />
             ) : isCompanyStorefront ? (
-              <DagangOSBrand compact dark />
+              <DagangOSBrand compact />
             ) : (
               <span className="font-bold text-xl tracking-tight" style={{ color: primaryColor }}>
                 {website.siteTitle}
@@ -115,7 +115,7 @@ export default async function SiteLayout({
             )}
           </Link>
           <div className="flex items-center gap-2 sm:gap-3">
-            <LanguageSwitcher variant="dark" />
+            <LanguageSwitcher />
             
             <Link 
               href="/project-setup?package=landing_page&v=v2"
@@ -125,13 +125,13 @@ export default async function SiteLayout({
             </Link>
           </div>
         </div>
-        <nav aria-label="Storefront navigation" className="border-t border-white/10 bg-slate-950/80">
+        <nav aria-label="Storefront navigation" className="border-t border-slate-200 bg-white/90">
           <div className="max-w-7xl mx-auto flex gap-1 overflow-x-auto px-3 py-2 sm:px-6 lg:px-8 [scrollbar-width:none]">
             {navigationTree.map((nav) => (
               <Link
                 key={nav.target}
                 href={nav.target}
-                className="shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/[.08] hover:text-white focus-visible:bg-white/[.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+                className="shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-emerald-50 hover:text-slate-950 focus-visible:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500"
               >
                 {nav.label}
               </Link>
@@ -144,24 +144,22 @@ export default async function SiteLayout({
         {children}
       </main>
 
-      <footer className="relative overflow-hidden bg-slate-950 py-14 text-slate-400">
-        <div className="absolute inset-0 dagangos-aurora opacity-35" />
-        <div className="absolute inset-0 dagangos-grid opacity-20" />
+      <footer className="relative overflow-hidden border-t border-slate-200 bg-slate-50 py-14 text-slate-600">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="relative grid gap-10 md:grid-cols-4 mb-10">
             <div className="md:col-span-2">
-              {isCompanyStorefront ? <DagangOSBrand dark /> : <h3 className="text-white font-bold text-lg mb-3">{tenant.companyName}</h3>}
+              {isCompanyStorefront ? <DagangOSBrand /> : <h3 className="text-slate-950 font-bold text-lg mb-3">{tenant.companyName}</h3>}
               <p className="text-slate-500 text-sm leading-relaxed">
                 {tStore('footer_desc')}
               </p>
-              <Link href="/support" className="mt-5 inline-flex items-center gap-2 rounded-xl border border-emerald-300/20 bg-emerald-300/10 px-3.5 py-2 text-xs font-bold text-emerald-100 transition hover:bg-emerald-300/20">Open internal support chat <span aria-hidden>↗</span></Link>
+              <Link href="/support" className="mt-5 inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-800 transition hover:bg-emerald-100">Open internal support chat <span aria-hidden>↗</span></Link>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-3 text-sm">{tStore('quick_links')}</h4>
+              <h4 className="text-slate-950 font-semibold mb-3 text-sm">{tStore('quick_links')}</h4>
               <ul className="space-y-2">
                 {navigationTree.map(nav => (
                   <li key={nav.target}>
-                    <Link href={nav.target} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">
+                    <Link href={nav.target} className="text-slate-600 hover:text-slate-950 text-sm transition-colors">
                       {nav.label}
                     </Link>
                   </li>
@@ -169,20 +167,20 @@ export default async function SiteLayout({
               </ul>
             </div>
             <div>
-              <h4 className="text-white font-semibold mb-3 text-sm">{tStore('platform')}</h4>
+              <h4 className="text-slate-950 font-semibold mb-3 text-sm">{tStore('platform')}</h4>
               <ul className="space-y-2">
-                <li><Link href="/project-setup?package=landing_page&v=v2" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('shop_now')}</Link></li>
-                <li><Link href="/support" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('support')}</Link></li>
+                <li><Link href="/project-setup?package=landing_page&v=v2" className="text-slate-600 hover:text-slate-950 text-sm transition-colors">{tStore('shop_now')}</Link></li>
+                <li><Link href="/support" className="text-slate-600 hover:text-slate-950 text-sm transition-colors">{tStore('support')}</Link></li>
               </ul>
             </div>
           </div>
-          <div className="relative border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="relative border-t border-slate-200 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex flex-col md:flex-row items-center gap-4">
               <p className="text-sm">&copy; {new Date().getFullYear()} {isCompanyStorefront ? COMPANY.legalName : tenant.companyName}. {tStore('all_rights')}</p>
               <div className="flex items-center gap-3">
-                <Link href="/terms" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('terms')}</Link>
-                <span className="text-slate-700 text-xs">&bull;</span>
-                <Link href="/privacy" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('privacy')}</Link>
+                <Link href="/terms" className="text-xs text-slate-600 hover:text-slate-950 transition-colors">{tStore('terms')}</Link>
+                <span className="text-slate-300 text-xs">&bull;</span>
+                <Link href="/privacy" className="text-xs text-slate-600 hover:text-slate-950 transition-colors">{tStore('privacy')}</Link>
               </div>
             </div>
             <p className="text-xs opacity-50">{tStore('powered_by')}</p>
