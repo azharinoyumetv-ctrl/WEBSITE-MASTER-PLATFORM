@@ -3,18 +3,14 @@
   "short_name": "DagangOS",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
-    },
-    {
-      "src": "/apple-touch-icon.png",
-      "sizes": "180x180",
-      "type": "image/png"
+      "src": "/dagangos-appicon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ],
-  "theme_color": "#4f46e5",
-  "background_color": "#ffffff",
+  "theme_color": "#061f65",
+  "background_color": "#06152f",
   "display": "standalone",
   "start_url": "/"
 }

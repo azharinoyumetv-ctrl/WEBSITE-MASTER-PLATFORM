@@ -19,24 +19,32 @@ export const metadata: Metadata = {
     template: `%s | ${COMPANY.legalName}`,
   },
   description: 'Enterprise-grade multi-tenant SaaS platform — built for agencies and their clients',
-  keywords: ['saas', 'multi-tenant', 'platform', 'cms', 'ecommerce', 'crm'],
+  keywords: ['DagangOS', 'self-hosted', 'platform', 'website', 'ecommerce', 'Indonesia'],
   openGraph: {
     type: 'website',
     title: `${COMPANY.legalName} | ${COMPANY.productName}`,
-    description: 'Enterprise-grade multi-tenant SaaS platform',
+    description: 'Self-hosted digital business platforms for Indonesian businesses.',
     siteName: COMPANY.legalName,
+    images: [{
+      url: '/dagangos-web-logo.png',
+      width: 1680,
+      height: 945,
+      alt: 'DagangOS Web',
+    }],
   },
   twitter: {
     card: 'summary_large_image',
     title: `${COMPANY.legalName} | ${COMPANY.productName}`,
-    description: 'Enterprise-grade multi-tenant SaaS platform',
+    description: 'Self-hosted digital business platforms for Indonesian businesses.',
+    images: ['/dagangos-web-logo.png'],
   },
   alternates: {
     canonical: 'https://store.dagangos.com',
   },
   icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
+    icon: [{ url: '/dagangos-appicon.png', type: 'image/png', sizes: '1024x1024' }],
+    shortcut: '/dagangos-appicon.png',
+    apple: [{ url: '/dagangos-appicon.png', type: 'image/png', sizes: '1024x1024' }],
   },
   manifest: '/site.webmanifest',
 }

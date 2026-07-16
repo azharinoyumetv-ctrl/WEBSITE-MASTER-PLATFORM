@@ -96,7 +96,7 @@ export default async function SiteLayout({
             "@type": "Organization",
             "name": isCompanyStorefront ? COMPANY.legalName : tenant.companyName,
             "url": `https://${website.domain || tenant.subdomain + '.' + (process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com')}`,
-            "logo": logoUrl || (isCompanyStorefront ? '/dagangos-logo.jpg' : ''),
+            "logo": logoUrl || (isCompanyStorefront ? '/dagangos-appicon.png' : ''),
             "description": website.globalSeoMetadata?.description || ''
           })
         }}
