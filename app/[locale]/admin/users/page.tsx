@@ -49,7 +49,6 @@ export default async function UsersPage() {
       initialUsers={initialUsers} 
       initialRoles={initialRoles} 
       tenantId={tenantId}
-      currentUser={session.user}
     />
   )
 }

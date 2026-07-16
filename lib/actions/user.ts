@@ -1,14 +1,20 @@
 'use server'
 
-import { PrismaClient, UserStatus } from '@prisma/client'
+import { UserStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
 import prisma from "@/lib/prisma"
+import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
+import { dispatchNotification, getActiveGatewayWithRouting } from '@/lib/actions/notifications'
 
 
 
 export async function getUsers(tenantId: string) {
   try {
+    const currentUser = await getAuthenticatedUser()
+    if (currentUser.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(currentUser.id, tenantId, 'user_management', 'read')
+
     const users = await prisma.user.findMany({
       where: { tenantId },
       include: {
@@ -39,6 +45,10 @@ export async function getUsers(tenantId: string) {
 
 export async function getRoles(tenantId: string) {
   try {
+    const currentUser = await getAuthenticatedUser()
+    if (currentUser.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(currentUser.id, tenantId, 'user_management', 'read')
+
     const roles = await prisma.role.findMany({
       where: { tenantId },
       orderBy: { name: 'asc' }
@@ -49,33 +59,74 @@ export async function getRoles(tenantId: string) {
   }
 }
 
-export async function inviteUser(tenantId: string, email: string, roleId: string, invitedBy: string) {
+export async function inviteUser(tenantId: string, email: string, roleId: string) {
   try {
+    const currentUser = await getAuthenticatedUser()
+    if (currentUser.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(currentUser.id, tenantId, 'user_management', 'write')
+
+    const normalizedEmail = email.trim().toLowerCase()
+    if (!/^\S+@\S+\.\S+$/.test(normalizedEmail)) {
+      throw new Error('Enter a valid email address')
+    }
+
     const existing = await prisma.user.findUnique({
-      where: { tenantId_email: { tenantId, email } }
+      where: { tenantId_email: { tenantId, email: normalizedEmail } }
     })
     
     if (existing) {
       return { success: false, error: 'User already exists in this tenant' }
     }
 
-    const token = crypto.randomBytes(32).toString('hex')
+    const [tenant, role] = await Promise.all([
+      prisma.systemTenant.findUnique({ where: { id: tenantId }, select: { companyName: true, subdomain: true } }),
+      prisma.role.findFirst({ where: { id: roleId, tenantId }, select: { id: true } })
+    ])
+    if (!tenant || !role) throw new Error('Workspace or assigned role was not found')
 
-    const invitation = await prisma.tenantInvitation.create({
+    // A raw token is sent once; only its SHA-256 digest is stored.
+    const token = crypto.randomBytes(32).toString('hex')
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex')
+    const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000)
+
+    // Keep a single valid invitation per email address so an older link cannot
+    // be accepted after an administrator has re-issued access.
+    await prisma.tenantInvitation.deleteMany({
+      where: { tenantId, email: normalizedEmail, acceptedAt: null }
+    })
+
+    await prisma.tenantInvitation.create({
       data: {
         tenantId,
-        email,
-        invitedBy,
+        email: normalizedEmail,
+        invitedBy: currentUser.id,
         assignedRoleId: roleId,
-        tokenHash: token, // In real app, hash this before storing
-        expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000) // 48 hours
+        tokenHash,
+        expiresAt
       }
     })
 
-    // TODO: Send email here using Notification service
-    
+    const origin = (process.env.NEXTAUTH_URL || 'https://store.dagangos.com').replace(/\/$/, '')
+    const accessUrl = `${origin}/id/auth/accept-invitation?token=${encodeURIComponent(token)}`
+    const emailGateway = await getActiveGatewayWithRouting(tenantId, 'email')
+
+    let delivery: 'email_queued' | 'copy_link' = 'copy_link'
+    if (emailGateway) {
+      const notification = await dispatchNotification(tenantId, normalizedEmail, 'email', 'workspace_invitation', {
+        company_name: tenant.companyName,
+        workspace_url: `https://${tenant.subdomain}.store.dagangos.com`,
+        access_url: accessUrl,
+        expires_at: expiresAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
+      })
+      if (notification.success) delivery = 'email_queued'
+    }
+
     revalidatePath('/admin/users')
-    return { success: true, invitation }
+    return {
+      success: true,
+      delivery,
+      ...(delivery === 'copy_link' ? { accessUrl } : {})
+    }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -83,6 +134,10 @@ export async function inviteUser(tenantId: string, email: string, roleId: string
 
 export async function toggleUserStatus(tenantId: string, userId: string, newStatus: UserStatus) {
   try {
+    const currentUser = await getAuthenticatedUser()
+    if (currentUser.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(currentUser.id, tenantId, 'user_management', 'write')
+
     const user = await prisma.user.update({
       where: { id: userId, tenantId },
       data: { status: newStatus }

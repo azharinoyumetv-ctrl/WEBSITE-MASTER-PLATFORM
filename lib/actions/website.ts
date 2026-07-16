@@ -7,6 +7,7 @@ import { requirePermission, getAuthenticatedUser } from '@/lib/rbac'
 import crypto from 'crypto'
 import { z } from 'zod'
 import { COMPANY } from '@/lib/company'
+import type { Prisma } from '@prisma/client'
 
 const layoutBlockSchema = z.array(z.object({
   type: z.enum(['hero', 'text', 'features', 'catalog_grid', 'contact_form']),
@@ -231,7 +232,9 @@ export async function getAdminWebsiteConfig(tenantId: string) {
       (website as any).isDokuSnapTokenUrlConfigured = !!website.dokuSnapTokenUrl;
       (website as any).isDokuSharedKeyConfigured = !!website.dokuSharedKey;
       (website as any).isWhatsAppAccessTokenConfigured = !!website.whatsappEncryptedAccessToken || !!legacyWhatsAppToken;
-      website.themeConfig = themeConfig
+      // This value originates from Prisma's JSON column; removing the legacy
+      // credential preserves a JSON object that is safe to return to the client.
+      website.themeConfig = themeConfig as Prisma.JsonObject
       
       // Explicitly clear keys so they never travel to the client
       website.xenditEncryptedSecret = null

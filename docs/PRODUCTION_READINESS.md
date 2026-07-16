@@ -4,8 +4,8 @@ This is a deliberately small, versioned list of remaining production work. It re
 
 ## Open
 
-- [ ] **API request telemetry** — add a tenant-scoped request-log store and middleware/instrumentation for authenticated API traffic. Then expose request volume, latency percentiles, and failure rate in the API Portal from that data.
-- [ ] **Workspace invitation delivery** — configure and test the DagangOS platform SMTP gateway. Provisioning already creates a seven-day, single-use password-setup link and provides a copy-link fallback; this item closes the automated delivery verification gap.
+- [ ] **Control-plane API activation** — configure `CONTROL_PLANE_SECRET` on the DagangOS VPS, then verify an authenticated production request. The routes intentionally remain disabled until that shared secret exists.
+- [ ] **Workspace invitation email delivery** — configure and test the DagangOS SMTP gateway. Invitations are otherwise fully usable through the secure copy-link fallback.
 - [ ] **Storefront payments** — configure and verify one production payment gateway (DOKU, Xendit, or Midtrans) in the DagangOS tenant settings. Project Setup is live, but no gateway credentials are stored for the new company tenant yet.
 
 ## Completed
@@ -14,4 +14,6 @@ This is a deliberately small, versioned list of remaining production work. It re
 - [x] Public storefront bootstrap creates the DagangOS company tenant, active website configuration, and production module records without sample data.
 - [x] Storefront analytics records persistent anonymous page-view sessions and dashboard analytics derives from recorded events and paid orders.
 - [x] API Portal synthetic traffic and monitoring uptime claims removed; visible values are now sourced from live configuration or measured checks.
+- [x] **API request telemetry** — tenant-scoped control-plane request logs record route, final status, and latency; the API Portal reports the 30-day request count, P95 latency, error rate, and recent requests from that store.
+- [x] **Workspace invitations** — authorized administrators issue a 48-hour single-use invitation with only a token digest stored. Recipients can set a password, receive their assigned role, and sign in; email delivery is used when configured, with an explicit secure copy-link fallback otherwise.
 - [x] **Hermes internal support API** — the local OpenAI-compatible service is active and reachable with its server-only URL, key, and model configured. A live public pre-sales support-chat request was verified; the public relay remains read-only and policy-scoped.

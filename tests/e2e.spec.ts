@@ -400,4 +400,37 @@ test.describe('Website Master Platform E2E Audit', () => {
     await expect(page.getByText('POST /api/v1/instances/validate-license')).toBeVisible();
     await expect(page.getByText('200', { exact: true }).last()).toBeVisible();
   });
+
+  test('22. Workspace invitation can be copied and accepted securely', async ({ page }) => {
+    await page.goto('/auth/login');
+    await page.fill('#email', 'admin@dagangos.com');
+    await page.fill('#password', 'password123');
+    await page.click('#login-submit');
+    await page.waitForURL('**/admin/dashboard');
+
+    await page.goto('/admin/users');
+    await page.getByRole('button', { name: 'Invite User' }).click();
+    await page.locator('#invite-email').fill('invited-e2e@dagangos.com');
+    await page.locator('#send-invite-btn').click();
+
+    const accessUrl = page.locator('#invite-access-url');
+    await expect(accessUrl).toBeVisible();
+    const invitationUrl = await accessUrl.inputValue();
+    expect(invitationUrl).toContain('/auth/accept-invitation?token=');
+
+    await page.goto(invitationUrl);
+    await expect(page.getByText('Activate your access')).toBeVisible();
+    await page.locator('#invite-first-name').fill('Invited');
+    await page.locator('#invite-last-name').fill('Tester');
+    await page.locator('#invite-password').fill('SecureE2EPassword!23');
+    await page.locator('#invite-password-confirmation').fill('SecureE2EPassword!23');
+    await page.locator('#accept-invitation-submit').click();
+    await expect(page.getByText('Workspace activated')).toBeVisible();
+
+    await page.getByRole('link', { name: 'Sign in' }).click();
+    await page.fill('#email', 'invited-e2e@dagangos.com');
+    await page.fill('#password', 'SecureE2EPassword!23');
+    await page.click('#login-submit');
+    await page.waitForURL('**/admin/dashboard');
+  });
 });
