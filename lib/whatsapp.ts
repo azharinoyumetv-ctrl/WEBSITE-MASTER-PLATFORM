@@ -1,6 +1,77 @@
 /**
  * Utility for sending messages via official Meta WhatsApp Cloud API
  */
+import prisma from '@/lib/prisma'
+import { decrypt } from '@/lib/crypto'
+
+export type WhatsAppCredentials = {
+  token: string
+  phoneNumberId: string
+}
+
+export type TenantWhatsAppConfig = WhatsAppCredentials & {
+  recipientNumber: string
+  templateName: string
+}
+
+/** Resolves credentials only for a tenant that owns the WhatsApp Business add-on. */
+export async function getTenantWhatsAppConfig(tenantId: string): Promise<TenantWhatsAppConfig | null> {
+  const [module, website] = await Promise.all([
+    prisma.tenantModule.findUnique({
+      where: { tenantId_moduleKey: { tenantId, moduleKey: 'whatsapp_module' } },
+      select: { isEnabled: true },
+    }),
+    prisma.tenantWebsite.findUnique({ where: { tenantId } }),
+  ])
+
+  if (!module?.isEnabled || !website) return null
+
+  const themeConfig = (website.themeConfig as Record<string, unknown>) || {}
+  const legacyToken = typeof themeConfig.whatsappToken === 'string' ? themeConfig.whatsappToken : ''
+  const token = website.whatsappEncryptedAccessToken
+    ? decrypt(website.whatsappEncryptedAccessToken)
+    : legacyToken
+  const phoneNumberId = typeof themeConfig.whatsappPhoneId === 'string' ? themeConfig.whatsappPhoneId.trim() : ''
+  const recipientNumber = typeof themeConfig.whatsappPaNumber === 'string' ? themeConfig.whatsappPaNumber.trim() : ''
+  const templateName = typeof themeConfig.whatsappTemplate === 'string' ? themeConfig.whatsappTemplate.trim() : ''
+
+  if (!token || !phoneNumberId) return null
+  return { token, phoneNumberId, recipientNumber, templateName }
+}
+
+export async function sendWhatsAppText({
+  to,
+  message,
+  credentials,
+}: {
+  to: string
+  message: string
+  credentials: WhatsAppCredentials
+}) {
+  const cleanPhone = to.replace(/[^0-9]/g, '')
+  if (!cleanPhone || !message.trim()) return { success: false, error: 'Recipient and message are required' }
+
+  try {
+    const res = await fetch(`https://graph.facebook.com/v20.0/${credentials.phoneNumberId}/messages`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${credentials.token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to: cleanPhone,
+        type: 'text',
+        text: { body: message.trim() },
+      }),
+    })
+    const data = await res.json()
+    if (!res.ok) return { success: false, error: data.error?.message || 'WhatsApp delivery failed' }
+    return { success: true, data }
+  } catch (error: any) {
+    console.error('WhatsApp API Network/Execution Error:', error)
+    return { success: false, error: error.message || 'WhatsApp delivery failed' }
+  }
+}
+
 export async function sendWhatsAppTemplate({
   to,
   templateName,
@@ -12,10 +83,7 @@ export async function sendWhatsAppTemplate({
   templateName: string
   parameters: string[]
   languageCode?: string
-  credentials?: {
-    token: string
-    phoneNumberId: string
-  }
+  credentials?: WhatsAppCredentials
 }) {
   const token = credentials?.token || process.env.WHATSAPP_ACCESS_TOKEN
   const phoneNumberId = credentials?.phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID

@@ -101,7 +101,7 @@ export async function createTenant(data: { companyName: string, subdomain: strin
       'website_module', 'admin_module', 'user_management', 'rbac_module',
       'catalog_module', 'ecommerce_module', 'payment_module', 'pos_module',
       'inventory_module', 'crm_module', 'booking_module', 'ai_module',
-      'notification_module', 'analytics_module', 'api_module'
+      'notification_module', 'whatsapp_module', 'analytics_module', 'api_module'
     ]
 
     await prisma.tenantModule.createMany({
@@ -135,7 +135,6 @@ export async function createTenant(data: { companyName: string, subdomain: strin
           midtransEnabled: false,
           whatsappPaNumber: '',
           whatsappPhoneId: '',
-          whatsappToken: '',
           whatsappTemplate: 'order_confirmation'
         }
       }

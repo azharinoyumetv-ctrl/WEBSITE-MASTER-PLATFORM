@@ -5,7 +5,7 @@ import {
   ToggleLeft, ToggleRight, Package, ShoppingCart, CreditCard, Monitor,
   Warehouse, Users2, CalendarCheck, Sparkles, Bell, BarChart3, Code2,
   Globe, Users, Shield, LayoutDashboard, CheckCircle2, AlertCircle,
-  Info, RefreshCw, Settings,
+  Info, RefreshCw, Settings, MessageCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -14,7 +14,7 @@ import { toggleTenantModule } from '@/lib/actions/module'
 const ICON_MAP: Record<string, React.ElementType> = {
   Globe, LayoutDashboard, Users, Shield, Package, ShoppingCart,
   CreditCard, Monitor, Warehouse, Users2, CalendarCheck, Sparkles,
-  Bell, BarChart3, Code2,
+  Bell, BarChart3, Code2, MessageCircle,
 }
 
 const CATEGORY_ORDER = ['core', 'commerce', 'operations', 'intelligence', 'developer']
@@ -102,7 +102,7 @@ export function ModulesClient({ initialModules, tenantId }: { initialModules: an
                     className={cn(
                       'card p-4 flex items-start gap-4 transition-all duration-200',
                       mod.isEnabled && !mod.isCore ? 'border-indigo-200 bg-indigo-50/30' : '',
-                      mod.isCore ? 'opacity-90' : 'hover:shadow-md cursor-pointer'
+                      (mod.isCore || mod.isAddOnOnly) ? 'opacity-90' : 'hover:shadow-md cursor-pointer'
                     )}
                   >
                     <div className={cn(
@@ -133,21 +133,25 @@ export function ModulesClient({ initialModules, tenantId }: { initialModules: an
                           </span>
                         </div>
                         
-                        <button
-                          id={`toggle-${mod.key}`}
-                          onClick={() => toggleModule(mod.key, mod.isCore)}
-                          disabled={mod.isCore}
-                          className={cn(
-                            'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none',
-                            mod.isEnabled ? 'bg-indigo-600' : 'bg-slate-200',
-                            mod.isCore ? 'cursor-not-allowed' : 'cursor-pointer'
-                          )}
-                        >
-                          <span className={cn(
-                            'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200',
-                            mod.isEnabled ? 'translate-x-[18px]' : 'translate-x-1'
-                          )} />
-                        </button>
+                        {mod.isAddOnOnly ? (
+                          <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Project add-on</span>
+                        ) : (
+                          <button
+                            id={`toggle-${mod.key}`}
+                            onClick={() => toggleModule(mod.key, mod.isCore)}
+                            disabled={mod.isCore}
+                            className={cn(
+                              'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none',
+                              mod.isEnabled ? 'bg-indigo-600' : 'bg-slate-200',
+                              mod.isCore ? 'cursor-not-allowed' : 'cursor-pointer'
+                            )}
+                          >
+                            <span className={cn(
+                              'inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-sm transition-transform duration-200',
+                              mod.isEnabled ? 'translate-x-[18px]' : 'translate-x-1'
+                            )} />
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>

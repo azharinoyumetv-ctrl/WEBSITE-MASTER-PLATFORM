@@ -84,7 +84,7 @@ export const addonModuleMap: Record<string, string> = {
   booking: 'booking_module',
   crm: 'crm_module',
   api: 'api_module',
-  whatsapp: 'notification_module',
+  whatsapp: 'whatsapp_module',
 }
 
 export const requirementFieldLabels: Record<string, { label: string; placeholder?: string; type?: string }> = {

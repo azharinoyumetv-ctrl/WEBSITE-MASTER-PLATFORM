@@ -35,11 +35,17 @@ export default async function SettingsPage() {
     where: { tenantId }
   })
 
+  const whatsAppModule = await prisma.tenantModule.findUnique({
+    where: { tenantId_moduleKey: { tenantId, moduleKey: 'whatsapp_module' } },
+    select: { isEnabled: true },
+  })
+
   return (
     <SettingsClient 
       initialWebsite={initialWebsite} 
       initialTenant={tenant} 
       initialAiConfig={aiConfig}
+      hasWhatsAppIntegration={Boolean(whatsAppModule?.isEnabled)}
       tenantId={tenantId} 
     />
   )

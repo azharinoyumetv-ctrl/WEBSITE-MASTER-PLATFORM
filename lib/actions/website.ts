@@ -61,7 +61,12 @@ export async function getPublicWebsiteConfig(tenantDomain: string) {
       return { success: false, error: 'Website not found or inactive' }
     }
 
-    return { success: true, website: tenant.website, tenantId: tenant.id, tenant }
+    const rawPublicThemeConfig = (tenant.website.themeConfig as Record<string, unknown>) || {}
+    const { whatsappToken: _legacyWhatsAppToken, ...publicThemeConfig } = rawPublicThemeConfig
+    const { whatsappEncryptedAccessToken: _whatsAppSecret, ...publicWebsite } = tenant.website
+    const publicTenant = { ...tenant, website: { ...publicWebsite, themeConfig: publicThemeConfig } }
+
+    return { success: true, website: publicTenant.website, tenantId: tenant.id, tenant: publicTenant }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -213,7 +218,11 @@ export async function getAdminWebsiteConfig(tenantId: string) {
     })
     
     if (website) {
-      // Return configured flags instead of raw placeholders
+      const rawThemeConfig = (website.themeConfig as Record<string, unknown>) || {}
+      const { whatsappToken: rawWhatsAppToken, ...themeConfig } = rawThemeConfig
+      const legacyWhatsAppToken = typeof rawWhatsAppToken === 'string' ? rawWhatsAppToken : '';
+
+      // Return configured flags instead of raw credentials.
       (website as any).isXenditSecretConfigured = !!website.xenditEncryptedSecret;
       (website as any).isXenditWebhookTokenConfigured = !!website.xenditEncryptedWebhookToken;
       (website as any).isMidtransServerKeyConfigured = !!website.midtransEncryptedServerKey;
@@ -221,6 +230,8 @@ export async function getAdminWebsiteConfig(tenantId: string) {
       (website as any).isDokuMerchantPublicKeyConfigured = !!website.dokuMerchantPublicKey;
       (website as any).isDokuSnapTokenUrlConfigured = !!website.dokuSnapTokenUrl;
       (website as any).isDokuSharedKeyConfigured = !!website.dokuSharedKey;
+      (website as any).isWhatsAppAccessTokenConfigured = !!website.whatsappEncryptedAccessToken || !!legacyWhatsAppToken;
+      website.themeConfig = themeConfig
       
       // Explicitly clear keys so they never travel to the client
       website.xenditEncryptedSecret = null
@@ -233,6 +244,7 @@ export async function getAdminWebsiteConfig(tenantId: string) {
       website.dokuMerchantPublicKey = null
       website.dokuSnapTokenUrl = null
       website.dokuSharedKey = null
+      website.whatsappEncryptedAccessToken = null
     }
 
     return { success: true, website }
@@ -248,20 +260,38 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
     await requirePermission(user.id, tenantId, 'website', 'write')
 
     const website = await prisma.$transaction(async (tx) => {
+      const currentWebsite = await tx.tenantWebsite.findUnique({ where: { tenantId } })
+      const currentTheme = (currentWebsite?.themeConfig as Record<string, unknown>) || {}
+      const rawIncomingTheme = (data.themeConfig as Record<string, unknown>) || {}
+      const { whatsappToken: submittedToken, ...incomingTheme } = rawIncomingTheme
+      const submittedWhatsAppToken = typeof submittedToken === 'string' ? submittedToken.trim() : ''
+      const legacyWhatsAppToken = typeof currentTheme.whatsappToken === 'string' ? currentTheme.whatsappToken.trim() : ''
+
+      let whatsappEncryptedAccessToken = currentWebsite?.whatsappEncryptedAccessToken || null
+      if (submittedWhatsAppToken && submittedWhatsAppToken !== '••••••••') {
+        whatsappEncryptedAccessToken = encrypt(submittedWhatsAppToken)
+      } else if (!whatsappEncryptedAccessToken && legacyWhatsAppToken) {
+        // Move credentials written by older versions out of public theme JSON on the next save.
+        whatsappEncryptedAccessToken = encrypt(legacyWhatsAppToken)
+      }
+
+      const safeData = { ...data, themeConfig: incomingTheme }
       const w = await tx.tenantWebsite.upsert({
         where: { tenantId },
         create: {
           tenantId,
-          siteTitle: data.siteTitle,
-          themeConfig: data.themeConfig,
-          globalSeoMetadata: data.globalSeoMetadata,
-          isActive: data.isActive
+          siteTitle: safeData.siteTitle,
+          themeConfig: safeData.themeConfig,
+          globalSeoMetadata: safeData.globalSeoMetadata,
+          isActive: safeData.isActive,
+          whatsappEncryptedAccessToken,
         },
         update: {
-          siteTitle: data.siteTitle,
-          themeConfig: data.themeConfig,
-          globalSeoMetadata: data.globalSeoMetadata,
-          isActive: data.isActive
+          siteTitle: safeData.siteTitle,
+          themeConfig: safeData.themeConfig,
+          globalSeoMetadata: safeData.globalSeoMetadata,
+          isActive: safeData.isActive,
+          whatsappEncryptedAccessToken,
         }
       })
       
@@ -269,7 +299,7 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
         data: {
           tenantId,
           configType: 'website_theme',
-          snapshot: data,
+          snapshot: safeData,
           actorId: user.id
         }
       })
@@ -323,11 +353,12 @@ export async function restoreWebsiteConfigSnapshot(tenantId: string, snapshotId:
         where: { tenantId }
       })
       const currentTheme = (currentWebsite?.themeConfig as any) || {}
+      const rawSnapshotTheme = (data.themeConfig as Record<string, unknown>) || {}
+      const { whatsappToken: _snapshotWhatsAppToken, ...snapshotTheme } = rawSnapshotTheme
       const safeThemeConfig = {
-        ...data.themeConfig,
+        ...snapshotTheme,
         whatsappPaNumber: currentTheme.whatsappPaNumber,
         whatsappPhoneId: currentTheme.whatsappPhoneId,
-        whatsappToken: currentTheme.whatsappToken,
         whatsappTemplate: currentTheme.whatsappTemplate
       }
 

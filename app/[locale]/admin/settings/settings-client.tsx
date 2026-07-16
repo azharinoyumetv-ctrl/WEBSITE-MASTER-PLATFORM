@@ -11,7 +11,19 @@ import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig
 import { getBillingInvoices } from '@/lib/actions/billing'
 import { exportTenantData, importTenantData, getAuditLogsForExport, runTenantIsolationAudit } from '@/lib/actions/backup'
 
-export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig, tenantId }: { initialWebsite: any, initialTenant: any, initialAiConfig?: any, tenantId: string }) {
+const SECRET_MASK = '••••••••'
+
+function initialThemeConfig(website: any) {
+  const theme = { ...(website?.themeConfig || {
+    colors: { primary: '#4f46e5', secondary: '#10b981' },
+    typography: { base_font: 'Inter' },
+    baseCurrency: 'IDR'
+  }) }
+  if (website?.isWhatsAppAccessTokenConfigured) theme.whatsappToken = SECRET_MASK
+  return theme
+}
+
+export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig, hasWhatsAppIntegration, tenantId }: { initialWebsite: any, initialTenant: any, initialAiConfig?: any, hasWhatsAppIntegration: boolean, tenantId: string }) {
   const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history' | 'security'>('general')
   const [logoPreview, setLogoPreview] = useState<string | null>(initialTenant?.logoUrl || null)
   const [isUploading, setIsUploading] = useState(false)
@@ -191,11 +203,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
   const [websiteData, setWebsiteData] = useState({
     siteTitle: initialWebsite?.siteTitle || 'Website',
     isActive: initialWebsite?.isActive ?? true,
-    themeConfig: initialWebsite?.themeConfig || {
-      colors: { primary: '#4f46e5', secondary: '#10b981' },
-      typography: { base_font: 'Inter' },
-      baseCurrency: 'IDR'
-    },
+    themeConfig: initialThemeConfig(initialWebsite),
     globalSeoMetadata: initialWebsite?.globalSeoMetadata || { description: '' }
   })
 
@@ -246,13 +254,14 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
 
   const isTabDirty = (tab: string) => {
     if (tab === 'general') {
-      const xenditSecretInit = initialWebsite?.isXenditSecretConfigured ? '••••••••' : ''
-      const xenditWebhookInit = initialWebsite?.isXenditWebhookTokenConfigured ? '••••••••' : ''
-      const midtransServerKeyInit = initialWebsite?.isMidtransServerKeyConfigured ? '••••••••' : ''
-      const dokuClientIdInit = initialWebsite?.isDokuClientIdConfigured ? '••••••••' : ''
-      const dokuMerchantPublicKeyInit = initialWebsite?.isDokuMerchantPublicKeyConfigured ? '••••••••' : ''
-      const dokuSnapTokenUrlInit = initialWebsite?.isDokuSnapTokenUrlConfigured ? '••••••••' : ''
-      const dokuSharedKeyInit = initialWebsite?.isDokuSharedKeyConfigured ? '••••••••' : ''
+      const xenditSecretInit = initialWebsite?.isXenditSecretConfigured ? SECRET_MASK : ''
+      const xenditWebhookInit = initialWebsite?.isXenditWebhookTokenConfigured ? SECRET_MASK : ''
+      const midtransServerKeyInit = initialWebsite?.isMidtransServerKeyConfigured ? SECRET_MASK : ''
+      const dokuClientIdInit = initialWebsite?.isDokuClientIdConfigured ? SECRET_MASK : ''
+      const dokuMerchantPublicKeyInit = initialWebsite?.isDokuMerchantPublicKeyConfigured ? SECRET_MASK : ''
+      const dokuSnapTokenUrlInit = initialWebsite?.isDokuSnapTokenUrlConfigured ? SECRET_MASK : ''
+      const dokuSharedKeyInit = initialWebsite?.isDokuSharedKeyConfigured ? SECRET_MASK : ''
+      const initialTheme = initialThemeConfig(initialWebsite)
       
       return paymentConfig.xenditEnabled !== (initialWebsite?.xenditEnabled || false) ||
         paymentConfig.xenditSecret !== xenditSecretInit ||
@@ -266,15 +275,13 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
         paymentConfig.dokuSnapTokenUrl !== dokuSnapTokenUrlInit ||
         paymentConfig.dokuSharedKey !== dokuSharedKeyInit ||
         paymentConfig.dokuPreferredChannel !== (initialWebsite?.dokuPreferredChannel || 'all') ||
-        (websiteData.themeConfig.paymentGateway || 'unset') !== (initialWebsite?.themeConfig?.paymentGateway || 'unset');
+        (websiteData.themeConfig.paymentGateway || 'unset') !== (initialTheme.paymentGateway || 'unset') ||
+        (hasWhatsAppIntegration && ['whatsappPaNumber', 'whatsappPhoneId', 'whatsappToken', 'whatsappTemplate']
+          .some(key => (websiteData.themeConfig[key] || '') !== (initialTheme[key] || '')));
     }
     if (tab === 'theme') {
       const siteTitleInit = initialWebsite?.siteTitle || 'Website'
-      const themeConfigInit = initialWebsite?.themeConfig || {
-        colors: { primary: '#4f46e5', secondary: '#10b981' },
-        typography: { base_font: 'Inter' },
-        baseCurrency: 'IDR'
-      }
+      const themeConfigInit = initialThemeConfig(initialWebsite)
       const seoInit = initialWebsite?.globalSeoMetadata || { description: '' }
       
       return websiteData.siteTitle !== siteTitleInit ||
@@ -779,9 +786,9 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                 </div>
               </div>
 
-              <div className="card p-6">
+              {hasWhatsAppIntegration && <div className="card p-6">
                 <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-slate-400" /> WhatsApp API Integration (PA Handoff)
+                  <MessageSquare className="w-4 h-4 text-slate-400" /> WhatsApp Business Integration
                 </h3>
                 <div className="space-y-4">
                   <div>
@@ -793,7 +800,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       value={websiteData.themeConfig.whatsappPaNumber || ''}
                       onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, whatsappPaNumber: e.target.value }})}
                     />
-                    <p className="text-xs text-slate-400 mt-1">Number to receive contact form submissions and AI escalations.</p>
+                    <p className="text-xs text-slate-400 mt-1">Receive approved template notifications for website leads, orders, and support escalations.</p>
                   </div>
                   <div>
                     <label className="form-label">Phone Number ID</label>
@@ -814,6 +821,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       value={websiteData.themeConfig.whatsappToken || ''}
                       onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, whatsappToken: e.target.value }})}
                     />
+                    <p className="text-xs text-slate-400 mt-1">Stored encrypted. Leave the masked value unchanged to retain the existing token.</p>
                   </div>
                   <div>
                     <label className="form-label">Template Name</label>
@@ -826,7 +834,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                     />
                   </div>
                 </div>
-              </div>
+              </div>}
             </div>
           )}
 

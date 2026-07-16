@@ -73,8 +73,10 @@ async function main() {
       permissions: {
         system: ['read', 'write'],
         catalog: ['read', 'write', 'delete'],
+        website: ['read', 'write'],
+        settings: ['read', 'write'],
         orders: ['read', 'write'],
-        payments: ['read'],
+        payments: ['read', 'write'],
         inventory: ['read', 'write'],
         pos: ['read', 'write'],
         crm: ['read', 'write'],

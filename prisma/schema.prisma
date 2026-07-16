@@ -307,6 +307,7 @@ model TenantWebsite {
   dokuSnapTokenUrl            String?   @map("doku_snap_token_url") @db.Text
   dokuSharedKey               String?   @map("doku_shared_key") @db.Text
   dokuPreferredChannel        String?   @default("all") @map("doku_preferred_channel")
+  whatsappEncryptedAccessToken String?  @map("whatsapp_encrypted_access_token") @db.Text
   createdAt                     DateTime @default(now()) @map("created_at") @db.Timestamptz
   updatedAt                     DateTime @updatedAt @map("updated_at") @db.Timestamptz
 

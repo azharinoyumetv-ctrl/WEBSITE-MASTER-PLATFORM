@@ -20,6 +20,9 @@ import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
 
 export async function toggleTenantModule(tenantId: string, moduleKey: string, isEnabled: boolean) {
   try {
+    if (moduleKey === 'whatsapp_module') {
+      return { success: false, error: 'WhatsApp Business is provisioned only through the selected project add-on.' }
+    }
     const user = await getAuthenticatedUser()
     const userId = user.id
 

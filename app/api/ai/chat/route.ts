@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { sendWhatsAppTemplate } from '@/lib/whatsapp'
+import { getTenantWhatsAppConfig, sendWhatsAppTemplate } from '@/lib/whatsapp'
 import { decrypt } from '@/lib/crypto'
 import { checkRateLimit } from '@/lib/rate-limit'
 
@@ -19,16 +19,13 @@ export async function POST(request: Request) {
     // Handoff check
     if (prompt && /(help|human|support|escalate|agent)/i.test(prompt)) {
       if (tenantId !== 'default') {
-        const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })
-        const themeConfig = website?.themeConfig as any || {}
-        const { whatsappPaNumber, whatsappPhoneId, whatsappToken, whatsappTemplate } = themeConfig
-        
-        if (whatsappPaNumber && whatsappPhoneId && whatsappToken && whatsappTemplate) {
+        const whatsAppConfig = await getTenantWhatsAppConfig(tenantId)
+        if (whatsAppConfig?.recipientNumber && whatsAppConfig.templateName) {
           await sendWhatsAppTemplate({
-            to: whatsappPaNumber,
-            templateName: whatsappTemplate,
+            to: whatsAppConfig.recipientNumber,
+            templateName: whatsAppConfig.templateName,
             parameters: ['Support Escalation', prompt.substring(0, 100)],
-            credentials: { token: whatsappToken, phoneNumberId: whatsappPhoneId }
+            credentials: whatsAppConfig,
           }).catch(console.error)
         }
       }

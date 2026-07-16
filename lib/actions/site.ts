@@ -2,7 +2,7 @@
 
 import prisma from "@/lib/prisma"
 import { Resend } from "resend"
-import { sendWhatsAppTemplate } from "@/lib/whatsapp"
+import { getTenantWhatsAppConfig, sendWhatsAppTemplate } from "@/lib/whatsapp"
 import crypto from 'crypto'
 import { headers } from 'next/headers'
 import { z } from 'zod'
@@ -151,21 +151,13 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
     }
 
     // 5. Trigger WhatsApp PA Alert (if configured)
-    const website = await prisma.tenantWebsite.findUnique({
-      where: { tenantId: resolvedTenantId }
-    })
-    const themeConfig = website?.themeConfig as any || {}
-    const { whatsappPaNumber, whatsappPhoneId, whatsappToken, whatsappTemplate } = themeConfig
-
-    if (whatsappPaNumber && whatsappPhoneId && whatsappToken && whatsappTemplate) {
+    const whatsAppConfig = await getTenantWhatsAppConfig(resolvedTenantId)
+    if (whatsAppConfig?.recipientNumber && whatsAppConfig.templateName) {
       await sendWhatsAppTemplate({
-        to: whatsappPaNumber,
-        templateName: whatsappTemplate,
+        to: whatsAppConfig.recipientNumber,
+        templateName: whatsAppConfig.templateName,
         parameters: [data.name, data.email],
-        credentials: {
-          token: whatsappToken,
-          phoneNumberId: whatsappPhoneId
-        }
+        credentials: whatsAppConfig,
       })
     }
 

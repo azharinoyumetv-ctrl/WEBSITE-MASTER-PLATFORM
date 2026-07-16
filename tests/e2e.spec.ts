@@ -345,4 +345,20 @@ test.describe('Website Master Platform E2E Audit', () => {
     await expect(page.locator('h5:has-text("Xendit") + label input[type="checkbox"]')).toBeChecked();
     await expect(page.locator('h5:has-text("Midtrans") + label input[type="checkbox"]')).toBeChecked();
   });
+
+  test('20. WhatsApp Is an Optional Project Add-on', async ({ page }) => {
+    await page.goto('/auth/login');
+    await page.fill('#email', 'admin@dagangos.com');
+    await page.fill('#password', 'password123');
+    await page.click('#login-submit');
+    await page.waitForURL('**/admin/dashboard');
+
+    await page.goto('/admin/settings');
+    await expect(page.getByText('WhatsApp Business Integration')).toHaveCount(0);
+
+    await page.goto('/admin/modules');
+    const whatsappModule = page.locator('.card').filter({ hasText: 'WhatsApp Business' });
+    await expect(whatsappModule).toContainText('Project add-on');
+    await expect(whatsappModule.getByRole('button')).toHaveCount(0);
+  });
 });
