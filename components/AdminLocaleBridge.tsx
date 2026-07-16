@@ -52,16 +52,45 @@ export function AdminLocaleBridge() {
 
   useEffect(() => {
     if (locale !== 'id') return
-    translate(document.body)
-    const observer = new MutationObserver((records) => records.forEach((record) => {
-      if (record.type === 'characterData') translateText(record.target as Text)
-      record.addedNodes.forEach((node) => {
-        if (node.nodeType === Node.ELEMENT_NODE) translate(node as Element)
-        if (node.nodeType === Node.TEXT_NODE) translateText(node as Text)
+    const main = document.getElementById('main-content')
+    if (!main) return
+
+    // Observing the whole document and translating synchronously for every
+    // mutation competes with React hydration. Batch only newly inserted admin
+    // content; text-node mutations are intentionally ignored to avoid reacting
+    // to our own translation writes.
+    translate(main)
+    const pendingRoots = new Set<Element>()
+    let frameId: number | null = null
+
+    const flush = () => {
+      frameId = null
+      const roots = Array.from(pendingRoots)
+      pendingRoots.clear()
+      roots.forEach((root) => {
+        const isNestedInQueuedRoot = roots.some((candidate) => candidate !== root && candidate.contains(root))
+        if (!isNestedInQueuedRoot && root.isConnected) translate(root)
       })
-    }))
-    observer.observe(document.body, { childList: true, subtree: true, characterData: true })
-    return () => observer.disconnect()
+    }
+
+    const observer = new MutationObserver((records) => {
+      records.forEach((record) => {
+        record.addedNodes.forEach((node) => {
+          if (node.nodeType === Node.ELEMENT_NODE) pendingRoots.add(node as Element)
+          if (node.nodeType === Node.TEXT_NODE && node.parentElement) pendingRoots.add(node.parentElement)
+        })
+      })
+
+      if (pendingRoots.size > 0 && frameId === null) {
+        frameId = window.requestAnimationFrame(flush)
+      }
+    })
+
+    observer.observe(main, { childList: true, subtree: true })
+    return () => {
+      observer.disconnect()
+      if (frameId !== null) window.cancelAnimationFrame(frameId)
+    }
   }, [locale])
 
   return null
