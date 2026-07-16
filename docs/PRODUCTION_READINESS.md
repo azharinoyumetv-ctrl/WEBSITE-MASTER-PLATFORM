@@ -4,9 +4,9 @@ This is a deliberately small, versioned list of remaining production work. It re
 
 ## Open
 
-- [ ] **Control-plane API activation** — configure `CONTROL_PLANE_SECRET` on the DagangOS VPS, then verify an authenticated production request. The routes intentionally remain disabled until that shared secret exists.
-- [ ] **Workspace invitation email delivery** — configure and test the DagangOS SMTP gateway. Invitations are otherwise fully usable through the secure copy-link fallback.
-- [ ] **Storefront payments** — configure and verify one production payment gateway (DOKU, Xendit, or Midtrans) in the DagangOS tenant settings. Project Setup is live, but no gateway credentials are stored for the new company tenant yet.
+- [ ] **Control-plane API activation** — configure `CONTROL_PLANE_SECRET` on the DagangOS VPS, then verify an authenticated production request. The routes intentionally remain disabled until that shared secret exists. Verified absent on 2026-07-16.
+- [ ] **Workspace invitation email delivery** — configure and test the DagangOS SMTP gateway. Invitations are otherwise fully usable through the secure copy-link fallback. Verified absent for the DagangOS company tenant on 2026-07-16.
+- [ ] **Storefront payments** — configure and verify one production payment gateway (DOKU, Xendit, or Midtrans) in the DagangOS tenant settings. Project Setup is live, but no gateway credentials are stored for the company tenant yet. Verified absent on 2026-07-16.
 
 ## Completed
 

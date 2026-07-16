@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 import { decrypt } from '@/lib/crypto'
 import crypto from 'crypto'
 import { sendOrderConfirmationEmail } from './notifications'
@@ -265,13 +266,7 @@ export async function createDokuCheckout(
     if (!tenant) throw new Error("Tenant not found");
 
     let host = returnBaseUrl || '';
-    if (!host && tenant.customDomain) {
-      host = `https://${tenant.customDomain}`;
-    } else if (!host) {
-      const subdomain = tenant.subdomain;
-      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com';
-      host = `https://${subdomain}.${baseDomain}`;
-    }
+    if (!host) host = getTenantPublicUrl(tenant)
     
     // Jokul Checkout API URL
     const baseUrl = auth.environment === 'production'

@@ -6,6 +6,7 @@ import crypto from 'crypto'
 import prisma from "@/lib/prisma"
 import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
 import { dispatchNotification, getActiveGatewayWithRouting } from '@/lib/actions/notifications'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 
 
 
@@ -79,7 +80,7 @@ export async function inviteUser(tenantId: string, email: string, roleId: string
     }
 
     const [tenant, role] = await Promise.all([
-      prisma.systemTenant.findUnique({ where: { id: tenantId }, select: { companyName: true, subdomain: true } }),
+      prisma.systemTenant.findUnique({ where: { id: tenantId }, select: { companyName: true, subdomain: true, customDomain: true } }),
       prisma.role.findFirst({ where: { id: roleId, tenantId }, select: { id: true } })
     ])
     if (!tenant || !role) throw new Error('Workspace or assigned role was not found')
@@ -114,7 +115,7 @@ export async function inviteUser(tenantId: string, email: string, roleId: string
     if (emailGateway) {
       const notification = await dispatchNotification(tenantId, normalizedEmail, 'email', 'workspace_invitation', {
         company_name: tenant.companyName,
-        workspace_url: `https://${tenant.subdomain}.store.dagangos.com`,
+        workspace_url: getTenantPublicUrl(tenant),
         access_url: accessUrl,
         expires_at: expiresAt.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' })
       })

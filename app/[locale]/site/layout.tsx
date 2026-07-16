@@ -3,6 +3,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { DagangOSBrand } from '@/components/DagangOSBrand'
 import { COMPANY } from '@/lib/company'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 import { headers } from 'next/headers'
 import { getPublicWebsiteConfig } from '@/lib/actions/website'
 import { getTranslations } from 'next-intl/server'
@@ -94,7 +95,7 @@ export default async function SiteLayout({
             "@context": "https://schema.org",
             "@type": "Organization",
             "name": isCompanyStorefront ? COMPANY.legalName : tenant.companyName,
-            "url": `https://${website.domain || tenant.subdomain + '.' + (process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com')}`,
+            "url": website.domain || getTenantPublicUrl(tenant),
             "logo": logoUrl || (isCompanyStorefront ? '/dagangos-web-wordmark-cropped.png' : ''),
             "description": website.globalSeoMetadata?.description || ''
           })
