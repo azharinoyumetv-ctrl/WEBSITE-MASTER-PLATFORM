@@ -23,6 +23,8 @@ export async function generateMetadata({ params }: { params: { slug?: string[] }
     products: 'Products',
     shop: 'Shop',
     catalog: 'Catalog',
+    terms: 'Terms of Service',
+    privacy: 'Privacy Policy',
   }
   
   if (!tenantId) return { title: pageLabels[slug] || 'Page' }
@@ -43,7 +45,7 @@ export async function generateMetadata({ params }: { params: { slug?: string[] }
   }
 
   if (!pageRes.success || !pageRes.page) {
-    if (!['shop', 'products', 'about', 'contact', 'support'].includes(slug)) {
+    if (!['shop', 'products', 'about', 'contact', 'support', 'terms', 'privacy'].includes(slug)) {
       notFound()
     }
     return { title: `${pageLabels[slug] || 'Page'} | ${siteTitle}` }

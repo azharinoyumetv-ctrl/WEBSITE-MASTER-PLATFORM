@@ -1,62 +1,48 @@
 # Terms of Service
 
-**Last Updated:** July 2026  
-**Company:** DagangOS Digital Indonesia
+**Effective date: 16 July 2026**
 
----
+These Terms of Service govern the DagangOS Web website and services operated by **DagangOS Digital Indonesia** ("DagangOS", "we", "us", or "our"). By requesting a proposal, placing an order, or using our services, you agree to these terms.
 
-## 1. Introduction
+## 1. Services and project scope
 
-Welcome to DagangOS Digital Indonesia ("DagangOS", "we", "our", or "us"). These Terms of Service ("Terms") govern your access to and use of our website development, custom software, POS systems, AI modules, automation services, and related products (collectively, the "Services"). By engaging our Services, you ("Client", "you") agree to be bound by these Terms.
+Each accepted proposal, order, or statement of work defines the agreed deliverables, timeline, fees, and support scope. Requests outside that agreed scope are changes and may require a separate written agreement, schedule, and fee.
 
-## 2. Definitions
+## 2. Your responsibilities
 
-- **"Client Infrastructure"**: The domain names, Virtual Private Servers (VPS), databases, and third-party accounts owned and maintained by the Client.
-- **"Platform"**: The DagangOS modular framework and reusable software architecture used to deliver the Services.
-- **"Deliverables"**: The final compiled code, configurations, and assets delivered to the Client's Infrastructure.
+You must provide accurate information and have the rights, permissions, and licences needed for the content, accounts, domains, data, and materials you provide. Where you control a VPS, domain, payment gateway, AI provider, or other third-party account, you are responsible for its credentials, fees, policies, and lawful use.
 
-## 3. Services Provided
+## 3. Fees and payment
 
-DagangOS provides modular digital commerce solutions. The exact scope of Services, including timelines and specific deliverables, will be detailed in the respective SOW or chosen subscription package.
-- **Website Development**: Deployment of our modular CMS and storefront templates.
-- **Software Development**: Custom software modules developed specifically for the Client.
-- **POS System**: Point of Sale software module (hardware is not provided unless explicitly stated).
-- **AI Services**: Features utilizing artificial intelligence. Outputs are provided "as is" and must be reviewed by the Client before use.
+Amounts, payment milestones, taxes, currency, and any refund terms are stated in the applicable proposal or invoice. We may pause work after reasonable notice if an undisputed payment remains overdue. A one-time implementation fee does not include third-party recurring costs or optional maintenance services unless the proposal expressly says so.
 
-## 4. Hosting & Deployment
+## 4. Data, infrastructure, and software rights
 
-> **Client-Owned Infrastructure Model:**
-> DagangOS deploys the Deliverables to the Client Infrastructure. **The Client strictly owns and is responsible for** domain registration, VPS fees, Database fees, Payment gateway accounts, and all third-party subscription fees. DagangOS is not liable for service outages caused by the Client's hosting provider, domain expiry, or unpaid infrastructure bills.
+You own the business data, domain, and infrastructure that you control. After full payment, DagangOS grants you a perpetual, transferable licence to use the deployed platform as set out in the accepted proposal. DagangOS retains ownership of its reusable source code, templates, methods, and intellectual property unless a separate written source-code or IP transfer agreement is purchased.
 
-## 5. Payments & Taxes
+## 5. Third-party and bring-your-own-key services
 
-- **Project Deposit**: A non-refundable deposit (typically 50%) is required before work commences.
-- **Milestone Payments**: Billed as project phases are completed and approved.
-- **Final Payment**: Due in full prior to production deployment.
-- **Late Payments**: Payments delayed beyond 14 days incur a 5% monthly late fee. Services may be suspended until accounts are settled.
-- **Taxes**: All fees are exclusive of applicable taxes (e.g., VAT, GST) unless otherwise specified.
+Integrations with payment providers, hosting, messaging providers, or AI services depend on those providers. You remain responsible for their terms, costs, API keys, account security, and availability. DagangOS is not responsible for a third party changing, restricting, or discontinuing its service.
 
-## 6. Intellectual Property & Ownership
+## 6. Availability and security
 
-- **Platform License**: The Client receives a perpetual, non-exclusive, non-transferable license to use the deployed Platform for their own business operations.
-- **Core Framework**: DagangOS Digital Indonesia retains full ownership of the reusable framework and core modules. The Client does *not* receive ownership of the base source code unless a "Full Source Code Buyout" is explicitly purchased.
-- **Client Data**: The Client retains full ownership of all their business data, customer data, and uploaded content.
+We use reasonable measures to deliver services securely and reliably. However, no online service is uninterrupted or risk-free. Unless a written support agreement states otherwise, you are responsible for maintaining suitable backups and access to systems you control.
 
-## 7. Delivery & Acceptance
+## 7. Confidentiality
 
-Upon delivery of the Services to a staging environment, the Client has 7 days to review and report defects. If no defects are reported, the Services are deemed accepted, triggering final billing and production deployment.
+Each party will protect the other party's non-public business information using reasonable care and use it only to perform the agreed services, except where disclosure is required by law.
 
-## 8. Warranty & Liability
+## 8. Limitation of liability
 
-THE SERVICES ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND. IN NO EVENT SHALL DAGANGOS DIGITAL INDONESIA BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOSS OF PROFITS, DATA, OR BUSINESS INTERRUPTION, ARISING OUT OF OR IN CONNECTION WITH THE SERVICES OR INFRASTRUCTURE FAILURES.
+To the maximum extent permitted by applicable law, DagangOS is not liable for indirect, incidental, special, consequential, or lost-profit damages arising from the services, third-party systems, or your use of them.
 
-## 9. Termination
+## 9. Suspension and termination
 
-Either party may terminate the agreement with 30 days written notice. Upon termination, the Client retains their license to use the deployed software (provided all fees are paid), but DagangOS will cease all maintenance and support activities.
+Either party may end an engagement according to the accepted proposal. We may suspend access or work where necessary to protect security, comply with law, or address a material breach or overdue undisputed payment. Provisions on payment, confidentiality, ownership, and liability continue after termination.
 
-## 10. Contact Information
+## 10. Changes and contact
 
-For legal inquiries, please contact:  
+We may update these terms for future use of the website or services. Material project terms remain governed by the proposal accepted for that project. Questions about these terms can be sent to **contact@dagangos.com**.
+
 **DagangOS Digital Indonesia**
-Email: legal@dagangos.com  
-Address: Subang, Jawa Barat, Indonesia
+Subang, Jawa Barat, Indonesia

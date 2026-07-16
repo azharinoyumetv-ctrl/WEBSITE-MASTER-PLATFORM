@@ -564,6 +564,16 @@
   to { background-position: 64px 64px, 64px 64px; }
 }
 
+@keyframes dagangos-shimmer {
+  0%, 60%, 100% { transform: translateX(-130%); }
+  78% { transform: translateX(130%); }
+}
+
+@keyframes dagangos-bar-pulse {
+  0%, 100% { transform: scaleY(0.72); opacity: 0.66; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+
 .dagangos-aurora {
   background:
     radial-gradient(circle at 12% 20%, rgba(20, 184, 166, 0.28), transparent 31%),
@@ -596,12 +606,47 @@
   animation: dagangos-float 5.8s ease-in-out -2.5s infinite;
 }
 
+.dagangos-play-card {
+  transition: transform 280ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.dagangos-play-card:hover {
+  transform: translateY(-0.35rem) rotate(-0.15deg);
+  box-shadow: 0 22px 48px rgba(15, 23, 42, 0.16);
+}
+
+.dagangos-shimmer {
+  isolation: isolate;
+}
+
+.dagangos-shimmer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  transform: translateX(-130%);
+  background: linear-gradient(105deg, transparent 35%, rgba(255, 255, 255, 0.18) 50%, transparent 65%);
+  animation: dagangos-shimmer 6s ease-in-out infinite;
+}
+
+.dagangos-spark-bar {
+  transform-origin: bottom;
+  animation: dagangos-bar-pulse 2.8s ease-in-out infinite;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .dagangos-grid,
   .dagangos-orb,
   .dagangos-orb-delayed,
   .dagangos-float,
-  .dagangos-float-delayed {
+  .dagangos-float-delayed,
+  .dagangos-shimmer::after,
+  .dagangos-spark-bar {
     animation: none;
+  }
+
+  .dagangos-play-card:hover {
+    transform: none;
   }
 }

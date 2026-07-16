@@ -73,11 +73,11 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             <div className="mt-9 flex flex-wrap gap-3">
               <a
                 href="/shop"
-                className="group inline-flex items-center gap-2 px-6 py-3.5 text-slate-950 font-bold rounded-xl bg-white shadow-[0_16px_45px_rgba(15,23,42,.35)] transition-transform hover:-translate-y-1 text-sm"
+                className="dagangos-play-card group inline-flex items-center gap-2 px-6 py-3.5 text-slate-950 font-bold rounded-xl bg-white shadow-[0_16px_45px_rgba(15,23,42,.35)] transition-transform hover:-translate-y-1 text-sm"
               >
                 {t('explore_packages')} <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </a>
-              <a href={projectSetupHref} className="inline-flex items-center gap-2 px-6 py-3.5 bg-white/10 hover:bg-white/15 text-white font-bold rounded-xl border border-white/15 backdrop-blur transition-all hover:-translate-y-1 text-sm">
+              <a href={projectSetupHref} className="dagangos-play-card inline-flex items-center gap-2 px-6 py-3.5 bg-white/10 hover:bg-white/15 text-white font-bold rounded-xl border border-white/15 backdrop-blur transition-all hover:-translate-y-1 text-sm">
                 <Calculator className="w-4 h-4" /> {t('contact_sales')}
               </a>
             </div>
@@ -89,7 +89,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
 
           <div className="relative mx-auto w-full max-w-md lg:max-w-none dagangos-float">
             <div className="absolute -inset-5 rounded-[2rem] bg-gradient-to-br from-emerald-300/30 via-sky-400/20 to-indigo-500/20 blur-2xl" />
-            <div className="relative rounded-[1.75rem] border border-white/15 bg-slate-950/70 p-4 shadow-2xl backdrop-blur-xl">
+            <div className="dagangos-shimmer relative rounded-[1.75rem] border border-white/15 bg-slate-950/70 p-4 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-rose-400" /><span className="h-2.5 w-2.5 rounded-full bg-amber-300" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /></div>
                 <span className="text-xs font-medium text-slate-400">DagangOS command centre</span>
@@ -98,7 +98,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                 <div className="col-span-2 rounded-2xl border border-white/10 bg-white/[.06] p-5">
                   <div className="flex items-center justify-between"><span className="text-sm text-slate-400">Your modular stack</span><Sparkles className="w-4 h-4 text-emerald-300" /></div>
                   <div className="mt-5 flex items-end gap-2 h-20">
-                    {[38, 58, 47, 76, 66, 92, 82].map((height, index) => <span key={index} className="flex-1 rounded-t-full bg-gradient-to-t from-emerald-500 to-sky-400 opacity-90" style={{ height: `${height}%` }} />)}
+                    {[38, 58, 47, 76, 66, 92, 82].map((height, index) => <span key={index} className="dagangos-spark-bar flex-1 rounded-t-full bg-gradient-to-t from-emerald-500 to-sky-400 opacity-90" style={{ height: `${height}%`, animationDelay: `${index * 150}ms` }} />)}
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p className="text-2xl font-black">15+</p><p className="mt-1 text-xs text-slate-400">Modules ready</p></div>
@@ -133,7 +133,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                     style={selectedPackage === key 
                       ? { borderColor: primaryColor, backgroundColor: `${primaryColor}08` } 
                       : {}}
-                    className={`group relative overflow-hidden p-4 rounded-2xl text-left border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
+                    className={`dagangos-play-card group relative overflow-hidden p-4 rounded-2xl text-left border transition-all duration-200 hover:-translate-y-1 hover:shadow-lg ${
                       selectedPackage === key 
                         ? 'text-slate-900 shadow-md'
                         : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
@@ -161,7 +161,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                     style={enabledAddons.includes(addon.key) 
                       ? { borderColor: primaryColor, boxShadow: `0 0 0 1px ${primaryColor}` } 
                       : {}}
-                    className={`flex items-center justify-between p-4 bg-white border rounded-2xl cursor-pointer hover:bg-slate-50 hover:shadow-md transition-all ${
+                    className={`dagangos-play-card flex items-center justify-between p-4 bg-white border rounded-2xl cursor-pointer hover:bg-slate-50 hover:shadow-md transition-all ${
                       enabledAddons.includes(addon.key) ? '' : 'border-slate-200'
                     }`}
                   >
@@ -186,7 +186,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
           </div>
 
           {/* Pricing Ledger Card */}
-          <div className="lg:col-span-5 relative overflow-hidden bg-white border border-slate-200 p-6 rounded-3xl shadow-[0_20px_60px_rgba(15,23,42,.12)] sticky top-24">
+          <div className="dagangos-play-card dagangos-shimmer lg:col-span-5 relative overflow-hidden bg-white border border-slate-200 p-6 rounded-3xl shadow-[0_20px_60px_rgba(15,23,42,.12)] sticky top-24">
             <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500" />
             <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
               <Calculator className="w-5 h-5" style={{ color: primaryColor }} />
@@ -256,7 +256,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
           <p className="text-lg opacity-80 mb-8 max-w-xl mx-auto">
             {t('cta_subtitle')}
           </p>
-          <a href="/shop" className="group inline-flex items-center gap-2 px-8 py-3.5 bg-white text-slate-950 font-bold rounded-xl shadow-xl transition-transform hover:-translate-y-1">
+          <a href="/shop" className="dagangos-play-card group inline-flex items-center gap-2 px-8 py-3.5 bg-white text-slate-950 font-bold rounded-xl shadow-xl transition-transform hover:-translate-y-1">
             {t('choose_price_plan')}
             <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
           </a>

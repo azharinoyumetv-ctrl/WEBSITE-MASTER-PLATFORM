@@ -16,19 +16,19 @@ type DagangOSBrandProps = {
  */
 export function DagangOSBrand({ className, compact = false, dark = false, showName = true }: DagangOSBrandProps) {
   return (
-    <div className={cn('flex min-w-0 flex-col items-start leading-none', className)} aria-label={COMPANY.legalName}>
+    <div className={cn('flex min-w-0 flex-col items-center leading-none', className)} aria-label={COMPANY.legalName}>
       <div className={cn('relative shrink-0 overflow-hidden', compact ? 'h-9 w-40' : 'h-12 w-[12.75rem]')}>
         <Image
           src="/dagangos-web-wordmark.png"
           alt="DagangOS Web"
           fill
           sizes={compact ? '160px' : '204px'}
-          className={cn('object-cover', dark && 'brightness-[1.65] saturate-125 drop-shadow-[0_1px_1px_rgba(255,255,255,0.22)]')}
+          className={cn('object-cover', dark && 'brightness-[2.1] saturate-125 drop-shadow-[0_0_8px_rgba(96,165,250,0.34)]')}
           priority
         />
       </div>
       {showName && (
-        <p className={cn('mt-0.5 whitespace-nowrap font-semibold tracking-[0.1em]', compact ? 'text-[7px]' : 'text-[10px]', dark ? 'text-slate-300' : 'text-slate-600')}>
+        <p className={cn('mt-0.5 w-full whitespace-nowrap text-center font-semibold tracking-[0.1em]', compact ? 'text-[7px]' : 'text-[10px]', dark ? 'text-slate-300' : 'text-slate-600')}>
           {COMPANY.legalName}
         </p>
       )}
