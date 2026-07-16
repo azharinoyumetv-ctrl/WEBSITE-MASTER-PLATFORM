@@ -9,6 +9,8 @@ This is a deliberately small, versioned list of remaining production work. It re
 
 ## Completed
 
+- [x] **Integration credential handling** - SMTP credentials, payment credentials, and webhook signing secrets are masked in dashboard reads. New webhook secrets are presented once at creation, stored encrypted, and used for per-endpoint signatures.
+
 - [x] **First platform owner** — the DagangOS owner account is active with `platform_owner` and `super-admin` access; its bcrypt credential and the live sign-in flow were verified.
 - [x] Public storefront bootstrap creates the DagangOS company tenant, active website configuration, and production module records without sample data.
 - [x] Storefront analytics records persistent anonymous page-view sessions and dashboard analytics derives from recorded events and paid orders.
