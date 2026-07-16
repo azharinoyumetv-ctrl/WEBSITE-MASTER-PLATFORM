@@ -12,6 +12,7 @@ import toast from 'react-hot-toast'
 import { createTenant } from '@/lib/actions/tenant'
 import { useLocale } from 'next-intl'
 import { addonsList, packages } from '@/lib/constants/packages'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 
 const PLAN_CONFIG = {
   core: { label: 'Core', icon: Zap, color: 'text-slate-600', bg: 'bg-slate-100' },
@@ -180,7 +181,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900">{tenant.companyName}</p>
-                          <p className="text-xs text-slate-400 font-mono">{tenant.subdomain}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'}</p>
+                          <p className="text-xs text-slate-400 font-mono">{getTenantPublicUrl(tenant).replace(/^https:\/\//, '')}</p>
                         </div>
                       </div>
                     </td>

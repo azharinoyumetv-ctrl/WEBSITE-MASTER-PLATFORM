@@ -10,6 +10,7 @@ import toast from 'react-hot-toast'
 import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig, getWebsiteConfigSnapshots, restoreWebsiteConfigSnapshot, createTempAiSecretToken } from '@/lib/actions/website'
 import { getBillingInvoices } from '@/lib/actions/billing'
 import { exportTenantData, importTenantData, getAuditLogsForExport, runTenantIsolationAudit } from '@/lib/actions/backup'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 
 const SECRET_MASK = '••••••••'
 
@@ -27,6 +28,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
   const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history' | 'security'>('general')
   const [logoPreview, setLogoPreview] = useState<string | null>(initialTenant?.logoUrl || null)
   const [isUploading, setIsUploading] = useState(false)
+  const publicTenantDomain = initialTenant ? getTenantPublicUrl(initialTenant).replace(/^https:\/\//, '') : ''
   const [snapshots, setSnapshots] = useState<any[]>([])
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false)
   const [diffSnapshot, setDiffSnapshot] = useState<any>(null)
@@ -490,10 +492,14 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                 <div className="space-y-4">
                   <div>
                     <label className="form-label">Platform Subdomain</label>
-                    <div className="flex">
-                      <input type="text" className="form-input rounded-r-none border-r-0 bg-slate-50 text-slate-500 font-mono" defaultValue={initialTenant?.subdomain || ''} disabled />
-                      <div className="px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-r-lg text-sm text-slate-500 font-mono">.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'}</div>
-                    </div>
+                    {initialTenant?.subdomain === 'default' ? (
+                      <input type="text" className="form-input bg-slate-50 text-slate-500 font-mono" value={publicTenantDomain} readOnly />
+                    ) : (
+                      <div className="flex">
+                        <input type="text" className="form-input rounded-r-none border-r-0 bg-slate-50 text-slate-500 font-mono" defaultValue={initialTenant?.subdomain || ''} disabled />
+                        <div className="px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-r-lg text-sm text-slate-500 font-mono">.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'}</div>
+                      </div>
+                    )}
                     <p className="text-xs text-slate-400 mt-1">Contact support to change your base subdomain.</p>
                   </div>
                   <div className="divider text-xs text-slate-400">OR</div>

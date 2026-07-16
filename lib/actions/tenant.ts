@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import prisma from "@/lib/prisma"
 import { requireSuperAdmin } from "@/lib/rbac"
 import { dispatchNotification } from '@/lib/actions/notifications'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { addonModuleMap, addonsList } from '@/lib/constants/packages'
@@ -248,8 +249,7 @@ export async function createTenant(data: { companyName: string, subdomain: strin
       prisma.tenantUserProfile.create({ data: { tenantId: tenant.id, userId: owner.id, preferences: { locale: 'id', timezone: 'Asia/Jakarta' } } }),
     ])
 
-    const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'
-    const workspaceUrl = `https://${subdomain}.${baseDomain}`
+    const workspaceUrl = getTenantPublicUrl({ subdomain })
     const accessUrl = `${workspaceUrl}/auth/reset-password?token=${invitationToken}`
     const notification = await dispatchNotification(user.tenantId, adminEmail, 'email', 'workspace_invitation', {
       company_name: companyName,
