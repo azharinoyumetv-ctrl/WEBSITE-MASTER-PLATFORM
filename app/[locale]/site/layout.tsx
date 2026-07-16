@@ -1,4 +1,3 @@
-import '@/app/globals.css'
 import { generateThemeCssVars } from '@/lib/utils'
 import Link from 'next/link'
 import Image from 'next/image'

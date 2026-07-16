@@ -193,7 +193,7 @@ test.describe('Website Master Platform E2E Audit', () => {
     await expect(page.locator('.card').first()).toContainText('e2e-contact@gmail.com');
   });
 
-  test('12. AI Assistant Playground', async ({ page }) => {
+  test('12. AI Assistant Configuration State', async ({ page }) => {
     await page.goto('/auth/login');
     await page.fill('#email', 'admin@dagangos.com');
     await page.fill('#password', 'password123');
@@ -203,12 +203,9 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.goto('/admin/ai');
     await expect(page.locator('h1')).toContainText(/AI Assistant/i);
 
-    // Test sending chat message
-    await page.fill('input[placeholder="Ask the AI anything about your platform..."]', 'Hello AI');
-    await page.click('#ai-send-btn');
-
-    // Verify simulator responds with API missing error since it's no longer mocking
-    await expect(page.locator('.page-container')).toContainText(/AI Not Configured|unable to assist/i);
+    // AI must not fabricate a response when the tenant has no configured provider.
+    await expect(page.getByRole('heading', { name: 'AI Provider Unconfigured' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Configure AI' })).toHaveAttribute('href', '/admin/settings?tab=ai');
   });
 
   test('13. API Portal & Key Generation', async ({ page }) => {
@@ -221,11 +218,13 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.goto('/admin/api-portal');
     await expect(page.locator('h1')).toContainText(/API Portal/i);
 
-    await page.click('text=Generate Key');
-    await page.waitForTimeout(1000);
-
-    // Verify key in first card (API Keys card)
-    await expect(page.locator('.card').first()).toContainText('New API Key 1');
+    await page.getByRole('button', { name: 'Generate Key' }).click();
+    const keyModal = page.locator('.fixed.inset-0').filter({ hasText: 'Generate API Key' });
+    await keyModal.getByPlaceholder('e.g. Production Client').fill('E2E API Key');
+    await keyModal.getByRole('button', { name: 'Generate', exact: true }).click();
+    await expect(page.getByText('Key Generated Successfully')).toBeVisible();
+    await page.getByRole('button', { name: 'Close & I have copied it' }).click();
+    await expect(page.locator('.card').first()).toContainText('E2E API Key');
   });
 
   test('14. Feature Flags & Overrides', async ({ page }) => {
@@ -236,7 +235,7 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.waitForURL('**/admin/dashboard');
 
     await page.goto('/admin/feature-flags');
-    await expect(page.locator('h1')).toContainText(/Feature Flags/i);
+    await expect(page.getByRole('heading', { name: 'Feature Flags', exact: true })).toBeVisible();
 
     const flagRow = page.locator('table tbody tr').first();
     const toggleButton = flagRow.locator('button');

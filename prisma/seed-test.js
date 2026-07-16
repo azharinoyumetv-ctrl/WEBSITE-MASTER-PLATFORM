@@ -84,8 +84,9 @@ async function main() {
   })
 
   // 6. Map User to Role
-  await prisma.userRole.create({
+  await prisma.tenantUserRole.create({
     data: {
+      tenantId: tenant.id,
       userId: adminUser.id,
       roleId: adminRole.id
     }
