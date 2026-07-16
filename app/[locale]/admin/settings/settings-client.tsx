@@ -631,7 +631,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                             </div>
                             
                             <div className="relative group/field">
-                              <label className="form-label text-xs font-semibold text-slate-700">DOKU Client ID (Public Key)</label>
+                              <label className="form-label text-xs font-semibold text-slate-700">DOKU Client ID</label>
                               <input 
                                 type={hoveredField === 'dokuClientId' ? 'text' : 'password'}
                                 className="form-input text-sm pr-10" 
@@ -644,43 +644,48 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                             </div>
                             
                             <div className="relative group/field">
-                              <label className="form-label text-xs font-semibold text-slate-700">Merchant Public Key</label>
-                              <input 
-                                type={hoveredField === 'dokuMerchantPublicKey' ? 'text' : 'password'}
-                                className="form-input text-sm pr-10" 
-                                placeholder="MC-PUB-..."
-                                value={paymentConfig.dokuMerchantPublicKey}
-                                onChange={(e) => setPaymentConfig({...paymentConfig, dokuMerchantPublicKey: e.target.value})}
-                                onMouseEnter={() => setHoveredField('dokuMerchantPublicKey')}
-                                onMouseLeave={() => setHoveredField(null)}
-                              />
-                            </div>
-                            
-                            <div className="relative group/field">
-                              <label className="form-label text-xs font-semibold text-slate-700">SNAP Token URL</label>
-                              <input 
-                                type={hoveredField === 'dokuSnapTokenUrl' ? 'text' : 'password'}
-                                className="form-input text-sm pr-10" 
-                                placeholder="e.g. https://..."
-                                value={paymentConfig.dokuSnapTokenUrl}
-                                onChange={(e) => setPaymentConfig({...paymentConfig, dokuSnapTokenUrl: e.target.value})}
-                                onMouseEnter={() => setHoveredField('dokuSnapTokenUrl')}
-                                onMouseLeave={() => setHoveredField(null)}
-                              />
-                            </div>
-                            
-                            <div className="relative group/field">
-                              <label className="form-label text-xs font-semibold text-slate-700">Shared Key (Secret Key)</label>
+                              <label className="form-label text-xs font-semibold text-slate-700">DOKU Secret Key</label>
                               <input 
                                 type={hoveredField === 'dokuSharedKey' ? 'text' : 'password'}
                                 className="form-input text-sm pr-10" 
-                                placeholder="Shared Key from DOKU Dashboard"
+                                placeholder="Secret Key from DOKU Dashboard"
                                 value={paymentConfig.dokuSharedKey}
                                 onChange={(e) => setPaymentConfig({...paymentConfig, dokuSharedKey: e.target.value})}
                                 onMouseEnter={() => setHoveredField('dokuSharedKey')}
                                 onMouseLeave={() => setHoveredField(null)}
                               />
                             </div>
+
+                            <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                              <summary className="cursor-pointer font-medium text-slate-700">Advanced SNAP settings (optional)</summary>
+                              <p className="mt-2 leading-5">Only configure these for a DOKU SNAP/DIPC flow. They are not needed for DOKU Checkout.</p>
+                              <div className="mt-3 space-y-3">
+                                <div className="relative group/field">
+                                  <label className="form-label text-xs font-semibold text-slate-700">Merchant Public Key</label>
+                                  <input
+                                    type={hoveredField === 'dokuMerchantPublicKey' ? 'text' : 'password'}
+                                    className="form-input text-sm pr-10"
+                                    placeholder="Merchant public key"
+                                    value={paymentConfig.dokuMerchantPublicKey}
+                                    onChange={(e) => setPaymentConfig({...paymentConfig, dokuMerchantPublicKey: e.target.value})}
+                                    onMouseEnter={() => setHoveredField('dokuMerchantPublicKey')}
+                                    onMouseLeave={() => setHoveredField(null)}
+                                  />
+                                </div>
+                                <div className="relative group/field">
+                                  <label className="form-label text-xs font-semibold text-slate-700">SNAP Token URL</label>
+                                  <input
+                                    type={hoveredField === 'dokuSnapTokenUrl' ? 'text' : 'password'}
+                                    className="form-input text-sm pr-10"
+                                    placeholder="https://..."
+                                    value={paymentConfig.dokuSnapTokenUrl}
+                                    onChange={(e) => setPaymentConfig({...paymentConfig, dokuSnapTokenUrl: e.target.value})}
+                                    onMouseEnter={() => setHoveredField('dokuSnapTokenUrl')}
+                                    onMouseLeave={() => setHoveredField(null)}
+                                  />
+                                </div>
+                              </div>
+                            </details>
                             
                             <div>
                               <label className="form-label text-xs font-semibold text-slate-700">Active Channels</label>

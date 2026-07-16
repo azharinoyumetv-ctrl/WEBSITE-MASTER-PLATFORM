@@ -499,14 +499,16 @@ export async function savePaymentConfig(tenantId: string, data: {
     const user = await getAuthenticatedUser()
     await requirePermission(user.id, tenantId, 'settings', 'write')
     
-    // Validations
+    // DOKU Checkout uses the Client ID and Secret Key. The public-key and
+    // token-URL fields below are only required for specific SNAP/DIPC flows,
+    // so treating them as required would prevent a valid Checkout setup.
     if (data.dokuEnabled) {
-      if (!data.dokuClientId || data.dokuClientId.trim() === '' ||
-          !data.dokuMerchantPublicKey || data.dokuMerchantPublicKey.trim() === '' ||
-          !data.dokuSnapTokenUrl || data.dokuSnapTokenUrl.trim() === '' ||
-          !data.dokuSharedKey || data.dokuSharedKey.trim() === '') {
-        throw new Error('All DOKU key fields are required when DOKU is enabled');
+      const hasClientId = Boolean(data.dokuClientId?.trim())
+      const hasSecretKey = Boolean(data.dokuSharedKey?.trim())
+      if (!hasClientId || !hasSecretKey) {
+        throw new Error('DOKU Client ID and Secret Key are required when DOKU is enabled');
       }
+      data.dokuClientId = data.dokuClientId || ''
       
       if (data.dokuEnvironment === 'production') {
         const checkClientId = data.dokuClientId.includes('•') ? '' : data.dokuClientId;
@@ -546,7 +548,9 @@ export async function savePaymentConfig(tenantId: string, data: {
       updateData.midtransEncryptedServerKeyIv = ''
     }
 
-    // DOKU fields encryption
+    // DOKU credentials are encrypted at rest. The optional fields support
+    // future SNAP/DIPC flows, while DOKU Checkout itself only needs Client ID
+    // and Secret Key.
     if (data.dokuClientId && data.dokuClientId.trim() !== '' && !data.dokuClientId.includes('•')) {
       updateData.dokuClientId = encrypt(data.dokuClientId)
     }

@@ -315,7 +315,10 @@ export async function createDokuCheckout(
         invoice_number: uniqueInvoiceNumber,
         currency: 'IDR',
         callback_url: `${host}/api/webhook/doku`,
-        callback_url_result: `${host}/en/project-setup/confirmation?orderId=${encodeURIComponent(orderId)}`
+        callback_url_result: `${host}/en/project-setup/confirmation?orderId=${encodeURIComponent(orderId)}`,
+        // DOKU Checkout requires this property. Keeping the hosted result page
+        // avoids redirecting a customer before they can review the result.
+        auto_redirect: false
       },
       payment: {
         payment_due_date: 60,
