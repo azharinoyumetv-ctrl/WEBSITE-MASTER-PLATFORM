@@ -29,7 +29,7 @@ export function StorefrontHeader({ labels }: StorefrontHeaderProps) {
 
   return (
     <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 text-white shadow-[0_12px_36px_rgba(2,6,23,.28)] backdrop-blur-xl">
-      <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+      <div className="relative mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
         <Link
           href="/site"
           aria-label="Back to DagangOS home"
@@ -47,9 +47,22 @@ export function StorefrontHeader({ labels }: StorefrontHeaderProps) {
             {labels.shopNow}
           </Link>
         </div>
+        <nav aria-label="Storefront navigation" className="absolute left-1/2 hidden -translate-x-1/2 lg:block">
+          <div className="flex items-center gap-1">
+            {navigation.map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/[.08] hover:text-white focus-visible:bg-white/[.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              >
+                {item.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
       </div>
-      <nav aria-label="Storefront navigation" className="border-t border-white/10 bg-slate-950/80">
-        <div className="mx-auto flex max-w-7xl justify-start gap-1 overflow-x-auto px-3 py-2 sm:justify-center sm:px-6 lg:px-8 [scrollbar-width:none]">
+      <nav aria-label="Storefront navigation" className="border-t border-white/10 bg-slate-950/80 lg:hidden">
+        <div className="mx-auto flex max-w-7xl justify-start gap-1 overflow-x-auto px-3 py-2 sm:justify-center sm:px-6 [scrollbar-width:none]">
           {navigation.map((item) => (
             <Link
               key={item.href}

@@ -96,13 +96,13 @@ export default async function SiteLayout({
             "@type": "Organization",
             "name": isCompanyStorefront ? COMPANY.legalName : tenant.companyName,
             "url": `https://${website.domain || tenant.subdomain + '.' + (process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com')}`,
-            "logo": logoUrl || (isCompanyStorefront ? '/dagangos-web-wordmark.png' : ''),
+            "logo": logoUrl || (isCompanyStorefront ? '/dagangos-web-wordmark-cropped.png' : ''),
             "description": website.globalSeoMetadata?.description || ''
           })
         }}
       />
-      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 text-white shadow-[0_12px_36px_rgba(2,6,23,.28)] backdrop-blur-xl">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[4.5rem] flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-50 relative border-b border-white/10 bg-slate-950/95 text-white shadow-[0_12px_36px_rgba(2,6,23,.28)] backdrop-blur-xl">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[4.5rem] flex items-center justify-between gap-4">
           <Link href="/site" aria-label="Back to DagangOS home" title="Back to DagangOS home" className="flex items-center gap-2 rounded-xl outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">
             {logoUrl ? (
               <Image src={logoUrl} alt={website.siteTitle} className="h-10 w-10 rounded-lg object-cover" width={40} height={40} unoptimized />
@@ -125,8 +125,21 @@ export default async function SiteLayout({
             </Link>
           </div>
         </div>
-        <nav aria-label="Storefront navigation" className="border-t border-white/10 bg-slate-950/80">
-          <div className="max-w-7xl mx-auto flex justify-start gap-1 overflow-x-auto px-3 py-2 sm:justify-center sm:px-6 lg:px-8 [scrollbar-width:none]">
+        <nav aria-label="Storefront navigation" className="absolute left-1/2 top-0 hidden h-[4.5rem] -translate-x-1/2 items-center lg:flex">
+          <div className="flex items-center gap-1">
+            {navigationTree.map((nav) => (
+              <Link
+                key={nav.target}
+                href={nav.target}
+                className="whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/[.08] hover:text-white focus-visible:bg-white/[.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              >
+                {nav.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
+        <nav aria-label="Storefront navigation" className="border-t border-white/10 bg-slate-950/80 lg:hidden">
+          <div className="max-w-7xl mx-auto flex justify-start gap-1 overflow-x-auto px-3 py-2 sm:justify-center sm:px-6 [scrollbar-width:none]">
             {navigationTree.map((nav) => (
               <Link
                 key={nav.target}
