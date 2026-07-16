@@ -2,14 +2,19 @@
 
 This is a deliberately small, versioned list of remaining production work. It records only real gaps; the interface must not substitute demo figures for any of them.
 
-## Open
+## Open platform work
 
-- [ ] **Workspace invitation email delivery** — configure and test the DagangOS SMTP gateway. Invitations are otherwise fully usable through the secure copy-link fallback. Verified absent for the DagangOS company tenant on 2026-07-16.
-- [ ] **Storefront payments** — configure and verify one production payment gateway (DOKU, Xendit, or Midtrans) in the DagangOS tenant settings. DOKU Checkout now requires only its Client ID and Secret Key; the DOKU business account is still under provider review and its production Secret Key must be entered through the protected admin form before a live checkout can be verified. Verified absent on 2026-07-16.
+No outstanding platform implementation items.
+
+## Deferred external configuration
+
+- [ ] **Workspace invitation email delivery** — SMTP setup and a delivered test email are intentionally deferred. Invitations remain fully usable through the secure copy-link fallback.
+- [ ] **Storefront payments** — live payment-gateway activation is intentionally deferred pending DOKU account approval and a rotated production Secret Key. DOKU Checkout configuration remains available in protected admin settings.
 
 ## Completed
 
 - [x] **Integration credential handling** - SMTP credentials, payment credentials, and webhook signing secrets are masked in dashboard reads. New webhook secrets are presented once at creation, stored encrypted, and used for per-endpoint signatures.
+- [x] **Admin deployment resilience** - admin HTML and Flight responses are not cacheable, stale Server Action errors trigger one guarded reload, and Indonesian translation work is batched so it cannot block dashboard interaction. Notifications templates, logs, and settings tabs were verified live on 2026-07-16.
 
 - [x] **First platform owner** — the DagangOS owner account is active with `platform_owner` and `super-admin` access; its bcrypt credential and the live sign-in flow were verified.
 - [x] Public storefront bootstrap creates the DagangOS company tenant, active website configuration, and production module records without sample data.
