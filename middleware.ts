@@ -152,7 +152,7 @@ export default async function middleware(request: NextRequest) {
     
     if (!isAuthorized) {
       if (request.headers.has('next-action') || pathname.startsWith('/api')) {
-        return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }), csp)
+        return applySecurityHeaders(preventAdminResponseCaching(NextResponse.json({ error: 'Unauthorized' }, { status: 401 })), csp)
       }
 
       // Determine locale to redirect to
@@ -169,7 +169,7 @@ export default async function middleware(request: NextRequest) {
         const cookieName = isSecure ? '__Secure-next-auth.session-token' : 'next-auth.session-token'
         response.cookies.delete(cookieName)
       }
-      return applySecurityHeaders(response, csp)
+      return applySecurityHeaders(preventAdminResponseCaching(response), csp)
     }
   }
 
