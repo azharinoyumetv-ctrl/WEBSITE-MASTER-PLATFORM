@@ -1,135 +1,119 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { CheckCircle2, Award, Zap, Globe2, Target, Users, Code2, TrendingUp } from 'lucide-react'
-import { useTranslations } from 'next-intl'
+import Link from 'next/link'
+import { useState } from 'react'
+import { ArrowUpRight, Award, Check, CircleDot, Globe2, Layers3, ShieldCheck, Sparkles, Target } from 'lucide-react'
+import { useLocale, useTranslations } from 'next-intl'
 
-export function AboutClient({ primaryColor, siteTitle }: { primaryColor: string, siteTitle: string }) {
+type AboutTab = 'mission' | 'vision' | 'values'
+
+export function AboutClient({ primaryColor, siteTitle }: { primaryColor: string; siteTitle: string }) {
   const t = useTranslations('Storefront')
-  const [activeTab, setActiveTab] = useState<'mission' | 'vision' | 'values'>('mission')
-  const [isLoaded, setIsLoaded] = useState(false)
+  const locale = useLocale()
+  const [activeTab, setActiveTab] = useState<AboutTab>('mission')
 
-  useEffect(() => {
-    setIsLoaded(true)
-  }, [])
+  const tabContent = {
+    mission: {
+      icon: Target,
+      eyebrow: t('tab_mission'),
+      title: t('mission_title'),
+      body: t('mission_text'),
+    },
+    vision: {
+      icon: Globe2,
+      eyebrow: t('tab_vision'),
+      title: t('vision_title'),
+      body: t('vision_text'),
+    },
+    values: {
+      icon: Award,
+      eyebrow: t('tab_values'),
+      title: t('values_title'),
+      body: '',
+    },
+  } satisfies Record<AboutTab, { icon: typeof Target; eyebrow: string; title: string; body: string }>
 
-  const stats = [
-    { label: 'DagangOS platform', value: '1', icon: Globe2 },
-    { label: t('stat_modules'), value: '15', icon: Code2 },
-    { label: 'Tenant-ready architecture', value: 'Secure', icon: Zap },
-    { label: 'Project launch flow', value: 'Built', icon: TrendingUp },
-  ]
+  const current = tabContent[activeTab]
+  const Icon = current.icon
 
   return (
-    <div className="w-full bg-slate-50 min-h-screen">
-      {/* Animated Hero */}
-      <section className="relative overflow-hidden py-24 md:py-32 bg-slate-950 text-white">
-        <div 
-          className="absolute inset-0 opacity-20"
-          style={{ background: `radial-gradient(circle at 70% 30%, ${primaryColor}, transparent 60%)` }}
-        />
-        <div className={`max-w-4xl mx-auto px-6 text-center relative z-10 transition-all duration-1000 transform ${isLoaded ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}>
-          <span 
-            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-white/5 border text-slate-200 mb-6"
-            style={{ borderColor: `${primaryColor}40` }}
-          >
-            <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: primaryColor }} />
-            {t('about_title')} {siteTitle}
-          </span>
-          <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight leading-tight mb-6">
-            {t('about_hero1')} <br />
-            <span style={{ color: primaryColor }}>{t('about_hero2')}</span>
-          </h1>
-          <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed">
-            {t('about_subtitle')}
-          </p>
-        </div>
-      </section>
-
-      {/* Interactive Mission Tabs */}
-      <section className="py-24 max-w-5xl mx-auto px-6">
-        <div className="bg-white rounded-3xl p-2 shadow-xl border border-slate-100 mb-12 flex flex-wrap md:flex-nowrap justify-between gap-2">
-          {['mission', 'vision', 'values'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setActiveTab(tab as any)}
-              className={`flex-1 py-4 px-6 rounded-2xl font-bold text-sm transition-all capitalize ${
-                activeTab === tab ? 'text-white shadow-md' : 'text-slate-500 hover:bg-slate-50'
-              }`}
-              style={activeTab === tab ? { backgroundColor: primaryColor } : {}}
-            >
-              {tab === 'mission' ? t('tab_mission') : tab === 'vision' ? t('tab_vision') : t('tab_values')}
-            </button>
-          ))}
-        </div>
-
-        <div className="bg-white rounded-3xl p-10 md:p-16 border border-slate-100 shadow-sm min-h-[300px] flex items-center transition-all">
-          {activeTab === 'mission' && (
-            <div className="animate-fade-in flex flex-col md:flex-row gap-12 items-center">
-              <div className="flex-1">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}>
-                  <Target className="w-8 h-8" />
-                </div>
-                <h2 className="text-3xl font-bold text-slate-900 mb-4">{t('mission_title')}</h2>
-                <p className="text-slate-600 leading-relaxed text-lg">
-                  {t('mission_text')}
-                </p>
-              </div>
+    <div className="min-h-screen overflow-hidden bg-[#f7fafc]">
+      <section className="relative isolate overflow-hidden bg-slate-950 py-24 text-white md:py-32">
+        <div className="absolute inset-0 dagangos-aurora" />
+        <div className="absolute inset-0 opacity-50 dagangos-grid" />
+        <div className="absolute -left-24 top-20 h-80 w-80 rounded-full bg-emerald-400/20 blur-3xl dagangos-orb" />
+        <div className="absolute -right-28 bottom-0 h-96 w-96 rounded-full bg-sky-400/20 blur-3xl dagangos-orb-delayed" />
+        <div className="relative mx-auto grid max-w-7xl items-center gap-14 px-6 md:px-8 lg:grid-cols-[1.1fr_.9fr]">
+          <div className="max-w-3xl">
+            <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold text-emerald-100 backdrop-blur">
+              <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-300 opacity-75" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" /></span>
+              {siteTitle}
+            </span>
+            <h1 className="mt-7 text-5xl font-black leading-[.95] tracking-[-.055em] md:text-7xl">
+              {t('about_hero1')}<br />
+              <span className="bg-gradient-to-r from-emerald-300 via-cyan-200 to-sky-400 bg-clip-text text-transparent">{t('about_hero2')}</span>
+            </h1>
+            <p className="mt-7 max-w-2xl text-lg leading-relaxed text-slate-300 md:text-xl">{t('about_subtitle')}</p>
+            <div className="mt-9 flex flex-wrap gap-3">
+              <Link href={`/${locale}/site/catalog`} className="group inline-flex items-center gap-2 rounded-xl bg-white px-6 py-3.5 text-sm font-black text-slate-950 shadow-[0_16px_45px_rgba(15,23,42,.35)] transition hover:-translate-y-1">
+                {t('explore_packages')} <ArrowUpRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              </Link>
+              <Link href={`/${locale}/project-setup?package=landing_page&v=v2`} className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-6 py-3.5 text-sm font-bold text-white backdrop-blur transition hover:-translate-y-1 hover:bg-white/15">
+                <Sparkles className="h-4 w-4 text-emerald-300" /> {t('contact_sales')}
+              </Link>
             </div>
-          )}
-          {activeTab === 'vision' && (
-            <div className="animate-fade-in flex flex-col md:flex-row gap-12 items-center">
-              <div className="flex-1">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}>
-                  <Globe2 className="w-8 h-8" />
-                </div>
-                <h2 className="text-3xl font-bold text-slate-900 mb-4">{t('vision_title')}</h2>
-                <p className="text-slate-600 leading-relaxed text-lg">
-                  {t('vision_text')}
-                </p>
-              </div>
-            </div>
-          )}
-          {activeTab === 'values' && (
-            <div className="animate-fade-in flex flex-col md:flex-row gap-12 items-center w-full">
-              <div className="flex-1">
-                <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-6" style={{ backgroundColor: `${primaryColor}15`, color: primaryColor }}>
-                  <Award className="w-8 h-8" />
-                </div>
-                <h2 className="text-3xl font-bold text-slate-900 mb-6">{t('values_title')}</h2>
-                <ul className="space-y-4">
-                  {[
-                    t('val_1'),
-                    t('val_2'),
-                    t('val_3'),
-                    t('val_4')
-                  ].map((val, idx) => (
-                    <li key={idx} className="flex items-center gap-3 text-slate-700">
-                      <CheckCircle2 className="w-5 h-5" style={{ color: primaryColor }} />
-                      <span className="font-medium text-lg">{val}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
-        </div>
-      </section>
-
-      {/* Stats Section with dynamic icons */}
-      <section className="py-24 bg-slate-900 text-white relative overflow-hidden">
-        <div className="max-w-7xl mx-auto px-6 relative z-10">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            {stats.map((stat, idx) => (
-              <div key={idx} className="p-6 rounded-3xl bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                <div className="flex justify-center mb-4">
-                  <stat.icon className="w-8 h-8" style={{ color: primaryColor }} />
-                </div>
-                <p className="text-4xl font-extrabold mb-2">{stat.value}</p>
-                <p className="text-slate-400 text-sm">{stat.label}</p>
-              </div>
-            ))}
           </div>
+
+          <div className="relative mx-auto w-full max-w-md dagangos-float lg:max-w-none">
+            <div className="absolute -inset-5 rounded-[2rem] bg-gradient-to-br from-emerald-300/30 via-sky-400/20 to-indigo-500/20 blur-2xl" />
+            <div className="relative overflow-hidden rounded-[1.75rem] border border-white/15 bg-slate-950/70 p-5 shadow-2xl backdrop-blur-xl">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4"><span className="text-xs font-bold text-slate-300">DagangOS Digital Indonesia</span><CircleDot className="h-4 w-4 text-emerald-300" /></div>
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="col-span-2 rounded-2xl border border-white/10 bg-white/[.06] p-5"><p className="text-sm text-slate-400">{t('about_ownership_label')}</p><p className="mt-2 text-2xl font-black">{t('about_ownership_title')} <span className="text-emerald-300">{t('about_ownership_accent')}</span></p></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><Layers3 className="h-5 w-5 text-sky-300" /><p className="mt-4 text-sm font-bold">15+ {t('stat_modules')}</p><p className="mt-1 text-xs text-slate-400">{t('about_connected_stack')}</p></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><ShieldCheck className="h-5 w-5 text-emerald-300" /><p className="mt-4 text-sm font-bold">{t('about_self_hosted')}</p><p className="mt-1 text-xs text-slate-400">{t('about_data_yours')}</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative mx-auto max-w-7xl px-6 py-24 md:px-8">
+        <div className="absolute right-10 top-20 h-64 w-64 rounded-full bg-emerald-200/40 blur-3xl" />
+        <div className="relative grid gap-10 lg:grid-cols-[.78fr_1.22fr]">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[.16em] text-emerald-700">{t('about_title')}</p>
+            <h2 className="mt-3 text-3xl font-black tracking-[-.04em] text-slate-950 md:text-5xl">{t('about_principles')}</h2>
+            <div className="mt-8 grid gap-2">
+              {(Object.keys(tabContent) as AboutTab[]).map((tab) => (
+                <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`flex items-center justify-between rounded-2xl border px-5 py-4 text-left text-sm font-bold transition ${activeTab === tab ? 'border-slate-950 bg-slate-950 text-white shadow-xl' : 'border-slate-200 bg-white text-slate-600 hover:-translate-y-0.5 hover:border-emerald-300'}`}>
+                  {tabContent[tab].eyebrow}<ArrowUpRight className={`h-4 w-4 ${activeTab === tab ? 'text-emerald-300' : 'text-slate-400'}`} />
+                </button>
+              ))}
+            </div>
+          </div>
+          <article className="relative overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_20px_60px_rgba(15,23,42,.1)] md:p-12">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500" />
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50" style={{ color: primaryColor }}><Icon className="h-7 w-7" /></div>
+            <p className="mt-8 text-xs font-black uppercase tracking-[.16em] text-emerald-700">{current.eyebrow}</p>
+            <h3 className="mt-3 text-3xl font-black tracking-[-.04em] text-slate-950 md:text-4xl">{current.title}</h3>
+            {activeTab === 'values' ? (
+              <ul className="mt-8 grid gap-4 sm:grid-cols-2">
+                {[t('val_1'), t('val_2'), t('val_3'), t('val_4')].map((value) => <li key={value} className="flex gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-4 text-sm font-semibold leading-relaxed text-slate-700"><Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />{value}</li>)}
+              </ul>
+            ) : <p className="mt-7 max-w-2xl text-lg leading-relaxed text-slate-600">{current.body}</p>}
+          </article>
+        </div>
+      </section>
+
+      <section className="relative isolate overflow-hidden bg-slate-950 py-20 text-white">
+        <div className="absolute inset-0 opacity-35 dagangos-grid" />
+        <div className="relative mx-auto grid max-w-7xl gap-4 px-6 md:grid-cols-3 md:px-8">
+          {[
+            [t('about_card_delivery_title'), t('about_card_delivery_desc')],
+            [t('about_card_infrastructure_title'), t('about_card_infrastructure_desc')],
+            [t('about_card_indonesia_title'), t('about_card_indonesia_desc')],
+          ].map(([title, detail]) => <div key={title} className="rounded-2xl border border-white/10 bg-white/[.05] p-6 backdrop-blur"><p className="text-lg font-black">{title}</p><p className="mt-2 text-sm leading-relaxed text-slate-400">{detail}</p></div>)}
         </div>
       </section>
     </div>
