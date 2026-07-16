@@ -42,9 +42,9 @@ export const metadata: Metadata = {
     canonical: 'https://store.dagangos.com',
   },
   icons: {
-    icon: [{ url: '/dagangos-tab-icon.png', type: 'image/png', sizes: '512x512' }],
-    shortcut: '/favicon.ico',
-    apple: [{ url: '/dagangos-tab-icon.png', type: 'image/png', sizes: '512x512' }],
+        icon: [{ url: '/dagangos-tab-icon.png?v=2', type: 'image/png', sizes: '512x512' }],
+        shortcut: '/favicon.ico?v=2',
+        apple: [{ url: '/dagangos-tab-icon.png?v=2', type: 'image/png', sizes: '512x512' }],
   },
   manifest: '/site.webmanifest',
 }
