@@ -3,8 +3,8 @@
   "short_name": "DagangOS",
   "icons": [
     {
-      "src": "/dagangos-web-favicon.png",
-      "sizes": "1024x1024",
+      "src": "/dagangos-tab-icon.png",
+      "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
