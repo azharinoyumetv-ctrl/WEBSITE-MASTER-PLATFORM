@@ -4,6 +4,12 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
 import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
+import { getWebhookSigningSecret, storeWebhookSigningSecret } from '@/lib/webhook-signing'
+
+function toSafeWebhook<T extends { secretSigningToken?: string }>(webhook: T) {
+  const { secretSigningToken: _secretSigningToken, ...safeWebhook } = webhook
+  return safeWebhook
+}
 
 export async function getApiData(tenantId: string) {
   try {
@@ -15,11 +21,19 @@ export async function getApiData(tenantId: string) {
     const [keys, webhooks, requestLogs] = await Promise.all([
       prisma.tenantApiKey.findMany({
         where: { tenantId },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, tenantId: true, createdBy: true, keyName: true, keyPrefix: true,
+          scopes: true, isActive: true, expiresAt: true, lastUsedAt: true, createdAt: true, updatedAt: true
+        }
       }),
       prisma.tenantApiWebhook.findMany({
         where: { tenantId },
-        orderBy: { createdAt: 'desc' }
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, tenantId: true, targetUrl: true, subscribedEvents: true, isActive: true,
+          failureCount: true, createdAt: true
+        }
       }),
       prisma.tenantApiRequestLog.findMany({
         where: { tenantId, createdAt: { gte: telemetrySince } },
@@ -172,14 +186,16 @@ export async function createWebhook(tenantId: string, targetUrl: string, events:
       data: {
         tenantId,
         targetUrl,
-        secretSigningToken,
+        secretSigningToken: storeWebhookSigningSecret(secretSigningToken),
         subscribedEvents: events,
         isActive: true
       }
     })
     
     revalidatePath('/admin/api-portal')
-    return { success: true, webhook }
+    // A webhook signing secret is only sent in this creation response. It is
+    // deliberately omitted from later dashboard loads and list responses.
+    return { success: true, webhook: toSafeWebhook(webhook), signingSecret: secretSigningToken }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -240,7 +256,7 @@ export async function testWebhookDispatch(tenantId: string, webhookId: string) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-webhook-signature': crypto.createHmac('sha256', webhook.secretSigningToken).update(JSON.stringify(payload)).digest('hex')
+        'x-webhook-signature': crypto.createHmac('sha256', getWebhookSigningSecret(webhook.secretSigningToken)).update(JSON.stringify(payload)).digest('hex')
       },
       body: JSON.stringify(payload)
     })

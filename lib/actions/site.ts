@@ -7,6 +7,7 @@ import crypto from 'crypto'
 import { headers } from 'next/headers'
 import { z } from 'zod'
 import { resolvePublicTenantFromHost } from '@/lib/tenant-context'
+import { getWebhookSigningSecret } from '@/lib/webhook-signing'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
@@ -112,14 +113,10 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
     }
 
     const payloadString = JSON.stringify(payload)
-    const webhookSecret = process.env.WEBHOOK_API_KEY
-    
     webhooksToTrigger.forEach(w => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (webhookSecret) {
-        const signature = crypto.createHmac('sha256', webhookSecret).update(payloadString).digest('hex')
-        headers['X-Webhook-Signature'] = signature
-      }
+      const signature = crypto.createHmac('sha256', getWebhookSigningSecret(w.secretSigningToken)).update(payloadString).digest('hex')
+      headers['X-Webhook-Signature'] = signature
 
       fetch(w.targetUrl, {
         method: 'POST',

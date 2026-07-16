@@ -31,6 +31,18 @@ function toSafeGateway<T extends { encryptedCredentials?: unknown }>(gateway: T 
   return providerConfig ? { ...safeGateway, providerConfig } : safeGateway
 }
 
+function toSafeEmailGatewayConfig(config: EmailGatewayConfig) {
+  return {
+    host: config.host || '',
+    port: config.port || '',
+    encryption: config.encryption || '',
+    username: config.username || '',
+    fromEmail: config.fromEmail || '',
+    fromName: config.fromName || '',
+    password: config.password ? SECRET_MASK : ''
+  }
+}
+
 export async function getNotificationTemplates(tenantId: string) {
   try {
     const user = await getAuthenticatedUser()
@@ -149,13 +161,15 @@ export async function getNotificationGateway(tenantId: string, channelType: stri
     })
     
     if (gateway && gateway.encryptedCredentials) {
-      const config = typeof gateway.encryptedCredentials === 'string' ? JSON.parse(gateway.encryptedCredentials) : gateway.encryptedCredentials
+      const rawConfig = typeof gateway.encryptedCredentials === 'string' ? JSON.parse(gateway.encryptedCredentials) : gateway.encryptedCredentials
+      const config = rawConfig && typeof rawConfig === 'object' && !Array.isArray(rawConfig) ? rawConfig as EmailGatewayConfig : {}
       return {
         success: true,
-        gateway: toSafeGateway(gateway, {
-            ...config,
-            password: config.password ? SECRET_MASK : ''
-          })
+        // The dashboard only needs the SMTP fields it can edit. Never return
+        // arbitrary provider configuration, encrypted data, or a raw token.
+        gateway: toSafeGateway(gateway, channelType === 'email'
+          ? toSafeEmailGatewayConfig(config)
+          : { credentialsConfigured: true })
       }
     }
     
@@ -233,7 +247,7 @@ export async function toggleNotificationGateway(tenantId: string, gatewayId: str
       data: { isActive }
     })
     revalidatePath('/admin/notifications')
-    return { success: true, gateway }
+    return { success: true, gateway: toSafeGateway(gateway) }
   } catch (error: any) {
     return { success: false, error: error.message }
   }

@@ -38,6 +38,7 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, telemetry, tenan
   const [showCreateKeyModal, setShowCreateKeyModal] = useState(false)
   const [newKeyForm, setNewKeyForm] = useState({ keyName: '', scopes: ['catalog:read'], expiresInDays: 30 })
   const [generatedKey, setGeneratedKey] = useState<any | null>(null)
+  const [generatedWebhookSecret, setGeneratedWebhookSecret] = useState<string | null>(null)
 
   const activeKeys = keys.filter(key => key.isActive && (!key.expiresAt || new Date(key.expiresAt) > new Date())).length
   const activeWebhooks = webhooks.filter(webhook => webhook.isActive).length
@@ -105,6 +106,7 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, telemetry, tenan
       const res = await createWebhook(tenantId, editingWebhook.targetUrl, editingWebhook.subscribedEvents)
       if (res.success) {
         setWebhooks([res.webhook, ...webhooks])
+        setGeneratedWebhookSecret(res.signingSecret || null)
         toast.success('Webhook endpoint added')
         setEditingWebhook(null)
       } else {
@@ -323,12 +325,7 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, telemetry, tenan
                 <div className="mt-3 space-y-1">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Signing Secret</p>
                   <div className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
-                    <code className="text-[10px] font-mono text-slate-600 truncate flex-1">{w.secretSigningToken || 'Hidden'}</code>
-                    {w.secretSigningToken && (
-                      <button onClick={() => copyToClipboard(w.secretSigningToken)} className="text-slate-400 hover:text-indigo-500">
-                        <Copy className="w-3 h-3" />
-                      </button>
-                    )}
+                    <code className="text-[10px] font-mono text-slate-600 truncate flex-1">Hidden after creation</code>
                   </div>
                 </div>
 
@@ -572,6 +569,24 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, telemetry, tenan
                 Close & I have copied it
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {generatedWebhookSecret && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 animate-slide-up">
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-emerald-600">
+              <CheckCircle2 className="w-6 h-6" /> Webhook Secret Created
+            </h3>
+            <p className="text-sm text-slate-600 mb-4">Copy this signing secret now. It will not be shown again after this dialog is closed.</p>
+            <div className="bg-slate-900 rounded-lg p-3 flex items-center justify-between mb-6">
+              <code className="text-xs text-emerald-400 font-mono break-all select-all">{generatedWebhookSecret}</code>
+              <button onClick={() => copyToClipboard(generatedWebhookSecret)} className="p-1 text-slate-400 hover:text-white transition-colors">
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <button onClick={() => setGeneratedWebhookSecret(null)} className="w-full btn-primary">I have saved it</button>
           </div>
         </div>
       )}
