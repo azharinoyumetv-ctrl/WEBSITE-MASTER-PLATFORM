@@ -1,6 +1,5 @@
 'use server'
 
-import { PrismaClient, OrderStatus, PaymentStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import { getCatalogItems } from './catalog'
 import prisma from "@/lib/prisma"
@@ -154,6 +153,28 @@ export async function updateTerminal(tenantId: string, id: string, data: any) {
       where: { id, tenantId },
       data
     })
+    revalidatePath('/admin/pos')
+    return { success: true, terminal }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function renameTerminal(tenantId: string, id: string, terminalName: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'pos', 'write')
+
+    const normalizedName = terminalName.trim().replace(/\s+/g, ' ')
+    if (!normalizedName) throw new Error('Register name is required')
+    if (normalizedName.length > 100) throw new Error('Register name must be 100 characters or fewer')
+
+    const terminal = await prisma.tenantPosTerminal.update({
+      where: { id, tenantId },
+      data: { terminalName: normalizedName }
+    })
+
     revalidatePath('/admin/pos')
     return { success: true, terminal }
   } catch (error: any) {
@@ -319,7 +340,7 @@ export async function getEndOfDayReport(tenantId: string, sessionId: string) {
 
     let cashDrops = 0
     let cashPayouts = 0
-    let openingFloat = Number(session.openingBalance)
+    const openingFloat = Number(session.openingBalance)
     
     events.forEach(e => {
       if (e.eventType === 'cash_drop') cashDrops += Number(e.amount || 0)

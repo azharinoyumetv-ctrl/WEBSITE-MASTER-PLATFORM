@@ -30,6 +30,15 @@ type NavGroup = {
   items: NavItem[]
 }
 
+type ThemeMode = 'system' | 'light' | 'dark'
+type ResolvedTheme = Exclude<ThemeMode, 'system'>
+
+const THEME_MODES: ThemeMode[] = ['system', 'light', 'dark']
+
+function isThemeMode(value: string | null): value is ThemeMode {
+  return value !== null && THEME_MODES.includes(value as ThemeMode)
+}
+
 const NAVIGATION_GROUPS: NavGroup[] = [
   {
     label: 'Core',
@@ -196,13 +205,17 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
   )
 }
 
-export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onMobileMenuToggle: () => void, tenant?: any, theme: string, toggleTheme: () => void }) {
+export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggleTheme }: { onMobileMenuToggle: () => void, tenant?: any, theme: ThemeMode, resolvedTheme: ResolvedTheme, toggleTheme: () => void }) {
   const pathname = usePathname()
   const t = useTranslations('AdminSidebar')
   const [unreadCount, setUnreadCount] = useState(0)
   const [sysStatus, setSysStatus] = useState('operational')
   const [recentAlerts, setRecentAlerts] = useState<any[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const nextTheme = THEME_MODES[(THEME_MODES.indexOf(theme) + 1) % THEME_MODES.length]
+  const themeLabel = theme === 'system'
+    ? `System (${resolvedTheme})`
+    : theme.charAt(0).toUpperCase() + theme.slice(1)
   
   useEffect(() => {
     if (!tenant?.id) return
@@ -272,9 +285,14 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
         <button
           onClick={toggleTheme}
           className="p-2 rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 transition-colors focus:ring-2 focus:ring-emerald-400 focus:outline-none"
-          aria-label="Toggle Theme"
+          aria-label={`Theme: ${themeLabel}. Switch to ${nextTheme}.`}
+          title={`Theme: ${themeLabel}. Click to use ${nextTheme}.`}
         >
-          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          {theme === 'system'
+            ? <Monitor className="w-5 h-5" />
+            : theme === 'dark'
+              ? <Moon className="w-5 h-5" />
+              : <Sun className="w-5 h-5" />}
         </button>
 
         {/* Status indicator */}
@@ -356,24 +374,39 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
 
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [theme, setTheme] = useState<ThemeMode>('system')
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('light')
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark'
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle('dark', savedTheme === 'dark')
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark')
-      document.documentElement.classList.add('dark')
-    }
+    const savedTheme = localStorage.getItem('theme')
+    setTheme(isThemeMode(savedTheme) ? savedTheme : 'system')
   }, [])
 
+  useEffect(() => {
+    const systemPreference = window.matchMedia('(prefers-color-scheme: dark)')
+
+    const applyTheme = () => {
+      const nextResolvedTheme: ResolvedTheme = theme === 'system'
+        ? (systemPreference.matches ? 'dark' : 'light')
+        : theme
+
+      setResolvedTheme(nextResolvedTheme)
+      document.documentElement.classList.toggle('dark', nextResolvedTheme === 'dark')
+      document.documentElement.style.colorScheme = nextResolvedTheme
+    }
+
+    applyTheme()
+
+    if (theme !== 'system') return
+
+    systemPreference.addEventListener('change', applyTheme)
+    return () => systemPreference.removeEventListener('change', applyTheme)
+  }, [theme])
+
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
-    localStorage.setItem('theme', newTheme)
-    document.documentElement.classList.toggle('dark', newTheme === 'dark')
+    const nextTheme = THEME_MODES[(THEME_MODES.indexOf(theme) + 1) % THEME_MODES.length]
+    setTheme(nextTheme)
+    localStorage.setItem('theme', nextTheme)
   }
 
   useEffect(() => {
@@ -456,7 +489,7 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} tenant={tenant} theme={theme} toggleTheme={toggleTheme} />
+        <TopBar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} tenant={tenant} theme={theme} resolvedTheme={resolvedTheme} toggleTheme={toggleTheme} />
         <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none bg-[radial-gradient(circle_at_90%_0%,rgba(56,189,248,.13),transparent_25%),radial-gradient(circle_at_15%_15%,rgba(16,185,129,.08),transparent_20%),#edf4f8] dark:bg-slate-900">
           {!mounted ? (
             <div className="p-6 space-y-6 animate-pulse">
