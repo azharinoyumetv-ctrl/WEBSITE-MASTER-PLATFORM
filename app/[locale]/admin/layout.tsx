@@ -36,8 +36,11 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const enabledModules = new Set<string>()
   PLATFORM_MODULES.forEach(moduleDefinition => {
     const dbMod = (dbModules || []).find((m: any) => m.moduleKey === moduleDefinition.key)
-    // Do not advertise unavailable capabilities if the module lookup fails.
-    const isEnabled = res.success ? Boolean(dbMod?.isEnabled) : moduleDefinition.isCore
+    // Core capabilities remain available for older tenants that predate module
+    // records; optional capabilities still require an explicit enabled record.
+    const isEnabled = res.success
+      ? (dbMod ? Boolean(dbMod.isEnabled) : moduleDefinition.isCore)
+      : moduleDefinition.isCore
     if (isEnabled) {
       enabledModules.add(moduleDefinition.key)
     }
@@ -55,6 +58,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <AdminLayoutClient 
       enabledModules={enabledModulesList}
+      canManageTenants={normalizedRoles.includes('super-admin')}
       tenant={tenant}
       user={{
         name: session.user.name || session.user.email?.split('@')[0] || 'Admin User',

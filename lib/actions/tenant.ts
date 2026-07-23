@@ -282,6 +282,8 @@ export async function updateTenantStatus(id: string, status: TenantStatus) {
 
 export async function getTenantById(tenantId: string) {
   try {
+    await requireSuperAdmin()
+
     const tenant = await prisma.systemTenant.findUnique({
       where: { id: tenantId },
       include: {

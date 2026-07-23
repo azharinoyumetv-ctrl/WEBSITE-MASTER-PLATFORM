@@ -2,11 +2,13 @@
 
 import prisma from "@/lib/prisma"
 import type { OrderStatus } from '@prisma/client'
-
-
+import { requirePermission, requireTenantUser } from '@/lib/rbac'
 
 export async function getDashboardMetrics(tenantId: string) {
   try {
+    const user = await requireTenantUser(tenantId)
+    await requirePermission(user.id, tenantId, 'analytics', 'read')
+
     const totalOrders = await prisma.tenantOrder.count({ where: { tenantId } })
     const completedOrderStatuses: OrderStatus[] = ['paid', 'pending_fulfillment', 'processing', 'shipped', 'completed']
     const revenueAgg = await prisma.tenantOrder.aggregate({
@@ -86,6 +88,11 @@ export async function getDashboardMetrics(tenantId: string) {
 
 export async function updateDashboardWidgets(tenantId: string, userId: string, widgets: Record<string, boolean>) {
   try {
+    const currentUser = await requireTenantUser(tenantId)
+    if (currentUser.id !== userId) {
+      throw new Error('Forbidden: Dashboard preferences can only be changed for the signed-in user')
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId, tenantId },
       include: { profile: true }

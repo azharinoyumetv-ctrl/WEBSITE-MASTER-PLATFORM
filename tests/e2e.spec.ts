@@ -24,6 +24,11 @@ test.describe('Website Master Platform E2E Audit', () => {
 
     await page.waitForURL('**/admin/dashboard', { timeout: 50000 });
     await expect(page.locator('h1')).toContainText(/Dashboard/i);
+    await expect(page.locator('nav a[href="/en/admin/pages"]')).toBeVisible();
+    await expect(page.locator('nav a[href="/en/admin/users"]')).toBeVisible();
+    await expect(page.locator('nav a[href="/en/admin/rbac"]')).toBeVisible();
+    await expect(page.locator('a[href="/en/admin/profile"]')).toBeVisible();
+    await expect(page.locator('nav a[href="/en/admin/tenants"]')).toHaveCount(0);
   });
 
   test('02. Admin Settings & Tenant Branding', async ({ page }) => {
@@ -59,6 +64,9 @@ test.describe('Website Master Platform E2E Audit', () => {
     await expect(page.locator('h1')).toContainText(/Users/i);
 
     await expect(page.locator('h1')).toContainText(/Users/i);
+
+    await page.goto('/admin/tenants');
+    await expect(page.getByRole('heading', { name: 'Platform-owner access required' })).toBeVisible();
   });
 
   test('04. RBAC Permission Boundaries', async ({ page }) => {
@@ -239,7 +247,7 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.waitForURL('**/admin/dashboard');
 
     await page.goto('/admin/feature-flags');
-    await expect(page.getByRole('heading', { name: 'Feature Flags', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Feature Flags', exact: true, level: 2 })).toBeVisible();
 
     const flagRow = page.locator('table tbody tr').first();
     const toggleButton = flagRow.locator('button');

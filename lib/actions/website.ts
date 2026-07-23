@@ -3,7 +3,7 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { encrypt, decrypt } from '@/lib/crypto'
-import { requirePermission, getAuthenticatedUser } from '@/lib/rbac'
+import { requirePermission, getAuthenticatedUser, requireTenantUser } from '@/lib/rbac'
 import crypto from 'crypto'
 import { z } from 'zod'
 import { COMPANY } from '@/lib/company'
@@ -98,6 +98,9 @@ export async function getPublicPage(tenantId: string, slug: string) {
 // Admin: Get all pages
 export async function getAdminPages(tenantId: string) {
   try {
+    const user = await requireTenantUser(tenantId)
+    await requirePermission(user.id, tenantId, 'website', 'read')
+
     const pages = await prisma.tenantPage.findMany({
       where: { tenantId, isDeleted: false },
       orderBy: { createdAt: 'desc' }

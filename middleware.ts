@@ -248,8 +248,11 @@ function handleRouting(
     }
     // Rewrite to /en/site or /en/site/about
     const targetPath = pathWithoutLocale === '/' ? '' : pathWithoutLocale
-    const origin = getBaseUrl(request)
-    const finalUrl = new URL(`/${localeInUrl}/site${targetPath}`, origin)
+    // Keep rewrites internal even when a local tenant is addressed through a
+    // Host header such as dagangos.localhost. Building a new absolute URL from
+    // that header makes Next proxy to DNS instead of rendering the local route.
+    const finalUrl = request.nextUrl.clone()
+    finalUrl.pathname = `/${localeInUrl}/site${targetPath}`
     return NextResponse.rewrite(finalUrl, {
       request: { headers: requestHeaders },
     })

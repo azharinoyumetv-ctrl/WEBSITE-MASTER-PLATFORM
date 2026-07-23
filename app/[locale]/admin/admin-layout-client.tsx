@@ -8,11 +8,11 @@ import {
   CreditCard, Monitor, Warehouse, Users2, CalendarCheck, Sparkles,
   Bell, BarChart3, Code2, Settings, ChevronLeft, ChevronRight,
   LogOut, Building2, Menu, X, ToggleLeft,
-  Activity, Zap, Sun, Moon,
+  Activity, Zap, Sun, Moon, FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getUnreadAlertCount, getMonitoringStatus } from '@/lib/actions/monitoring'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { signOut } from 'next-auth/react'
 import { DagangOSBrand } from '@/components/DagangOSBrand'
@@ -23,6 +23,7 @@ type NavItem = {
   icon: React.ElementType
   label: string
   requiredModule?: string
+  platformOnly?: boolean
 }
 
 type NavGroup = {
@@ -44,7 +45,8 @@ const NAVIGATION_GROUPS: NavGroup[] = [
     label: 'Core',
     items: [
       { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { href: '/admin/tenants', icon: Building2, label: 'Tenants', requiredModule: 'admin_module' },
+      { href: '/admin/pages', icon: FileText, label: 'Pages', requiredModule: 'website_module' },
+      { href: '/admin/tenants', icon: Building2, label: 'Tenants', requiredModule: 'admin_module', platformOnly: true },
       { href: '/admin/modules', icon: ToggleLeft, label: 'Modules', requiredModule: 'admin_module' },
     ],
   },
@@ -100,13 +102,16 @@ const NAVIGATION_GROUPS: NavGroup[] = [
 type SidebarProps = {
   collapsed: boolean
   onToggle: () => void
+  onNavigate?: () => void
   navGroups: NavGroup[]
   user?: { name: string, role: string }
 }
 
-function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
+function Sidebar({ collapsed, onToggle, onNavigate, navGroups, user }: SidebarProps) {
   const pathname = usePathname()
+  const locale = useLocale()
   const t = useTranslations('AdminSidebar')
+  const normalizedPathname = pathname.replace(/^\/(en|id)(?=\/)/, '')
 
   return (
     <aside
@@ -124,15 +129,19 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="relative flex-1 overflow-y-auto py-4 px-2 space-y-1">
-        {navGroups.map((group) => (
-          <div key={group.label} className="mb-2">
+        {navGroups.map((group) => {
+          const groupKey = `group_${group.label.toLowerCase()}` as any
+          let translatedGroup = group.label
+          try { translatedGroup = t(groupKey) } catch {}
+
+          return <div key={group.label} className="mb-2">
             {!collapsed && (
               <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.18em] px-3 py-1.5 mb-1">
-                {group.label}
+                {translatedGroup}
               </p>
             )}
             {group.items.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              const isActive = normalizedPathname === item.href || normalizedPathname.startsWith(item.href + '/')
               // Extract a translation key from the label (e.g. "Access Control" -> "access_control")
               const tKey = item.label.toLowerCase().replace(/ /g, '_').replace('-', '') as any
               // Fallback to item.label if translation is missing (though we've added them all)
@@ -142,7 +151,8 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={`/${locale}${item.href}`}
+                  onClick={onNavigate}
                   title={collapsed ? translatedLabel : undefined}
                   className={cn(
                     'flex items-center rounded-xl transition-all duration-200 mb-1',
@@ -158,13 +168,14 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
               )
             })}
           </div>
-        ))}
+        })}
       </nav>
 
       {/* Footer */}
       <div className="relative border-t border-white/10 p-2 flex items-center justify-between bg-slate-950/20">
         <Link
-          href="/admin/settings"
+          href={`/${locale}/admin/profile`}
+          onClick={onNavigate}
           className={cn(
             'flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-150 flex-1',
             collapsed ? 'justify-center px-2' : ''
@@ -182,9 +193,10 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
         </Link>
         {!collapsed && (
           <button 
-            onClick={() => signOut({ callbackUrl: '/auth/login' })}
+            onClick={() => signOut({ callbackUrl: `/${locale}/auth/login` })}
             className="p-2 text-slate-500 hover:text-red-400 hover:bg-white/5 rounded-lg transition-colors"
-            title="Log out"
+            title={t('logout')}
+            aria-label={t('logout')}
           >
             <LogOut className="w-4 h-4" />
           </button>
@@ -197,6 +209,7 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
           className={cn(
             'mt-1 w-full flex items-center justify-center rounded-xl py-2 text-slate-500 hover:text-white hover:bg-white/10 transition-all duration-150'
           )}
+          aria-label={collapsed ? t('expand_navigation') : t('collapse_navigation')}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
@@ -207,6 +220,7 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
 
 export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggleTheme }: { onMobileMenuToggle: () => void, tenant?: any, theme: ThemeMode, resolvedTheme: ResolvedTheme, toggleTheme: () => void }) {
   const pathname = usePathname()
+  const locale = useLocale()
   const t = useTranslations('AdminSidebar')
   const [unreadCount, setUnreadCount] = useState(0)
   const [sysStatus, setSysStatus] = useState('operational')
@@ -241,6 +255,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggl
 
   const getPageTitle = () => {
     if (pathname.includes('/dashboard')) return t('dashboard')
+    if (pathname.includes('/pages')) return t('pages')
     if (pathname.includes('/tenants')) return t('tenants')
     if (pathname.includes('/modules')) return t('modules')
     if (pathname.includes('/users')) return t('users')
@@ -257,9 +272,11 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggl
     if (pathname.includes('/notifications')) return t('notifications')
     if (pathname.includes('/analytics')) return t('analytics')
     if (pathname.includes('/api-portal')) return t('api_portal')
-    if (pathname.includes('/monitoring')) return 'System Monitoring'
+    if (pathname.includes('/monitoring')) return t('system_monitoring')
+    if (pathname.includes('/feature-flags')) return t('feature_flags')
+    if (pathname.includes('/profile')) return t('profile')
     if (pathname.includes('/settings')) return t('settings')
-    return 'Admin Console'
+    return t('admin_console')
   }
 
   return (
@@ -269,7 +286,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggl
         <button
           onClick={onMobileMenuToggle}
           className="md:hidden min-h-10 min-w-10 p-2 rounded-xl text-slate-300 hover:bg-white/10 transition-colors"
-          aria-label="Open navigation menu"
+          aria-label={t('open_navigation')}
         >
           <Menu className="w-5 h-5" />
         </button>
@@ -308,7 +325,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggl
             "text-xs font-medium",
             sysStatus === 'operational' ? "text-emerald-200" : "text-amber-200"
           )}>
-            {sysStatus === 'operational' ? 'All Systems Operational' : 'Active Incidents'}
+            {sysStatus === 'operational' ? t('all_systems_operational') : t('active_incidents')}
           </span>
         </div>
 
@@ -317,7 +334,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggl
           <button 
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
             className="relative p-2 rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 transition-colors"
-            aria-label="Open notifications"
+            aria-label={isDropdownOpen ? t('close_notifications') : t('open_notifications')}
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
@@ -331,7 +348,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggl
             <>
               <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
               <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden">
-                <div className="p-3 border-b border-slate-100 font-medium text-sm">Recent Notifications</div>
+                <div className="p-3 border-b border-slate-100 font-medium text-sm">{t('recent_notifications')}</div>
                 <div className="max-h-64 overflow-y-auto">
                   {recentAlerts.length > 0 ? (
                     recentAlerts.map(alert => (
@@ -341,12 +358,12 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggl
                       </div>
                     ))
                   ) : (
-                    <div className="p-4 text-center text-sm text-slate-500">No recent notifications</div>
+                    <div className="p-4 text-center text-sm text-slate-500">{t('no_recent_notifications')}</div>
                   )}
                 </div>
                 <div className="p-2 border-t border-slate-100 bg-slate-50 text-center">
-                  <Link href="/admin/notifications" className="text-xs font-medium text-indigo-600 hover:text-indigo-700" onClick={() => setIsDropdownOpen(false)}>
-                    View all notifications
+                  <Link href={`/${locale}/admin/notifications`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700" onClick={() => setIsDropdownOpen(false)}>
+                    {t('view_all_notifications')}
                   </Link>
                 </div>
               </div>
@@ -356,23 +373,26 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggl
 
         {/* Public site link */}
         <Link
-          href="/site"
+          href={`/${locale}`}
           target="_blank"
+          rel="noopener noreferrer"
           className="hidden sm:flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-white/15"
         >
           <Globe className="w-3.5 h-3.5" />
-          <span>View Site</span>
+          <span>{t('view_site')}</span>
         </Link>
       </div>
     </header>
   )
 }
 
-export default function AdminLayoutClient({ children, enabledModules, user, tenant }: { children: React.ReactNode, enabledModules: string[], user?: { name: string, role: string }, tenant?: any }) {
+export default function AdminLayoutClient({ children, enabledModules, canManageTenants = false, user, tenant }: { children: React.ReactNode, enabledModules: string[], canManageTenants?: boolean, user?: { name: string, role: string }, tenant?: any }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
+  const locale = useLocale()
+  const t = useTranslations('AdminSidebar')
 
   const [theme, setTheme] = useState<ThemeMode>('system')
   const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('light')
@@ -427,19 +447,19 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
       if (e.altKey) {
         switch (e.key.toLowerCase()) {
           case 'd':
-            router.push('/admin/dashboard')
+            router.push(`/${locale}/admin/dashboard`)
             break
           case 's':
-            router.push('/admin/settings')
+            router.push(`/${locale}/admin/settings`)
             break
           case 'p':
-            router.push('/admin/pos')
+            router.push(`/${locale}/admin/pos`)
             break
           case 'i':
-            router.push('/admin/inventory')
+            router.push(`/${locale}/admin/inventory`)
             break
           case 'b':
-            router.push('/admin/booking')
+            router.push(`/${locale}/admin/booking`)
             break
         }
       }
@@ -447,12 +467,15 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [router])
+  }, [locale, router])
 
   // Filter navigation groups based on enabled modules
   const filteredNavGroups = NAVIGATION_GROUPS.map(group => ({
     ...group,
-    items: group.items.filter(item => !item.requiredModule || enabledModules.includes(item.requiredModule))
+    items: group.items.filter(item =>
+      (!item.requiredModule || enabledModules.includes(item.requiredModule)) &&
+      (!item.platformOnly || canManageTenants)
+    )
   })).filter(group => group.items.length > 0)
 
   return (
@@ -462,7 +485,7 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
         href="#main-content" 
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-white dark:focus:bg-slate-800 focus:text-indigo-600 dark:focus:text-indigo-400 focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
       >
-        Skip to main content
+        {t('skip_to_main')}
       </a>
 
       {/* Desktop sidebar */}
@@ -475,11 +498,11 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div className="fixed inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <div className="relative flex-shrink-0">
-            <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} navGroups={filteredNavGroups} user={user} />
+            <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} onNavigate={() => setMobileOpen(false)} navGroups={filteredNavGroups} user={user} />
             <button
               onClick={() => setMobileOpen(false)}
               className="absolute top-4 right-4 min-h-10 min-w-10 p-2 rounded-xl text-white/60 hover:text-white hover:bg-white/10"
-              aria-label="Close navigation menu"
+              aria-label={t('close_navigation')}
             >
               <X className="w-4 h-4" />
             </button>
