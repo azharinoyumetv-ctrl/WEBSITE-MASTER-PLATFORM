@@ -57,7 +57,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
   return (
     <div className="w-full min-h-screen bg-[#f7fafc]">
       {/* Interactive Hero Section */}
-      <section className="relative isolate overflow-hidden py-24 md:py-32 dagangos-aurora text-white">
+      <section className="relative isolate overflow-hidden pb-28 pt-20 text-white dagangos-aurora md:pb-36 md:pt-28">
         <div className="absolute inset-0 opacity-60 dagangos-grid" />
         <div className="absolute -left-32 top-12 h-80 w-80 rounded-full bg-emerald-400/20 blur-3xl dagangos-orb" />
         <div className="absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-sky-400/20 blur-3xl dagangos-orb-delayed" />
@@ -70,7 +70,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
               <span className="relative flex h-2 w-2"><span className="absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75 animate-ping" /><span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300" /></span>
               {t('dynamic_modular_active')}
             </span>
-            <h1 className="mt-7 text-5xl md:text-7xl font-black tracking-[-0.055em] leading-[0.95]">
+            <h1 className="mt-7 text-5xl font-black leading-[0.94] tracking-[-0.06em] md:text-7xl lg:text-[4.75rem]">
               {t('hero_title1')} <br />
               <span className="bg-gradient-to-r from-emerald-300 via-cyan-200 to-sky-400 bg-clip-text text-transparent">
                 {t('hero_title2')}
@@ -81,13 +81,13 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link
-                href={`/${locale}/site/shop`}
+                href={projectSetupHref}
                 className="dagangos-cta-gradient dagangos-play-card group inline-flex items-center gap-2 px-6 py-3.5 font-bold rounded-xl text-sm"
               >
-                {t('explore_packages')} <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                {t('hero_primary_cta')} <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
               </Link>
-              <Link href={projectSetupHref} className="dagangos-play-card inline-flex items-center gap-2 px-6 py-3.5 bg-white/10 hover:bg-white/15 text-white font-bold rounded-xl border border-white/15 backdrop-blur transition-all hover:-translate-y-1 text-sm">
-                <Calculator className="w-4 h-4" /> {t('contact_sales')}
+              <Link href={`/${locale}/site/catalog`} className="dagangos-play-card inline-flex items-center gap-2 px-6 py-3.5 bg-white/10 hover:bg-white/15 text-white font-bold rounded-xl border border-white/15 backdrop-blur transition-all hover:-translate-y-1 text-sm">
+                <Layers3 className="w-4 h-4" /> {t('hero_secondary_cta')}
               </Link>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-300">
@@ -111,10 +111,39 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                   </div>
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p className="text-2xl font-black">15+</p><p className="mt-1 text-xs text-slate-400">{t('modules_ready')}</p></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p className="text-2xl font-black text-emerald-300">1</p><p className="mt-1 text-xs text-slate-400">{t('unified_workspace')}</p></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p className="text-2xl font-black text-emerald-300">0%</p><p className="mt-1 text-xs text-slate-400">{t('monthly_platform_fee')}</p></div>
               </div>
             </div>
-            <div className="absolute -right-2 -bottom-5 rounded-2xl border border-emerald-200/25 bg-emerald-400/10 px-4 py-3 backdrop-blur dagangos-float-delayed sm:-right-4"><p className="text-xs text-emerald-100">{t('launch_with_clarity')}</p><p className="text-sm font-bold text-white">{t('design_commerce_ops')}</p></div>
+            <div className="absolute -bottom-5 left-3 rounded-2xl border border-emerald-200/25 bg-emerald-400/10 px-4 py-3 backdrop-blur dagangos-float-delayed sm:left-6"><p className="text-xs text-emerald-100">{t('launch_with_clarity')}</p><p className="text-sm font-bold text-white">{t('ownership_floating')}</p></div>
+          </div>
+        </div>
+      </section>
+
+      <section className="relative z-20 -mt-12 px-6 md:px-8" aria-labelledby="ownership-section-title">
+        <div className="mx-auto max-w-7xl overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white shadow-[0_24px_80px_rgba(15,23,42,.14)]">
+          <div className="grid lg:grid-cols-[1.05fr_1.95fr]">
+            <div className="border-b border-slate-200 bg-slate-950 p-7 text-white lg:border-b-0 lg:border-r lg:p-9">
+              <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-300">{t('ownership_section_kicker')}</p>
+              <h2 id="ownership-section-title" className="mt-3 text-2xl font-black leading-tight tracking-[-0.035em] md:text-3xl">{t('ownership_section_title')}</h2>
+              <p className="mt-3 text-sm leading-relaxed text-slate-300">{t('ownership_section_desc')}</p>
+            </div>
+            <div className="grid sm:grid-cols-3">
+              <div className="border-b border-slate-200 p-7 sm:border-b-0 sm:border-r">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700"><Cloud className="h-5 w-5" /></span>
+                <h3 className="mt-5 font-black text-slate-950">{t('ownership_vps_title')}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{t('ownership_vps_desc')}</p>
+              </div>
+              <div className="border-b border-slate-200 p-7 sm:border-b-0 sm:border-r">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-sky-100 text-sky-700"><ShieldCheck className="h-5 w-5" /></span>
+                <h3 className="mt-5 font-black text-slate-950">{t('ownership_data_title')}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{t('ownership_data_desc')}</p>
+              </div>
+              <div className="p-7">
+                <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-indigo-100 text-indigo-700"><Layers3 className="h-5 w-5" /></span>
+                <h3 className="mt-5 font-black text-slate-950">{t('ownership_fee_title')}</h3>
+                <p className="mt-2 text-sm leading-relaxed text-slate-600">{t('ownership_fee_desc')}</p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
