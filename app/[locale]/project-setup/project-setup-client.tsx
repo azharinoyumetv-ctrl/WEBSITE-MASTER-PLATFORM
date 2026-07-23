@@ -66,6 +66,7 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
     }
     const required = pkg.requirementsFields.filter(f => f !== 'timeline')
     for (const field of required) {
+      if (field === 'contactEmail') continue
       if (!requirements[field] || requirements[field].trim().length === 0) {
         next[field] = 'This field is required'
       }

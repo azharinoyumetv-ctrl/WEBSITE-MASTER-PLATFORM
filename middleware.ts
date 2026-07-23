@@ -53,6 +53,7 @@ function createContentSecurityPolicy(nonce: string) {
     "default-src 'self'",
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com${isDevelopment ? " 'unsafe-eval'" : ''}`,
     `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
+    "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
     "style-src-attr 'unsafe-inline'",
     "font-src 'self' https://fonts.gstatic.com",
     "img-src 'self' data: blob: https:",
@@ -68,7 +69,17 @@ function createContentSecurityPolicy(nonce: string) {
 }
 
 function applySecurityHeaders(res: NextResponse, csp: string) {
-
+  const cacheControl = res.headers.get('Cache-Control')
+  if (cacheControl) {
+    if (!cacheControl.includes('no-transform')) {
+      res.headers.set('Cache-Control', `${cacheControl}, no-transform`)
+    }
+  } else {
+    // Cloudflare's email obfuscation rewrites React's server HTML before
+    // hydration. Keeping dynamic responses private and non-transformable
+    // preserves the exact DOM React expects.
+    res.headers.set('Cache-Control', 'private, no-cache, no-store, max-age=0, must-revalidate, no-transform')
+  }
   res.headers.set('Content-Security-Policy', csp)
   res.headers.set('X-Frame-Options', 'DENY')
   res.headers.set('X-Content-Type-Options', 'nosniff')
