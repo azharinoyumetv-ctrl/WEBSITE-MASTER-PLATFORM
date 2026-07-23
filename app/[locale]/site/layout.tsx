@@ -74,13 +74,30 @@ export default async function SiteLayout({
   const primaryColor = themeConfig.colors.primary
   const logoUrl = tenant.logoUrl || null
   const isCompanyStorefront = tenantDomain === 'default'
+  const nonce = headersList.get('x-nonce') || undefined
+  const configuredDomain = typeof website.domain === 'string' ? website.domain.trim() : ''
+  const requestHost = headersList.get('x-forwarded-host') || headersList.get('host')
+  const requestProtocol = headersList.get('x-forwarded-proto') || (requestHost?.includes('localhost') ? 'http' : 'https')
+  const siteUrl = requestHost
+    ? `${requestProtocol}://${requestHost}`
+    : configuredDomain
+      ? (/^https?:\/\//i.test(configuredDomain) ? configuredDomain : `https://${configuredDomain}`)
+      : getTenantPublicUrl(tenant)
+  let structuredLogoUrl: string | undefined
+  if (logoUrl || isCompanyStorefront) {
+    try {
+      structuredLogoUrl = new URL(logoUrl || '/dagangos-web-wordmark-cropped.png', siteUrl).toString()
+    } catch {
+      structuredLogoUrl = undefined
+    }
+  }
 
   const navigationTree = [
-    { label: t('home'), target: '/site' },
-    { label: t('about'), target: '/site/about' },
-    { label: t('catalog'), target: '/site/catalog' },
-    { label: t('shop'), target: '/site/shop' },
-    { label: t('contact'), target: '/site/contact' },
+    { label: t('home'), target: `/${locale}` },
+    { label: t('about'), target: `/${locale}/site/about` },
+    { label: t('catalog'), target: `/${locale}/site/catalog` },
+    { label: t('shop'), target: `/${locale}/site/shop` },
+    { label: t('contact'), target: `/${locale}/site/contact` },
   ]
 
   return (
@@ -90,20 +107,22 @@ export default async function SiteLayout({
     >
       <script
         type="application/ld+json"
+        nonce={nonce}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Organization",
+            "@id": `${siteUrl.replace(/\/+$/, '')}/#organization`,
             "name": isCompanyStorefront ? COMPANY.legalName : tenant.companyName,
-            "url": website.domain || getTenantPublicUrl(tenant),
-            "logo": logoUrl || (isCompanyStorefront ? '/dagangos-web-wordmark-cropped.png' : ''),
+            "url": siteUrl,
+            ...(structuredLogoUrl ? { "logo": structuredLogoUrl } : {}),
             "description": website.globalSeoMetadata?.description || ''
-          })
+          }).replace(/</g, '\\u003c')
         }}
       />
-      <header className="sticky top-0 z-50 relative border-b border-white/10 bg-slate-950/95 text-white shadow-[0_12px_36px_rgba(2,6,23,.28)] backdrop-blur-xl">
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 text-white shadow-[0_12px_36px_rgba(2,6,23,.28)] backdrop-blur-xl">
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[4.5rem] flex items-center justify-between gap-4">
-          <Link href="/site" aria-label="Back to DagangOS home" title="Back to DagangOS home" className="flex items-center gap-2 rounded-xl outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">
+          <Link href={`/${locale}`} aria-label={tStore('back_home')} title={tStore('back_home')} className="flex items-center gap-2 rounded-xl outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">
             {logoUrl ? (
               <Image src={logoUrl} alt={website.siteTitle} className="h-10 w-10 rounded-lg object-cover" width={40} height={40} unoptimized />
             ) : isCompanyStorefront ? (
@@ -118,7 +137,7 @@ export default async function SiteLayout({
             <LanguageSwitcher variant="dark" />
             
             <Link 
-              href="/project-setup?package=landing_page&v=v2"
+              href={`/${locale}/project-setup?package=landing_page&v=v2`}
               className="dagangos-cta-gradient hidden md:inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-black"
             >
               {tStore('shop_now')}
@@ -167,7 +186,7 @@ export default async function SiteLayout({
               <p className="text-slate-400 text-sm leading-relaxed">
                 {tStore('footer_desc')}
               </p>
-              <Link href={`/${locale}/site/support`} className="dagangos-cta-gradient mt-5 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold">Open internal support chat <span aria-hidden>↗</span></Link>
+              <Link href={`/${locale}/site/support`} className="dagangos-cta-gradient mt-5 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold">{tStore('support_chat_cta')} <span aria-hidden>↗</span></Link>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-3 text-sm">{tStore('quick_links')}</h4>

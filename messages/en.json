@@ -36,9 +36,116 @@
     "dynamic_modular_active": "Dynamic Modular Engine Active",
     "hero_title1": "Modular Websites",
     "hero_title2": "Plug & Play Templates",
-    "hero_subtitle": "Design your platform, activate 15+ pre-integrated modules, and pre-configure layout templates with one single click.",
+    "hero_subtitle": "Design your platform, activate 15+ pre-integrated modules, and configure your launch through one guided setup.",
     "explore_packages": "Explore Ownership Packages",
     "contact_sales": "Contact Sales",
+    "tenant_ready": "Tenant-ready architecture",
+    "connected_modules": "15+ connected modules",
+    "command_centre": "DagangOS command centre",
+    "your_modular_stack": "Your modular stack",
+    "modules_ready": "Modules ready",
+    "unified_workspace": "Unified workspace",
+    "launch_with_clarity": "Launch with clarity",
+    "design_commerce_ops": "Design · Commerce · Ops",
+    "build_your_stack": "Build your stack",
+    "starting_at": "Starting at",
+    "one_time": "one-time",
+    "ownership_note": "Data and infrastructure remain under the client's control. Source-code/IP transfer is a separately quoted enterprise option.",
+    "start_project": "Start Your Project",
+    "back_home": "Back to the storefront home",
+    "support_chat_cta": "Chat with DagangOS support",
+    "project_brief": "Project brief",
+    "direct_contact": "Direct contact",
+    "form_required_error": "Please fill in all required fields.",
+    "security_check_error": "Please complete the security check.",
+    "message_sent": "Your message has been sent successfully.",
+    "message_failed": "We couldn't send your message. Please try again.",
+    "support_title": "DagangOS support",
+    "support_scope": "Read-only, scoped support",
+    "support_welcome": "Hi — I can answer public questions about DagangOS packages and guide you through Project Setup. I cannot access accounts or perform changes.",
+    "support_placeholder": "Write a message…",
+    "support_button": "Support chat",
+    "open_support": "Open support chat",
+    "close_support": "Close support chat",
+    "send_support_message": "Send message",
+    "support_page_badge": "DagangOS support desk",
+    "support_page_title": "Get clear guidance for your DagangOS project.",
+    "support_page_description": "Ask public questions about packages, platform ownership, and project setup. For account-specific help, use the contact channel.",
+    "support_page_no_access": "No account access",
+    "support_page_read_only": "Read-only pre-sales guidance",
+    "support_page_badge": "DagangOS support desk",
+    "support_page_title": "Get clear guidance for your DagangOS project.",
+    "support_page_description": "Ask public questions about packages, platform ownership, and project setup. For account-specific help, use the contact channel.",
+    "support_page_no_access": "No account access",
+    "support_page_read_only": "Read-only pre-sales guidance",
+    "package_copy": {
+      "landing_page": {
+        "name": "Launch Website",
+        "desc": "One-time conversion-focused website deployment"
+      },
+      "company_profile": {
+        "name": "Company Profile",
+        "desc": "One-time professional corporate web presence"
+      },
+      "business_website": {
+        "name": "Business Website + Admin",
+        "desc": "One-time business website and admin workspace deployment"
+      },
+      "ecommerce": {
+        "name": "E-Commerce Platform",
+        "desc": "One-time commerce platform deployment with storefront and payments"
+      },
+      "restaurant": {
+        "name": "Restaurant System",
+        "desc": "One-time restaurant system deployment for menus, bookings, and operations"
+      },
+      "retail_pos": {
+        "name": "Retail POS + Website",
+        "desc": "One-time online store and browser POS deployment"
+      },
+      "custom": {
+        "name": "Custom Platform",
+        "desc": "Starting price for a bespoke self-hosted business platform"
+      }
+    },
+    "addon_copy": {
+      "ai": {
+        "name": "AI Copywriter Integration (BYOK)",
+        "desc": "Bring your own provider API key. No DagangOS AI markup or lock-in."
+      },
+      "booking": {
+        "name": "Booking & Scheduling Module",
+        "desc": "Appointments, reservations, and operational scheduling."
+      },
+      "crm": {
+        "name": "CRM & Customer Timeline",
+        "desc": "Customer history, relationship management, and follow-up context."
+      },
+      "api": {
+        "name": "Developer API & Webhook Portal",
+        "desc": "Developer keys and controlled external-system integration."
+      },
+      "whatsapp": {
+        "name": "WhatsApp Business Integration",
+        "desc": "Tenant-owned Meta WhatsApp Business integration and templates."
+      },
+      "payment_gateway": {
+        "name": "Payment Gateway Setup",
+        "desc": "Setup and verification for one payment gateway."
+      },
+      "data_migration": {
+        "name": "Initial Product/Data Migration",
+        "desc": "Structured import and validation of the first product batch."
+      },
+      "admin_workflow": {
+        "name": "Extra Admin/User Workflow",
+        "desc": "One additional approval, staff, or operational workflow."
+      },
+      "custom_report": {
+        "name": "Custom Report/Dashboard",
+        "desc": "A tailored operational report or dashboard."
+      }
+    },
     "modular_layout_templates": "Modular Layout Templates",
     "select_booking_slot": "Select Booking Slot",
     "calculator_title": "Dynamic Package Calculator",

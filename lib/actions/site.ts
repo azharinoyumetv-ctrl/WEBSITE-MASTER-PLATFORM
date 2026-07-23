@@ -14,10 +14,20 @@ const resend = new Resend(process.env.RESEND_API_KEY)
 const contactFormSchema = z.object({
   name: z.string().trim().min(1).max(255),
   email: z.string().trim().email().max(255),
-  subject: z.string().trim().max(255),
+  subject: z.string().trim().max(255).refine(value => !/[\r\n]/.test(value), 'Subject must be a single line.'),
   message: z.string().trim().min(1).max(5000),
   turnstileToken: z.string().trim().max(4096).nullable().optional(),
 })
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  })[character] || character)
+}
 
 export async function submitContactForm(tenantId: string, data: { name: string, email: string, subject: string, message: string, turnstileToken?: string | null }) {
   try {
@@ -34,16 +44,23 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
       return { success: false, error: 'This storefront is not available.' }
     }
 
-    if (process.env.TURNSTILE_SECRET_KEY && data.turnstileToken) {
+    if (process.env.TURNSTILE_SECRET_KEY) {
+      if (!data.turnstileToken) {
+        return { success: false, error: 'Security check is required.' }
+      }
+
       const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `secret=${process.env.TURNSTILE_SECRET_KEY}&response=${data.turnstileToken}`
+        body: new URLSearchParams({
+          secret: process.env.TURNSTILE_SECRET_KEY,
+          response: data.turnstileToken,
+        }),
       })
-      const verifyData = await verifyRes.json()
-      if (!verifyData.success) {
+      const verifyData = await verifyRes.json().catch(() => ({ success: false }))
+      if (!verifyRes.ok || !verifyData.success) {
         return { success: false, error: 'Security check failed. Please try again.' }
       }
     }
@@ -127,18 +144,20 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
 
     // 4. Send Confirmation Email via Resend
     if (process.env.RESEND_API_KEY) {
+      const safeFirstName = escapeHtml(firstName || 'there')
+      const safeMessage = escapeHtml(data.message).replace(/\n/g, '<br/>')
       await resend.emails.send({
         from: 'contact@dagangos.com',
         to: [data.email],
         subject: `Re: ${data.subject || 'Thank you for contacting us'}`,
         html: `
           <div>
-            <p>Hi ${firstName || 'there'},</p>
+            <p>Hi ${safeFirstName},</p>
             <p>Thank you for reaching out! We've received your message and will get back to you shortly.</p>
             <br/>
             <p><strong>Your message:</strong></p>
             <blockquote style="border-left: 3px solid #ccc; padding-left: 10px; color: #555;">
-              ${data.message.replace(/\n/g, '<br/>')}
+              ${safeMessage}
             </blockquote>
             <br/>
             <p>Best regards,<br/>The Team</p>
@@ -159,7 +178,8 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
     }
 
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (error) {
+    console.error('Contact form submission failed', { name: error instanceof Error ? error.name : 'unknown' })
+    return { success: false, error: 'Unable to send your message right now.' }
   }
 }

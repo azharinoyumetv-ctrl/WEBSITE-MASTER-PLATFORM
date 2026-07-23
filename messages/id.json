@@ -39,6 +39,113 @@
     "hero_subtitle": "Rancang platform Anda, aktifkan 15+ modul terintegrasi, dan konfigurasi templat tata letak dengan satu klik.",
     "explore_packages": "Jelajahi Paket Kepemilikan",
     "contact_sales": "Hubungi Penjualan",
+    "tenant_ready": "Arsitektur siap multi-tenant",
+    "connected_modules": "15+ modul terhubung",
+    "command_centre": "Pusat kendali DagangOS",
+    "your_modular_stack": "Stack modular Anda",
+    "modules_ready": "Modul siap digunakan",
+    "unified_workspace": "Ruang kerja terpadu",
+    "launch_with_clarity": "Luncurkan dengan jelas",
+    "design_commerce_ops": "Desain · Perdagangan · Operasional",
+    "build_your_stack": "Bangun stack Anda",
+    "starting_at": "Mulai dari",
+    "one_time": "sekali bayar",
+    "ownership_note": "Data dan infrastruktur tetap berada dalam kendali klien. Pengalihan kode sumber/HKI ditawarkan terpisah untuk kebutuhan enterprise.",
+    "start_project": "Mulai Proyek Anda",
+    "back_home": "Kembali ke beranda toko",
+    "support_chat_cta": "Chat dengan dukungan DagangOS",
+    "project_brief": "Ringkasan proyek",
+    "direct_contact": "Kontak langsung",
+    "form_required_error": "Lengkapi semua kolom wajib.",
+    "security_check_error": "Selesaikan pemeriksaan keamanan.",
+    "message_sent": "Pesan Anda berhasil dikirim.",
+    "message_failed": "Pesan Anda belum dapat dikirim. Silakan coba lagi.",
+    "support_title": "Dukungan DagangOS",
+    "support_scope": "Dukungan terbatas dan hanya-baca",
+    "support_welcome": "Halo — saya dapat menjawab pertanyaan publik tentang paket DagangOS dan memandu Anda melalui Penyiapan Proyek. Saya tidak dapat mengakses akun atau melakukan perubahan.",
+    "support_placeholder": "Tulis pesan…",
+    "support_button": "Chat dukungan",
+    "open_support": "Buka chat dukungan",
+    "close_support": "Tutup chat dukungan",
+    "send_support_message": "Kirim pesan",
+    "support_page_badge": "Pusat dukungan DagangOS",
+    "support_page_title": "Dapatkan panduan yang jelas untuk proyek DagangOS Anda.",
+    "support_page_description": "Ajukan pertanyaan publik tentang paket, kepemilikan platform, dan penyiapan proyek. Untuk bantuan khusus akun, gunakan kanal kontak.",
+    "support_page_no_access": "Tanpa akses akun",
+    "support_page_read_only": "Panduan pra-penjualan hanya-baca",
+    "support_page_badge": "Pusat dukungan DagangOS",
+    "support_page_title": "Dapatkan panduan yang jelas untuk proyek DagangOS Anda.",
+    "support_page_description": "Ajukan pertanyaan publik tentang paket, kepemilikan platform, dan penyiapan proyek. Untuk bantuan khusus akun, gunakan kanal kontak.",
+    "support_page_no_access": "Tanpa akses akun",
+    "support_page_read_only": "Panduan pra-penjualan hanya-baca",
+    "package_copy": {
+      "landing_page": {
+        "name": "Situs Peluncuran",
+        "desc": "Penerapan situs sekali bayar yang berfokus pada konversi"
+      },
+      "company_profile": {
+        "name": "Profil Perusahaan",
+        "desc": "Kehadiran web perusahaan profesional dengan sekali bayar"
+      },
+      "business_website": {
+        "name": "Situs Bisnis + Admin",
+        "desc": "Penerapan situs bisnis dan ruang kerja admin dengan sekali bayar"
+      },
+      "ecommerce": {
+        "name": "Platform E-Commerce",
+        "desc": "Penerapan platform perdagangan dengan etalase dan pembayaran"
+      },
+      "restaurant": {
+        "name": "Sistem Restoran",
+        "desc": "Penerapan sistem menu, reservasi, dan operasional restoran"
+      },
+      "retail_pos": {
+        "name": "POS Ritel + Situs Web",
+        "desc": "Penerapan toko daring dan POS berbasis browser"
+      },
+      "custom": {
+        "name": "Platform Khusus",
+        "desc": "Harga awal untuk platform bisnis self-hosted yang dirancang khusus"
+      }
+    },
+    "addon_copy": {
+      "ai": {
+        "name": "Integrasi AI Copywriter (BYOK)",
+        "desc": "Gunakan API key penyedia Anda sendiri tanpa markup atau penguncian AI DagangOS."
+      },
+      "booking": {
+        "name": "Modul Pemesanan & Penjadwalan",
+        "desc": "Janji temu, reservasi, dan penjadwalan operasional."
+      },
+      "crm": {
+        "name": "CRM & Linimasa Pelanggan",
+        "desc": "Riwayat pelanggan, pengelolaan relasi, dan konteks tindak lanjut."
+      },
+      "api": {
+        "name": "Portal API & Webhook Pengembang",
+        "desc": "Kunci pengembang dan integrasi sistem eksternal yang terkontrol."
+      },
+      "whatsapp": {
+        "name": "Integrasi WhatsApp Business",
+        "desc": "Integrasi dan templat Meta WhatsApp Business milik tenant."
+      },
+      "payment_gateway": {
+        "name": "Penyiapan Gerbang Pembayaran",
+        "desc": "Penyiapan dan verifikasi untuk satu gerbang pembayaran."
+      },
+      "data_migration": {
+        "name": "Migrasi Produk/Data Awal",
+        "desc": "Impor terstruktur dan validasi kumpulan produk pertama."
+      },
+      "admin_workflow": {
+        "name": "Alur Admin/Pengguna Tambahan",
+        "desc": "Satu alur persetujuan, staf, atau operasional tambahan."
+      },
+      "custom_report": {
+        "name": "Laporan/Dasbor Khusus",
+        "desc": "Laporan atau dasbor operasional yang disesuaikan."
+      }
+    },
     "modular_layout_templates": "Templat Tata Letak Modular",
     "select_booking_slot": "Pilih Slot Pemesanan",
     "calculator_title": "Kalkulator Paket Dinamis",

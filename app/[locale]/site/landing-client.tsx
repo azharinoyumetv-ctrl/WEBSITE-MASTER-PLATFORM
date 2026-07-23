@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowUpRight, Calculator, Cloud, Layers3, ShieldCheck, Sparkles } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
+import Link from 'next/link'
 import { packages, addonsList } from '@/lib/constants/packages'
 
 const PACKAGE_CALCULATOR_VERSION = 'v2'
@@ -13,11 +14,19 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
   const locale = useLocale()
   const [selectedPackage, setSelectedPackage] = useState<string>('landing_page')
   const [enabledAddons, setEnabledAddons] = useState<string[]>([])
-  const [previewMode, setPreviewMode] = useState<string>('landing_page')
 
   const toggleAddon = (key: string) => {
     setEnabledAddons(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
   }
+
+  const getPackageCopy = (key: string) => ({
+    name: t(`package_copy.${key}.name`),
+    desc: t(`package_copy.${key}.desc`),
+  })
+  const getAddonCopy = (key: string) => ({
+    name: t(`addon_copy.${key}.name`),
+    desc: t(`addon_copy.${key}.desc`),
+  })
 
   const selectedPackageData = useMemo(() => packages[selectedPackage] || null, [selectedPackage])
   const enabledAddonsData = useMemo(
@@ -71,19 +80,19 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
               {t('hero_subtitle')}
             </p>
             <div className="mt-9 flex flex-wrap gap-3">
-              <a
-                href="/shop"
+              <Link
+                href={`/${locale}/site/shop`}
                 className="dagangos-cta-gradient dagangos-play-card group inline-flex items-center gap-2 px-6 py-3.5 font-bold rounded-xl text-sm"
               >
                 {t('explore_packages')} <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-              </a>
-              <a href={projectSetupHref} className="dagangos-play-card inline-flex items-center gap-2 px-6 py-3.5 bg-white/10 hover:bg-white/15 text-white font-bold rounded-xl border border-white/15 backdrop-blur transition-all hover:-translate-y-1 text-sm">
+              </Link>
+              <Link href={projectSetupHref} className="dagangos-play-card inline-flex items-center gap-2 px-6 py-3.5 bg-white/10 hover:bg-white/15 text-white font-bold rounded-xl border border-white/15 backdrop-blur transition-all hover:-translate-y-1 text-sm">
                 <Calculator className="w-4 h-4" /> {t('contact_sales')}
-              </a>
+              </Link>
             </div>
             <div className="mt-10 flex flex-wrap gap-x-6 gap-y-3 text-sm text-slate-300">
-              <span className="inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-300" /> Tenant-ready architecture</span>
-              <span className="inline-flex items-center gap-2"><Layers3 className="w-4 h-4 text-sky-300" /> 15+ connected modules</span>
+              <span className="inline-flex items-center gap-2"><ShieldCheck className="w-4 h-4 text-emerald-300" /> {t('tenant_ready')}</span>
+              <span className="inline-flex items-center gap-2"><Layers3 className="w-4 h-4 text-sky-300" /> {t('connected_modules')}</span>
             </div>
           </div>
 
@@ -92,20 +101,20 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             <div className="dagangos-shimmer relative rounded-[1.75rem] border border-white/15 bg-slate-950/70 p-4 shadow-2xl backdrop-blur-xl">
               <div className="flex items-center justify-between border-b border-white/10 pb-4">
                 <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-rose-400" /><span className="h-2.5 w-2.5 rounded-full bg-amber-300" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /></div>
-                <span className="text-xs font-medium text-slate-400">DagangOS command centre</span>
+                <span className="text-xs font-medium text-slate-400">{t('command_centre')}</span>
               </div>
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <div className="col-span-2 rounded-2xl border border-white/10 bg-white/[.06] p-5">
-                  <div className="flex items-center justify-between"><span className="text-sm text-slate-400">Your modular stack</span><Sparkles className="w-4 h-4 text-emerald-300" /></div>
+                  <div className="flex items-center justify-between"><span className="text-sm text-slate-400">{t('your_modular_stack')}</span><Sparkles className="w-4 h-4 text-emerald-300" /></div>
                   <div className="mt-5 flex items-end gap-2 h-20">
                     {[38, 58, 47, 76, 66, 92, 82].map((height, index) => <span key={index} className="dagangos-spark-bar flex-1 rounded-t-full bg-gradient-to-t from-emerald-500 to-sky-400 opacity-90" style={{ height: `${height}%`, animationDelay: `${index * 150}ms` }} />)}
                   </div>
                 </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p className="text-2xl font-black">15+</p><p className="mt-1 text-xs text-slate-400">Modules ready</p></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p className="text-2xl font-black text-emerald-300">1</p><p className="mt-1 text-xs text-slate-400">Unified workspace</p></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p className="text-2xl font-black">15+</p><p className="mt-1 text-xs text-slate-400">{t('modules_ready')}</p></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p className="text-2xl font-black text-emerald-300">1</p><p className="mt-1 text-xs text-slate-400">{t('unified_workspace')}</p></div>
               </div>
             </div>
-            <div className="absolute -right-4 -bottom-5 rounded-2xl border border-emerald-200/25 bg-emerald-400/10 px-4 py-3 backdrop-blur dagangos-float-delayed"><p className="text-xs text-emerald-100">Launch with clarity</p><p className="text-sm font-bold text-white">Design · Commerce · Ops</p></div>
+            <div className="absolute -right-2 -bottom-5 rounded-2xl border border-emerald-200/25 bg-emerald-400/10 px-4 py-3 backdrop-blur dagangos-float-delayed sm:-right-4"><p className="text-xs text-emerald-100">{t('launch_with_clarity')}</p><p className="text-sm font-bold text-white">{t('design_commerce_ops')}</p></div>
           </div>
         </div>
       </section>
@@ -116,7 +125,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           
           <div className="lg:col-span-7 space-y-6">
-            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-700"><span className="h-px w-8 bg-emerald-500" /> Build your stack</div>
+            <div className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-[0.16em] text-emerald-700"><span className="h-px w-8 bg-emerald-500" /> {t('build_your_stack')}</div>
             <h2 className="text-3xl md:text-5xl font-black tracking-[-0.04em] text-slate-950">{t('calculator_title')}</h2>
             <p className="text-slate-600 max-w-2xl leading-relaxed">
               {t('calculator_subtitle')}
@@ -124,12 +133,14 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
 
             {/* Packages dropdown selection */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">{t('select_core_package')}</label>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <h3 id="ownership-package-label" className="block text-sm font-semibold text-slate-700 mb-2">{t('select_core_package')}</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3" role="group" aria-labelledby="ownership-package-label">
                 {Object.entries(packages).map(([key, pkg]) => (
                   <button
                     key={key}
+                    type="button"
                     onClick={() => setSelectedPackage(key)}
+                    aria-pressed={selectedPackage === key}
                     style={selectedPackage === key 
                       ? { borderColor: primaryColor, backgroundColor: `${primaryColor}08` } 
                       : {}}
@@ -140,10 +151,10 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                     }`}
                   >
                     {selectedPackage === key && <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500" />}
-                    <p className="font-bold text-sm text-slate-900">{pkg.name}</p>
-                    <p className="text-xs text-slate-500 mt-1">{pkg.desc}</p>
+                    <p className="font-bold text-sm text-slate-900">{getPackageCopy(key).name}</p>
+                    <p className="text-xs text-slate-500 mt-1">{getPackageCopy(key).desc}</p>
                     <p className="text-sm font-semibold mt-2" style={{ color: primaryColor }}>
-                      {pkg.key === 'custom' ? 'Starting at ' : ''}{pkg.price > 0 ? formatRp(pkg.price) : t('custom_quote')} <span className="text-xs font-medium text-slate-500">one-time</span>
+                      {pkg.key === 'custom' ? `${t('starting_at')} ` : ''}{pkg.price > 0 ? formatRp(pkg.price) : t('custom_quote')} <span className="text-xs font-medium text-slate-500">{t('one_time')}</span>
                     </p>
                   </button>
                 ))}
@@ -152,35 +163,41 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
 
             {/* Add-ons selection checkbox list */}
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-2">{t('optional_addons')}</label>
+              <h3 className="block text-sm font-semibold text-slate-700 mb-2">{t('optional_addons')}</h3>
               <div className="space-y-3">
-                {addonsList.map(addon => (
-                  <div 
+                {addonsList.map(addon => {
+                  const inputId = `addon-${addon.key}`
+                  const descriptionId = `${inputId}-description`
+                  const addonCopy = getAddonCopy(addon.key)
+                  return (
+                  <label
                     key={addon.key} 
-                    onClick={() => toggleAddon(addon.key)}
+                    htmlFor={inputId}
                     style={enabledAddons.includes(addon.key) 
                       ? { borderColor: primaryColor, boxShadow: `0 0 0 1px ${primaryColor}` } 
                       : {}}
-                    className={`dagangos-play-card flex items-center justify-between p-4 bg-white border rounded-2xl cursor-pointer hover:bg-slate-50 hover:shadow-md transition-all ${
+                    className={`dagangos-play-card flex cursor-pointer flex-col gap-3 rounded-2xl border bg-white p-4 transition-all hover:bg-slate-50 hover:shadow-md sm:flex-row sm:items-center sm:justify-between ${
                       enabledAddons.includes(addon.key) ? '' : 'border-slate-200'
                     }`}
                   >
                     <div className="flex items-start gap-3">
                       <input 
+                        id={inputId}
                         type="checkbox" 
                         checked={enabledAddons.includes(addon.key)} 
-                        onChange={() => {}} // Controlled by outer div click
-                        style={enabledAddons.includes(addon.key) ? { color: primaryColor } : {}}
+                        onChange={() => toggleAddon(addon.key)}
+                        aria-describedby={descriptionId}
+                        style={{ accentColor: primaryColor }}
                         className="mt-1 rounded border-slate-300 focus:ring-0"
                       />
                       <div>
-                        <p className="font-bold text-slate-900 text-sm">{addon.name}</p>
-                        <p className="text-slate-500 text-xs">{addon.desc}</p>
+                        <p className="font-bold text-slate-900 text-sm">{addonCopy.name}</p>
+                        <p id={descriptionId} className="text-slate-500 text-xs">{addonCopy.desc}</p>
                       </div>
                     </div>
-                    <span className="text-sm font-semibold" style={{ color: primaryColor }}>{formatRp(addon.price)} <span className="text-xs font-medium text-slate-500">one-time</span></span>
-                  </div>
-                ))}
+                    <span className="pl-7 text-sm font-semibold sm:pl-0 sm:text-right" style={{ color: primaryColor }}>{formatRp(addon.price)} <span className="text-xs font-medium text-slate-500">{t('one_time')}</span></span>
+                  </label>
+                )})}
               </div>
             </div>
           </div>
@@ -195,7 +212,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             
             <div className="space-y-4 border-b border-slate-100 pb-4 mb-4 text-sm text-slate-600">
               <div className="flex justify-between">
-                <span>{packages[selectedPackage]?.name}</span>
+                <span>{getPackageCopy(selectedPackage).name}</span>
                 <span className="font-semibold text-slate-900">{formatRp(packages[selectedPackage]?.price || 0)}</span>
               </div>
               
@@ -203,14 +220,14 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                 const addon = addonsList.find(a => a.key === key)
                 return (
                   <div key={key} className="flex justify-between text-xs">
-                    <span>{addon?.name}</span>
-                    <span className="font-semibold text-slate-900">{formatRp(addon?.price || 0)} one-time</span>
+                    <span>{addon ? getAddonCopy(addon.key).name : ''}</span>
+                    <span className="font-semibold text-slate-900">{formatRp(addon?.price || 0)} {t('one_time')}</span>
                   </div>
                 )
               })}
             </div>
 
-            <div className="flex justify-between items-baseline mb-6">
+            <div className="flex flex-wrap justify-between gap-2 items-baseline mb-6" aria-live="polite">
               <span className="font-bold text-slate-900">{t('total_setup_cost')}</span>
               <span className="text-3xl font-extrabold text-slate-900">{formatRp(total)}</span>
             </div>
@@ -218,7 +235,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-xl leading-relaxed mb-4">
               {t('infra_note')}
             </div>
-            <p className="mb-4 text-xs leading-relaxed text-slate-500">Data and infrastructure remain under the client&apos;s control. Source-code/IP transfer is a separately quoted enterprise option.</p>
+            <p className="mb-4 text-xs leading-relaxed text-slate-500">{t('ownership_note')}</p>
 
             <a
               href={HOSTINGER_REFERRAL_URL}
@@ -234,13 +251,13 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
               </span>
             </a>
 
-            <a 
+            <Link
               href={projectSetupHref}
               className="block text-center py-3.5 text-white font-bold rounded-xl transition-opacity hover:opacity-90 shadow-lg text-sm w-full"
               style={{ backgroundColor: primaryColor }}
             >
-              Mulai Proyek
-            </a>
+              {t('start_project')}
+            </Link>
           </div>
 
         </div>
@@ -256,10 +273,10 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
           <p className="text-lg opacity-80 mb-8 max-w-xl mx-auto">
             {t('cta_subtitle')}
           </p>
-          <a href="/shop" className="dagangos-cta-gradient dagangos-play-card group inline-flex items-center gap-2 px-8 py-3.5 font-bold rounded-xl">
+          <Link href={`/${locale}/site/shop`} className="dagangos-cta-gradient dagangos-play-card group inline-flex items-center gap-2 px-8 py-3.5 font-bold rounded-xl">
             {t('choose_price_plan')}
             <ArrowUpRight className="w-4 h-4 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-          </a>
+          </Link>
         </div>
       </section>
     </div>

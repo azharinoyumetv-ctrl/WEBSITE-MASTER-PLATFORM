@@ -10,24 +10,102 @@ import { SupportPageClient } from '../support-page-client'
 import { getTranslations } from 'next-intl/server'
 import { addonsList, packages } from '@/lib/constants/packages'
 import { COMPANY } from '@/lib/company'
+import type { Metadata } from 'next'
 
-export async function generateMetadata({ params }: { params: { slug?: string[] } }) {
+export async function generateMetadata({ params }: { params: { slug?: string[], locale: string } }): Promise<Metadata> {
   const headersList = headers()
   const tenantId = headersList.get('x-tenant-id')
-  
+  const locale = params.locale === 'id' ? 'id' : 'en'
+  const isIndonesian = locale === 'id'
   const slug = params.slug ? params.slug.join('/') : 'home'
-  const pageLabels: Record<string, string> = {
-    about: 'About Us',
-    contact: 'Contact Us',
-    support: 'Support',
-    products: 'Products',
-    shop: 'Shop',
-    catalog: 'Catalog',
-    terms: 'Terms of Service',
-    privacy: 'Privacy Policy',
+  const pageLabels: Record<string, { en: string, id: string }> = {
+    home: { en: 'Home', id: 'Beranda' },
+    about: { en: 'About Us', id: 'Tentang Kami' },
+    contact: { en: 'Contact Us', id: 'Hubungi Kami' },
+    support: { en: 'Support', id: 'Dukungan' },
+    products: { en: 'Products', id: 'Produk' },
+    shop: { en: 'Ownership Packages', id: 'Paket Kepemilikan' },
+    catalog: { en: 'Solutions', id: 'Solusi' },
+    terms: { en: 'Terms of Service', id: 'Syarat & Ketentuan' },
+    privacy: { en: 'Privacy Policy', id: 'Kebijakan Privasi' },
   }
-  
-  if (!tenantId) return { title: pageLabels[slug] || 'Page' }
+  const pageDescriptions: Record<string, { en: string, id: string }> = {
+    about: {
+      en: 'Learn how DagangOS delivers self-hosted, modular digital business platforms for Indonesian companies.',
+      id: 'Pelajari cara DagangOS menghadirkan platform bisnis digital modular dan self-hosted untuk perusahaan Indonesia.',
+    },
+    contact: {
+      en: 'Talk with DagangOS about your website, commerce, POS, or custom business platform project.',
+      id: 'Diskusikan proyek website, perdagangan, POS, atau platform bisnis khusus Anda bersama DagangOS.',
+    },
+    support: {
+      en: 'Get public pre-sales guidance about DagangOS packages, project setup, and platform ownership.',
+      id: 'Dapatkan panduan pra-penjualan tentang paket DagangOS, penyiapan proyek, dan kepemilikan platform.',
+    },
+    products: {
+      en: 'Compare DagangOS one-time, self-hosted digital business platform packages.',
+      id: 'Bandingkan paket platform bisnis digital DagangOS yang self-hosted dan sekali bayar.',
+    },
+    shop: {
+      en: 'Compare one-time ownership packages for websites, e-commerce, restaurant operations, retail POS, and custom platforms.',
+      id: 'Bandingkan paket kepemilikan sekali bayar untuk website, e-commerce, restoran, POS ritel, dan platform khusus.',
+    },
+    catalog: {
+      en: 'Explore DagangOS solutions for brand websites, commerce, restaurant operations, retail POS, and custom workflows.',
+      id: 'Jelajahi solusi DagangOS untuk website merek, perdagangan, restoran, POS ritel, dan alur kerja khusus.',
+    },
+    terms: {
+      en: 'Read the DagangOS terms of service.',
+      id: 'Baca syarat dan ketentuan layanan DagangOS.',
+    },
+    privacy: {
+      en: 'Read how DagangOS handles personal data and privacy.',
+      id: 'Baca cara DagangOS menangani data pribadi dan privasi.',
+    },
+  }
+  const pageLabel = pageLabels[slug]?.[locale] || (isIndonesian ? 'Halaman' : 'Page')
+  const defaultDescription = pageDescriptions[slug]?.[locale]
+    || (isIndonesian
+      ? 'Platform bisnis digital self-hosted sekali bayar untuk bisnis Indonesia.'
+      : 'One-time, self-hosted digital business platforms for Indonesian businesses.')
+  const canonicalPath = slug === 'home' ? `/${locale}` : `/${locale}/site/${slug}`
+  const alternatePath = slug === 'home'
+    ? (language: string) => `/${language}`
+    : (language: string) => `/${language}/site/${slug}`
+  const createMetadata = (resolvedTitle: string, description: string): Metadata => ({
+    title: { absolute: resolvedTitle },
+    description,
+    alternates: {
+      canonical: canonicalPath,
+      languages: {
+        en: alternatePath('en'),
+        id: alternatePath('id'),
+        'x-default': alternatePath('en'),
+      },
+    },
+    openGraph: {
+      type: 'website',
+      url: canonicalPath,
+      locale: isIndonesian ? 'id_ID' : 'en_US',
+      alternateLocale: isIndonesian ? ['en_US'] : ['id_ID'],
+      title: resolvedTitle,
+      description,
+      images: [{
+        url: '/og.png',
+        width: 1200,
+        height: 630,
+        alt: 'DagangOS Web — self-hosted digital business platforms',
+      }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: resolvedTitle,
+      description,
+      images: ['/og.png'],
+    },
+  })
+
+  if (!tenantId) return createMetadata(`${pageLabel} | ${COMPANY.legalName}`, defaultDescription)
 
   const websiteRes = await getPublicWebsiteConfig(tenantId)
   const siteTitle = websiteRes.success && websiteRes.website?.siteTitle 
@@ -35,7 +113,7 @@ export async function generateMetadata({ params }: { params: { slug?: string[] }
     : COMPANY.legalName
 
   if (!websiteRes.success || !websiteRes.website) {
-    return { title: `${pageLabels[slug] || 'Page'} | ${siteTitle}` }
+    return createMetadata(`${pageLabel} | ${siteTitle}`, defaultDescription)
   }
 
   const pageRes = await getPublicPage(websiteRes.tenantId!, slug)
@@ -48,16 +126,25 @@ export async function generateMetadata({ params }: { params: { slug?: string[] }
     if (!['shop', 'products', 'about', 'contact', 'support', 'terms', 'privacy'].includes(slug)) {
       notFound()
     }
-    return { title: `${pageLabels[slug] || 'Page'} | ${siteTitle}` }
+    return createMetadata(`${pageLabel} | ${siteTitle}`, defaultDescription)
   }
 
   const pageSeo = pageRes.page.seoMetadata as any || {}
   const globalSeo = websiteRes.website.globalSeoMetadata as any || {}
 
-  return {
-    title: `${pageRes.page.title} | ${siteTitle}`,
-    description: pageSeo.description || globalSeo.description || ''
+  if (['shop', 'products', 'about', 'contact', 'support', 'catalog', 'terms', 'privacy'].includes(slug)) {
+    const standardDescription = isIndonesian
+      ? defaultDescription
+      : pageSeo.description || globalSeo.description || defaultDescription
+    return createMetadata(`${pageLabel} | ${siteTitle}`, standardDescription)
   }
+
+  const description = pageSeo.description || globalSeo.description || defaultDescription
+  const databaseTitle = String(pageRes.page.title || pageLabel).trim()
+  const resolvedTitle = databaseTitle.toLocaleLowerCase().includes(siteTitle.toLocaleLowerCase())
+    ? databaseTitle
+    : `${databaseTitle} | ${siteTitle}`
+  return createMetadata(resolvedTitle, description)
 }
 
 // Built-in fallback templates for standard pages
@@ -84,7 +171,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
           <div className="grid md:grid-cols-2 gap-16">
             {/* Contact Info */}
             <div className="rounded-[1.75rem] border border-slate-200 bg-white p-8 shadow-[0_16px_45px_rgba(15,23,42,.08)]">
-              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">Direct contact</p>
+              <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-700">{t('direct_contact')}</p>
               <h2 className="mt-3 text-3xl font-black text-slate-950 mb-8">{t('get_in_touch')}</h2>
               <div className="space-y-6">
                 {[
@@ -105,7 +192,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
             </div>
 
             {/* Contact Form */}
-            <ContactClient tenantId={tenantId} primaryColor={primaryColor} />
+            <ContactClient tenantId={tenantId} />
           </div>
         </section>
       </div>

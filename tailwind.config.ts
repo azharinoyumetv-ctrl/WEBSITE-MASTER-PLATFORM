@@ -11,9 +11,9 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        mono: ['Geist Mono', 'Fira Code', 'monospace'],
-        heading: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
+        mono: ['var(--font-geist-mono)', 'Fira Code', 'monospace'],
+        heading: ['var(--font-geist-sans)', 'system-ui', 'sans-serif'],
       },
       colors: {
         background: 'hsl(var(--background, 210 40% 98%))',
