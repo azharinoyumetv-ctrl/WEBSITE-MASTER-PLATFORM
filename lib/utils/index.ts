@@ -170,6 +170,16 @@ export function sanitizeHtml(str: string): string {
     .replace(/'/g, '&#039;')
 }
 
+function buildThemeFontStack(value: string | undefined): string | null {
+  const font = value?.trim()
+  if (!font || /[;{}]/.test(font)) return null
+
+  const sanitizedFont = font.replace(/[^a-zA-Z0-9\s'",._-]/g, '').trim()
+  if (!sanitizedFont) return null
+
+  return `${sanitizedFont}, var(--font-geist-sans), system-ui, sans-serif`
+}
+
 // Parse theme config and generate CSS variables
 export function generateThemeCssVars(themeConfig: Record<string, unknown>): Record<string, string> {
   const colors = (themeConfig?.colors as Record<string, string>) || {}
@@ -180,8 +190,10 @@ export function generateThemeCssVars(themeConfig: Record<string, unknown>): Reco
   if (colors.secondary) vars['--tenant-color-secondary'] = colors.secondary
   if (colors.background) vars['--tenant-color-bg'] = colors.background
   if (colors.text) vars['--tenant-color-text'] = colors.text
-  if (typography.base_font) vars['--tenant-font-family'] = typography.base_font
-  if (typography.headings) vars['--tenant-font-headings'] = typography.headings
+  const bodyFontStack = buildThemeFontStack(typography.base_font)
+  const headingFontStack = buildThemeFontStack(typography.headings)
+  if (bodyFontStack) vars['--tenant-font-family'] = bodyFontStack
+  if (headingFontStack) vars['--tenant-font-headings'] = headingFontStack
   
   return vars
 }
