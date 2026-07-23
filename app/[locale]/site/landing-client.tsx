@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import { ArrowUpRight, Calculator, Cloud, Layers3, ShieldCheck, Sparkles } from 'lucide-react'
 import { useLocale, useTranslations } from 'next-intl'
+import Image from 'next/image'
 import Link from 'next/link'
 import { packages, addonsList } from '@/lib/constants/packages'
 
@@ -61,7 +62,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
         <div className="absolute inset-0 opacity-60 dagangos-grid" />
         <div className="absolute -left-32 top-12 h-80 w-80 rounded-full bg-emerald-400/20 blur-3xl dagangos-orb" />
         <div className="absolute -right-24 bottom-0 h-96 w-96 rounded-full bg-sky-400/20 blur-3xl dagangos-orb-delayed" />
-        <div className="max-w-7xl mx-auto px-6 md:px-8 relative z-10 grid items-center gap-14 lg:grid-cols-[1.1fr_.9fr]">
+        <div className="max-w-7xl mx-auto px-6 md:px-8 relative z-10 grid items-center gap-10 lg:grid-cols-[1.1fr_.9fr] lg:gap-14">
           <div className="max-w-3xl">
             <span
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold bg-white/10 border border-white/15 text-slate-100 backdrop-blur"
@@ -96,22 +97,21 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             </div>
           </div>
 
-          <div className="relative mx-auto w-full max-w-md lg:max-w-none dagangos-float">
+          <div className="order-first relative mx-auto w-full max-w-md lg:order-none lg:max-w-none dagangos-float">
             <div className="absolute -inset-5 rounded-[2rem] bg-gradient-to-br from-emerald-300/30 via-sky-400/20 to-indigo-500/20 blur-2xl" />
-            <div className="dagangos-shimmer relative rounded-[1.75rem] border border-white/15 bg-slate-950/70 p-4 shadow-2xl backdrop-blur-xl">
-              <div className="flex items-center justify-between border-b border-white/10 pb-4">
-                <div className="flex items-center gap-2"><span className="h-2.5 w-2.5 rounded-full bg-rose-400" /><span className="h-2.5 w-2.5 rounded-full bg-amber-300" /><span className="h-2.5 w-2.5 rounded-full bg-emerald-300" /></div>
-                <span className="text-xs font-medium text-slate-400">{t('command_centre')}</span>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="col-span-2 rounded-2xl border border-white/10 bg-white/[.06] p-5">
-                  <div className="flex items-center justify-between"><span className="text-sm text-slate-400">{t('your_modular_stack')}</span><Sparkles className="w-4 h-4 text-emerald-300" /></div>
-                  <div className="mt-5 flex items-end gap-2 h-20">
-                    {[38, 58, 47, 76, 66, 92, 82].map((height, index) => <span key={index} className="dagangos-spark-bar flex-1 rounded-t-full bg-gradient-to-t from-emerald-500 to-sky-400 opacity-90" style={{ height: `${height}%`, animationDelay: `${index * 150}ms` }} />)}
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p className="text-2xl font-black">15+</p><p className="mt-1 text-xs text-slate-400">{t('modules_ready')}</p></div>
-                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-4"><p className="text-2xl font-black text-emerald-300">0%</p><p className="mt-1 text-xs text-slate-400">{t('monthly_platform_fee')}</p></div>
+            <div className="dagangos-shimmer relative overflow-hidden rounded-[1.75rem] border border-white/15 bg-slate-950/80 p-2.5 shadow-2xl backdrop-blur-xl">
+              <Image
+                src="/og.png"
+                alt={t('hero_visual_alt')}
+                width={1200}
+                height={630}
+                priority
+                sizes="(min-width: 1024px) 42vw, (min-width: 768px) 70vw, 92vw"
+                className="h-auto w-full rounded-[1.25rem] border border-white/10"
+              />
+              <div className="grid grid-cols-2 gap-2.5 p-1 pt-3">
+                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-3.5"><p className="text-xl font-black">15+</p><p className="mt-1 text-xs text-slate-400">{t('modules_ready')}</p></div>
+                <div className="rounded-2xl border border-white/10 bg-white/[.06] p-3.5"><p className="text-xl font-black text-emerald-300">0%</p><p className="mt-1 text-xs text-slate-400">{t('monthly_platform_fee')}</p></div>
               </div>
             </div>
             <div className="absolute -bottom-5 left-3 rounded-2xl border border-emerald-200/25 bg-emerald-400/10 px-4 py-3 backdrop-blur dagangos-float-delayed sm:left-6"><p className="text-xs text-emerald-100">{t('launch_with_clarity')}</p><p className="text-sm font-bold text-white">{t('ownership_floating')}</p></div>
