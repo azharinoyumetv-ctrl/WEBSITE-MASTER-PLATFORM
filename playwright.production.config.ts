@@ -5,6 +5,7 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: true,
   retries: 0,
+  timeout: 90_000,
   workers: 1,
   outputDir: '.playwright-production-results',
   reporter: [

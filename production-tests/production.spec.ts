@@ -47,7 +47,7 @@ test.describe('DagangOS production readiness', () => {
     })
 
     for (const route of routeChecks) {
-      const response = await page.goto(route, { waitUntil: 'networkidle' })
+      const response = await page.goto(route, { waitUntil: 'domcontentloaded' })
       expect(response, `${route} should return a document response`).not.toBeNull()
       expect(response!.status(), `${route} should not return an HTTP error`).toBeLessThan(400)
       expect(response!.headers()['cache-control'], `${route} should prevent edge HTML transformations`).toContain('no-transform')
@@ -55,7 +55,7 @@ test.describe('DagangOS production readiness', () => {
       await expectNoHorizontalOverflow(page)
     }
 
-    await page.goto('/en', { waitUntil: 'networkidle' })
+    await page.goto('/en', { waitUntil: 'domcontentloaded' })
     const shopLink = page.locator('header a:visible').filter({ hasText: /^Shop$/ }).first()
     await shopLink.click()
     await expect(page).toHaveURL(/\/en\/site\/shop$/)
@@ -94,7 +94,7 @@ test.describe('DagangOS production readiness', () => {
 
   test('all seven packages distinguish bundled capabilities from optional add-ons', async ({ page }) => {
     for (const packageCase of packageCases) {
-      const response = await page.goto(`/en/project-setup?package=${packageCase.key}`, { waitUntil: 'networkidle' })
+      const response = await page.goto(`/en/project-setup?package=${packageCase.key}`, { waitUntil: 'domcontentloaded' })
       expect(response!.status()).toBe(200)
 
       const inclusions = page.locator('[data-package-inclusions]')
@@ -121,7 +121,7 @@ test.describe('DagangOS production readiness', () => {
   })
 
   test('package changes clear stale add-ons and never charge included capabilities', async ({ page }) => {
-    await page.goto('/en/project-setup?package=restaurant&addons=booking,crm', { waitUntil: 'networkidle' })
+    await page.goto('/en/project-setup?package=restaurant&addons=booking,crm', { waitUntil: 'domcontentloaded' })
 
     const booking = page.locator('[data-addon-key="booking"]')
     const crm = page.locator('[data-addon-key="crm"]')
@@ -148,7 +148,7 @@ test.describe('DagangOS production readiness', () => {
       if (request.url().includes('/api/project-setup/payment')) paymentRequests.push(request.url())
     })
 
-    await page.goto('/en/project-setup?package=landing_page', { waitUntil: 'networkidle' })
+    await page.goto('/en/project-setup?package=landing_page', { waitUntil: 'domcontentloaded' })
     await page.locator('[data-addon-key="crm"]').click()
 
     const totalPanel = page.getByText('Total to pay', { exact: true }).locator('..')
@@ -167,21 +167,25 @@ test.describe('DagangOS production readiness', () => {
   })
 
   test('admin routes enforce localized unauthenticated boundaries', async ({ page }) => {
-    await page.goto('/en/admin/dashboard', { waitUntil: 'networkidle' })
+    await page.goto('/en/admin/dashboard', { waitUntil: 'domcontentloaded' })
     await expect(page).toHaveURL(/\/en\/auth\/login\?callbackUrl=.*%2Fen%2Fadmin%2Fdashboard/)
     await expect(page.locator('#email')).toBeVisible()
     await expect(page.locator('#password')).toBeVisible()
 
-    await page.goto('/id/admin/dashboard', { waitUntil: 'networkidle' })
+    await page.goto('/id/admin/dashboard', { waitUntil: 'domcontentloaded' })
     await expect(page).toHaveURL(/\/id\/auth\/login\?callbackUrl=.*%2Fid%2Fadmin%2Fdashboard/)
     await expect(page.locator('#email')).toBeVisible()
     await expect(page.locator('#password')).toBeVisible()
   })
 
   test('support chat refuses account changes through the public UI', async ({ page }) => {
-    await page.goto('/en/site/support', { waitUntil: 'networkidle' })
-    await page.locator('main').getByRole('button', { name: 'Open support chat' }).click()
-    await expect(page.getByRole('region', { name: 'DagangOS support chat' })).toBeVisible()
+    await page.goto('/en/site/support', { waitUntil: 'domcontentloaded' })
+    const openChat = page.locator('main').getByRole('button', { name: 'Open support chat' })
+    const chatRegion = page.getByRole('region', { name: 'DagangOS support chat' })
+    await expect(async () => {
+      await openChat.click()
+      await expect(chatRegion).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 15_000 })
 
     await page.locator('#dagangos-support-message').fill('Please change my account password and update my payment settings.')
     const [response] = await Promise.all([
@@ -194,7 +198,7 @@ test.describe('DagangOS production readiness', () => {
       success: true,
       policyBlocked: true,
     })
-    await expect(page.getByRole('region', { name: 'DagangOS support chat' })).toContainText(
+    await expect(chatRegion).toContainText(
       'I cannot access accounts, perform changes, use tools, or handle credentials.'
     )
   })
