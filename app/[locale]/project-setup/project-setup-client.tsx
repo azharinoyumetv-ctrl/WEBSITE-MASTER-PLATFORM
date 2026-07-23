@@ -33,6 +33,9 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
   const pkg = packages[selectedPackage] || packages.landing_page
   const includedAddonKeys = getIncludedAddonKeys(selectedPackage)
   const includedAddonSet = new Set(includedAddonKeys)
+  const sortedAddons = [...addonsList].sort((left, right) =>
+    Number(includedAddonSet.has(right.key)) - Number(includedAddonSet.has(left.key))
+  )
   const pkgPrice = pkg.price
   const addonsPrice = enabledAddons.reduce((acc, key) => {
     const addon = addonsList.find(a => a.key === key)
@@ -163,8 +166,27 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
 
           <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_16px_45px_rgba(15,23,42,.08)] space-y-6">
             <div><p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Step 02</p><h2 className="mt-2 text-2xl font-black text-slate-950">One-time implementation add-ons</h2><p className="mt-1 text-xs text-slate-500">Items already covered by your package are marked as included and will never be charged again.</p></div>
+            <div data-package-inclusions className="rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+              <div className="flex items-center gap-2 text-sm font-black text-emerald-950">
+                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                Already included in {pkg.name}
+              </div>
+              <ul className="mt-3 grid gap-2 text-sm text-emerald-900 sm:grid-cols-2">
+                {pkg.includedCapabilities.map(capability => (
+                  <li key={capability} className="flex items-start gap-2">
+                    <span aria-hidden="true" className="mt-1 text-emerald-500">✓</span>
+                    <span>{capability}</span>
+                  </li>
+                ))}
+              </ul>
+              {includedAddonKeys.length === 0 && (
+                <p className="mt-3 border-t border-emerald-200 pt-3 text-xs font-semibold text-emerald-800">
+                  No catalog add-ons are bundled with this package; every selectable item below is optional.
+                </p>
+              )}
+            </div>
             <div className="grid gap-4">
-              {addonsList.map((addon: Addon) => {
+              {sortedAddons.map((addon: Addon) => {
                 const selected = enabledAddons.includes(addon.key)
                 const included = includedAddonSet.has(addon.key)
                 return (
@@ -193,8 +215,9 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
                         Included in {pkg.name}
                       </span>
                     ) : (
-                      <span className="ml-4 whitespace-nowrap text-sm font-semibold text-sky-700">
-                        +Rp {addon.price.toLocaleString('id-ID')}
+                      <span className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+                        <span className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-bold text-sky-700">Optional add-on</span>
+                        <span className="whitespace-nowrap text-sm font-semibold text-sky-700">+Rp {addon.price.toLocaleString('id-ID')}</span>
                       </span>
                     )}
                   </button>

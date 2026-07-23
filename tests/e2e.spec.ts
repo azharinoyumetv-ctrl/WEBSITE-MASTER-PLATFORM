@@ -469,4 +469,41 @@ test.describe('Website Master Platform E2E Audit', () => {
     await expect(crm).toHaveAttribute('aria-pressed', 'false');
     await expect(totalPanel.getByText('Rp 22.000.000', { exact: true })).toBeVisible();
   });
+
+  test('24. Every package distinguishes included capabilities from optional add-ons', async ({ page }) => {
+    const packageCases = [
+      { key: 'landing_page', name: 'Launch Website', includedAddons: [] },
+      { key: 'company_profile', name: 'Company Profile', includedAddons: [] },
+      { key: 'business_website', name: 'Business Website + Admin', includedAddons: [] },
+      { key: 'ecommerce', name: 'E-Commerce Platform', includedAddons: ['payment_gateway'] },
+      { key: 'restaurant', name: 'Restaurant System', includedAddons: ['booking'] },
+      { key: 'retail_pos', name: 'Retail POS + Website', includedAddons: ['payment_gateway'] },
+      { key: 'custom', name: 'Custom Platform', includedAddons: ['ai', 'booking', 'crm', 'api', 'payment_gateway'] },
+    ];
+
+    for (const packageCase of packageCases) {
+      await page.goto(`${tenantPublicBaseUrl}/en/project-setup?package=${packageCase.key}`);
+
+      const inclusions = page.locator('[data-package-inclusions]');
+      await expect(inclusions).toContainText(`Already included in ${packageCase.name}`);
+      await expect(inclusions.locator('li')).toHaveCount(4);
+
+      const addonCards = page.locator('[data-addon-key]');
+      const disabledKeys = await page.locator('[data-addon-key]:disabled').evaluateAll(cards =>
+        cards.map(card => (card as HTMLElement).dataset.addonKey)
+      );
+      expect(disabledKeys).toEqual(packageCase.includedAddons);
+
+      const optionalCards = page.locator('[data-addon-key]:not(:disabled)');
+      await expect(optionalCards).toHaveCount(9 - packageCase.includedAddons.length);
+      const optionalText = await optionalCards.allTextContents();
+      expect(optionalText.every(text => text.includes('Optional add-on'))).toBe(true);
+
+      if (packageCase.includedAddons.length > 0) {
+        await expect(addonCards.first()).toHaveAttribute('data-addon-key', packageCase.includedAddons[0]);
+      } else {
+        await expect(inclusions).toContainText('No catalog add-ons are bundled with this package');
+      }
+    }
+  });
 });

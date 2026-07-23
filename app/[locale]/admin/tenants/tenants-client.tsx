@@ -38,6 +38,9 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
     addons: [] as string[]
   })
   const includedAddonSet = new Set(getIncludedAddonKeys(formData.packageKey))
+  const sortedAddons = [...addonsList].sort((left, right) =>
+    Number(includedAddonSet.has(right.key)) - Number(includedAddonSet.has(left.key))
+  )
 
   const filtered = tenants.filter(t =>
     t.companyName.toLowerCase().includes(search.toLowerCase()) ||
@@ -308,7 +311,10 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
               <div>
                 <label className="form-label">Add-ons (Optional)</label>
                 <div className="space-y-2 mt-1.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  {addonsList.map(addon => (
+                  <p className="px-2 pb-1 text-xs text-slate-500">
+                    Included items are locked and moved to the top. Every selectable item is an additional paid implementation.
+                  </p>
+                  {sortedAddons.map(addon => (
                     <label key={addon.key} className={`flex items-start gap-2 rounded-lg p-2 text-sm font-normal ${includedAddonSet.has(addon.key) ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700'}`}>
                       <input 
                         type="checkbox" 

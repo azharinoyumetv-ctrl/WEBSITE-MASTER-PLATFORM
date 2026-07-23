@@ -12,6 +12,7 @@ export interface PackageOption {
   name: string
   price: number
   desc: string
+  includedCapabilities: string[]
   requirementsFields: string[]
 }
 
@@ -21,6 +22,7 @@ export const packages: Record<string, PackageOption> = {
     name: 'Launch Website',
     price: 3500000,
     desc: 'One-time conversion-focused website deployment',
+    includedCapabilities: ['Responsive landing page', 'Contact form', 'Basic SEO setup', 'Content management access'],
     requirementsFields: ['companyName', 'contactEmail', 'projectDescription', 'timeline', 'designPreferences'],
   },
   company_profile: {
@@ -28,6 +30,7 @@ export const packages: Record<string, PackageOption> = {
     name: 'Company Profile',
     price: 6000000,
     desc: 'One-time professional corporate web presence',
+    includedCapabilities: ['Multi-page company website', 'Content management system', 'Contact form integration', 'SEO-ready page structure'],
     requirementsFields: ['companyName', 'contactEmail', 'companyInfo', 'teamSize', 'pagesNeeded', 'brandAssets', 'timeline'],
   },
   business_website: {
@@ -35,6 +38,7 @@ export const packages: Record<string, PackageOption> = {
     name: 'Business Website + Admin',
     price: 12000000,
     desc: 'One-time business website and admin workspace deployment',
+    includedCapabilities: ['Company website and content management', 'Admin dashboard', 'User access and role controls', 'Analytics and notifications'],
     requirementsFields: ['companyName', 'contactEmail', 'projectDescription', 'adminUsers', 'contentTypes', 'integrations', 'timeline'],
   },
   ecommerce: {
@@ -42,6 +46,7 @@ export const packages: Record<string, PackageOption> = {
     name: 'E-Commerce Platform',
     price: 22000000,
     desc: 'One-time commerce platform deployment with storefront and payments',
+    includedCapabilities: ['Business website and admin workspace', 'Product catalog and storefront', 'Checkout and payment gateway setup', 'Orders and inventory management'],
     requirementsFields: ['companyName', 'contactEmail', 'productCount', 'paymentGateways', 'shippingNeeds', 'inventorySystem', 'timeline'],
   },
   restaurant: {
@@ -49,6 +54,7 @@ export const packages: Record<string, PackageOption> = {
     name: 'Restaurant System',
     price: 28000000,
     desc: 'One-time restaurant system deployment for menus, bookings, and operations',
+    includedCapabilities: ['Restaurant website and admin workspace', 'Menu catalog', 'Booking and scheduling', 'Staff access and operational analytics'],
     requirementsFields: ['companyName', 'contactEmail', 'menuItems', 'tableCount', 'reservationNeeds', 'kitchenDisplay', 'timeline'],
   },
   retail_pos: {
@@ -56,6 +62,7 @@ export const packages: Record<string, PackageOption> = {
     name: 'Retail POS + Website',
     price: 35000000,
     desc: 'One-time online store and browser POS deployment',
+    includedCapabilities: ['E-commerce storefront and checkout', 'Browser-based POS terminal', 'Payment gateway setup', 'Inventory tracking and synchronization'],
     requirementsFields: ['companyName', 'contactEmail', 'storeLocations', 'productTypes', 'paymentMethods', 'staffCount', 'timeline'],
   },
   custom: {
@@ -63,6 +70,7 @@ export const packages: Record<string, PackageOption> = {
     name: 'Custom Platform',
     price: 45000000,
     desc: 'Starting price for a bespoke self-hosted business platform',
+    includedCapabilities: ['Website, admin, commerce, POS, and inventory modules', 'CRM and booking modules', 'AI assistant integration', 'Analytics, notifications, and developer API portal'],
     requirementsFields: ['companyName', 'contactEmail', 'detailedRequirements', 'budget', 'timeline'],
   },
 }
