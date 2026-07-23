@@ -2,16 +2,27 @@
 
 import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { ArrowRight, Calculator, Loader2 } from 'lucide-react'
+import { ArrowRight, Calculator, CheckCircle2, Loader2 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
-import { packages, addonsList, requirementFieldLabels, type Addon, type PackageOption } from '@/lib/constants/packages'
+import {
+  packages,
+  addonsList,
+  getBillableAddonKeys,
+  getIncludedAddonKeys,
+  requirementFieldLabels,
+  type Addon,
+  type PackageOption,
+} from '@/lib/constants/packages'
 
 type CheckoutErrors = Partial<Record<'package' | 'contactEmail' | string, string>>;
 
 export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
   const search = useSearchParams()
-  const preselectedPackage = search.get('package') || 'landing_page'
-  const preselectedAddons = search.get('addons')?.split(',').filter(Boolean) || []
+  const requestedPackage = search.get('package') || 'landing_page'
+  const preselectedPackage = packages[requestedPackage] ? requestedPackage : 'landing_page'
+  const requestedAddons = (search.get('addons')?.split(',').filter(Boolean) || [])
+    .filter(key => addonsList.some(addon => addon.key === key))
+  const preselectedAddons = getBillableAddonKeys(preselectedPackage, requestedAddons)
 
   const [selectedPackage, setSelectedPackage] = useState<string>(preselectedPackage)
   const [enabledAddons, setEnabledAddons] = useState<string[]>(preselectedAddons)
@@ -20,6 +31,8 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
   const [errors, setErrors] = useState<CheckoutErrors>({})
 
   const pkg = packages[selectedPackage] || packages.landing_page
+  const includedAddonKeys = getIncludedAddonKeys(selectedPackage)
+  const includedAddonSet = new Set(includedAddonKeys)
   const pkgPrice = pkg.price
   const addonsPrice = enabledAddons.reduce((acc, key) => {
     const addon = addonsList.find(a => a.key === key)
@@ -28,6 +41,7 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
   const total = pkgPrice + addonsPrice
 
   const toggleAddon = (key: string) => {
+    if (includedAddonSet.has(key)) return
     setEnabledAddons(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
     setErrors(prev => ({ ...prev, addons: '' }))
   }
@@ -148,26 +162,41 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
           </div>
 
           <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_16px_45px_rgba(15,23,42,.08)] space-y-6">
-            <div><p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Step 02</p><h2 className="mt-2 text-2xl font-black text-slate-950">One-time implementation add-ons</h2><p className="mt-1 text-xs text-slate-500">Selected integrations are implemented with your platform; they are not recurring subscriptions.</p></div>
+            <div><p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">Step 02</p><h2 className="mt-2 text-2xl font-black text-slate-950">One-time implementation add-ons</h2><p className="mt-1 text-xs text-slate-500">Items already covered by your package are marked as included and will never be charged again.</p></div>
             <div className="grid gap-4">
               {addonsList.map((addon: Addon) => {
                 const selected = enabledAddons.includes(addon.key)
+                const included = includedAddonSet.has(addon.key)
                 return (
                   <button
                     key={addon.key}
                     type="button"
+                    data-addon-key={addon.key}
+                    disabled={included}
+                    aria-pressed={included ? undefined : selected}
                     onClick={() => toggleAddon(addon.key)}
-                    className={`text-left p-4 rounded-xl border flex justify-between items-center transition ${
-                      selected ? 'border-sky-400 bg-sky-50 shadow-sm' : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md'
+                    className={`flex flex-col items-start justify-between gap-3 rounded-xl border p-4 text-left transition sm:flex-row sm:items-center ${
+                      included
+                        ? 'cursor-not-allowed border-emerald-200 bg-emerald-50/70'
+                        : selected
+                          ? 'border-sky-400 bg-sky-50 shadow-sm'
+                          : 'border-slate-200 bg-white hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-md'
                     }`}
                   >
-                    <div>
+                    <div className="pr-4">
                       <p className="font-semibold text-slate-900">{addon.name}</p>
                       <p className="text-sm text-slate-500">{addon.desc}</p>
                     </div>
-                    <span className="text-sm font-semibold text-sky-700 ml-4 whitespace-nowrap">
-                      +Rp {addon.price.toLocaleString('id-ID')}
-                    </span>
+                    {included ? (
+                      <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-800">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        Included in {pkg.name}
+                      </span>
+                    ) : (
+                      <span className="ml-4 whitespace-nowrap text-sm font-semibold text-sky-700">
+                        +Rp {addon.price.toLocaleString('id-ID')}
+                      </span>
+                    )}
                   </button>
                 )
               })}
@@ -215,6 +244,11 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
             <p className="text-sm text-slate-300 mt-1">
               {enabledAddons.length > 0 ? `${enabledAddons.length} add-on${enabledAddons.length > 1 ? 's' : ''} selected` : 'No add-ons'}
             </p>
+            {includedAddonKeys.length > 0 && (
+              <p className="mt-1 text-xs font-semibold text-emerald-200">
+                {includedAddonKeys.length} add-on {includedAddonKeys.length === 1 ? 'capability is' : 'capabilities are'} already included
+              </p>
+            )}
           </div>
           <div className="relative text-right">
             <p className="text-sm text-slate-300 mb-1">Total to pay</p>

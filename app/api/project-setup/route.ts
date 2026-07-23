@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
-import { addonsList, packages } from '@/lib/constants/packages'
+import { addonsList, getBillableAddonKeys, getIncludedAddonKeys, packages } from '@/lib/constants/packages'
 import { resolvePublicTenant } from '@/lib/tenant-context'
 import { isTenantFeatureEnabled } from '@/lib/feature-flags'
 
@@ -54,7 +54,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: `Missing required field: ${missingRequirement}` }, { status: 400 })
     }
 
-    const selectedAddons = selectedAddonKeys.map(key => addonsList.find(addon => addon.key === key)!)
+    // Included capabilities are never charged again, even if an old link or
+    // modified request submits them as add-ons.
+    const billableAddonKeys = getBillableAddonKeys(packageKey, selectedAddonKeys)
+    const selectedAddons = billableAddonKeys.map(key => addonsList.find(addon => addon.key === key)!)
+    const includedAddons = getIncludedAddonKeys(packageKey)
+      .map(key => addonsList.find(addon => addon.key === key)!)
     const calculatedTotal = pkg.price + selectedAddons.reduce((sum, addon) => sum + addon.price, 0)
     if (total !== undefined && total !== calculatedTotal) {
       return NextResponse.json({ success: false, error: 'The submitted total does not match the selected package' }, { status: 400 })
@@ -71,6 +76,7 @@ export async function POST(request: NextRequest) {
           packageKey,
           packageName: pkg.name,
           addons: selectedAddons.map(({ key, name, price }) => ({ key, name, price })),
+          includedAddons: includedAddons.map(({ key, name }) => ({ key, name, price: 0 })),
           requirements,
           source: 'project_setup',
         }),

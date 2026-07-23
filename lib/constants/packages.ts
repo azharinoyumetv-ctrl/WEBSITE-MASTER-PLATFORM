@@ -87,6 +87,40 @@ export const addonModuleMap: Record<string, string> = {
   whatsapp: 'whatsapp_module',
 }
 
+export const packageModuleMap: Record<string, string[]> = {
+  landing_page: ['website_module', 'admin_module', 'user_management', 'rbac_module'],
+  company_profile: ['website_module', 'admin_module', 'user_management', 'rbac_module'],
+  business_website: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'notification_module', 'analytics_module'],
+  ecommerce: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'ecommerce_module', 'payment_module', 'inventory_module', 'notification_module', 'analytics_module'],
+  restaurant: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'booking_module', 'notification_module', 'analytics_module'],
+  retail_pos: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'ecommerce_module', 'payment_module', 'pos_module', 'inventory_module', 'notification_module', 'analytics_module'],
+  custom: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'ecommerce_module', 'payment_module', 'pos_module', 'inventory_module', 'crm_module', 'booking_module', 'ai_module', 'notification_module', 'analytics_module', 'api_module'],
+}
+
+/**
+ * Implementation services that are explicitly covered by a package even
+ * though they do not map one-to-one to a provisioned platform module.
+ */
+const packageIncludedServiceAddons: Record<string, string[]> = {
+  ecommerce: ['payment_gateway'],
+  retail_pos: ['payment_gateway'],
+  custom: ['payment_gateway'],
+}
+
+export function getIncludedAddonKeys(packageKey: string): string[] {
+  const includedModules = new Set(packageModuleMap[packageKey] || [])
+  const includedServices = new Set(packageIncludedServiceAddons[packageKey] || [])
+
+  return addonsList
+    .filter(addon => includedServices.has(addon.key) || includedModules.has(addonModuleMap[addon.key]))
+    .map(addon => addon.key)
+}
+
+export function getBillableAddonKeys(packageKey: string, addonKeys: string[]): string[] {
+  const included = new Set(getIncludedAddonKeys(packageKey))
+  return Array.from(new Set(addonKeys)).filter(key => !included.has(key))
+}
+
 export const requirementFieldLabels: Record<string, { label: string; placeholder?: string; type?: string }> = {
   companyName: { label: 'Company / Personal Name', placeholder: 'Your name or business name' },
   contactEmail: { label: 'Contact Email', placeholder: 'email@domain.com', type: 'email' },

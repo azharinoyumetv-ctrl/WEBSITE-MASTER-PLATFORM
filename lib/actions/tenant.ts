@@ -8,7 +8,7 @@ import { dispatchNotification } from '@/lib/actions/notifications'
 import { getTenantPublicUrl } from '@/lib/tenant-url'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
-import { addonModuleMap, addonsList } from '@/lib/constants/packages'
+import { addonModuleMap, addonsList, getBillableAddonKeys, packageModuleMap, packages } from '@/lib/constants/packages'
 
 export async function getTenants() {
   try {
@@ -61,6 +61,9 @@ export async function createTenant(data: { companyName: string, subdomain: strin
     }
 
     const packageKey = data.packageKey || 'landing_page'
+    if (!packages[packageKey]) {
+      return { success: false, error: 'The selected package is invalid.' }
+    }
     const plan = (packageKey === 'custom' || packageKey === 'retail_pos' || packageKey === 'ecommerce') ? 'enterprise' : 'core'
 
     const tenant = await prisma.systemTenant.create({
@@ -72,25 +75,16 @@ export async function createTenant(data: { companyName: string, subdomain: strin
       }
     })
 
-    // Determine modules to enable based on package
-    const packageModuleMap: Record<string, string[]> = {
-      landing_page: ['website_module', 'admin_module', 'user_management', 'rbac_module'],
-      company_profile: ['website_module', 'admin_module', 'user_management', 'rbac_module'],
-      business_website: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'notification_module', 'analytics_module'],
-      ecommerce: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'ecommerce_module', 'payment_module', 'inventory_module', 'notification_module', 'analytics_module'],
-      restaurant: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'booking_module', 'notification_module', 'analytics_module'],
-      retail_pos: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'ecommerce_module', 'payment_module', 'pos_module', 'inventory_module', 'notification_module', 'analytics_module'],
-      custom: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'ecommerce_module', 'payment_module', 'pos_module', 'inventory_module', 'crm_module', 'booking_module', 'ai_module', 'notification_module', 'analytics_module', 'api_module']
-    }
-
-    const enabledModules = new Set(packageModuleMap[packageKey] || packageModuleMap.landing_page)
+    // Determine modules to enable based on package.
+    const enabledModules = new Set(packageModuleMap[packageKey])
     
-    const selectedAddons = Array.from(new Set(data.addons || []))
-    const hasInvalidAddon = selectedAddons.some(key => !addonsList.some(addon => addon.key === key))
+    const submittedAddons = Array.from(new Set(data.addons || []))
+    const hasInvalidAddon = submittedAddons.some(key => !addonsList.some(addon => addon.key === key))
     if (hasInvalidAddon) {
       await prisma.systemTenant.delete({ where: { id: tenant.id } })
       return { success: false, error: 'One or more selected add-ons are invalid.' }
     }
+    const selectedAddons = getBillableAddonKeys(packageKey, submittedAddons)
 
     for (const addonKey of selectedAddons) {
       const moduleKey = addonModuleMap[addonKey]

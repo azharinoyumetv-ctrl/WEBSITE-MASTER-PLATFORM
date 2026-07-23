@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
 import crypto from 'crypto';
+import { getBillableAddonKeys, getIncludedAddonKeys } from '../lib/constants/packages';
 
 const e2eBaseUrl = process.env.E2E_BASE_URL || 'http://localhost:4000';
 const e2ePort = new URL(e2eBaseUrl).port;
@@ -440,5 +441,32 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.fill('#password', 'SecureE2EPassword!23');
     await page.click('#login-submit');
     await page.waitForURL('**/admin/dashboard');
+  });
+
+  test('23. Package-included add-ons cannot be selected or charged again', async ({ page }) => {
+    expect(getIncludedAddonKeys('restaurant')).toContain('booking');
+    expect(getBillableAddonKeys('restaurant', ['booking', 'crm'])).toEqual(['crm']);
+
+    await page.goto(`${tenantPublicBaseUrl}/en/project-setup?package=restaurant&addons=booking,crm`);
+
+    const booking = page.locator('[data-addon-key="booking"]');
+    await expect(booking).toBeDisabled();
+    await expect(booking).toContainText('Included in Restaurant System');
+    await expect(booking).not.toContainText('+Rp');
+
+    const crm = page.locator('[data-addon-key="crm"]');
+    await expect(crm).toBeEnabled();
+    await expect(crm).toHaveAttribute('aria-pressed', 'true');
+    const totalPanel = page.getByText('Total to pay', { exact: true }).locator('..');
+    await expect(totalPanel.getByText('Rp 31.500.000', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: /E-Commerce Platform/ }).click();
+
+    const paymentGateway = page.locator('[data-addon-key="payment_gateway"]');
+    await expect(paymentGateway).toBeDisabled();
+    await expect(paymentGateway).toContainText('Included in E-Commerce Platform');
+    await expect(booking).toBeEnabled();
+    await expect(crm).toHaveAttribute('aria-pressed', 'false');
+    await expect(totalPanel.getByText('Rp 22.000.000', { exact: true })).toBeVisible();
   });
 });

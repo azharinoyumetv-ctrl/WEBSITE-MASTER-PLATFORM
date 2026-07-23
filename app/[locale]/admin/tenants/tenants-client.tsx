@@ -11,7 +11,7 @@ import { formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { createTenant } from '@/lib/actions/tenant'
 import { useLocale } from 'next-intl'
-import { addonsList, packages } from '@/lib/constants/packages'
+import { addonsList, getBillableAddonKeys, getIncludedAddonKeys, packages } from '@/lib/constants/packages'
 import { getTenantPublicUrl } from '@/lib/tenant-url'
 
 const PLAN_CONFIG = {
@@ -37,6 +37,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
     packageKey: 'landing_page',
     addons: [] as string[]
   })
+  const includedAddonSet = new Set(getIncludedAddonKeys(formData.packageKey))
 
   const filtered = tenants.filter(t =>
     t.companyName.toLowerCase().includes(search.toLowerCase()) ||
@@ -290,7 +291,14 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                 <select 
                   className="form-select"
                   value={formData.packageKey}
-                  onChange={(e) => setFormData({ ...formData, packageKey: e.target.value })}
+                  onChange={(e) => {
+                    const packageKey = e.target.value
+                    setFormData({
+                      ...formData,
+                      packageKey,
+                      addons: getBillableAddonKeys(packageKey, formData.addons),
+                    })
+                  }}
                 >
                   {Object.values(packages).map((pkg) => (
                     <option key={pkg.key} value={pkg.key}>{pkg.name} ({new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price)}{pkg.key === 'custom' ? '+' : ''})</option>
@@ -301,19 +309,27 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                 <label className="form-label">Add-ons (Optional)</label>
                 <div className="space-y-2 mt-1.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
                   {addonsList.map(addon => (
-                    <label key={addon.key} className="flex items-center gap-2 text-sm text-slate-700 font-normal">
+                    <label key={addon.key} className={`flex items-start gap-2 rounded-lg p-2 text-sm font-normal ${includedAddonSet.has(addon.key) ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700'}`}>
                       <input 
                         type="checkbox" 
-                        checked={formData.addons.includes(addon.key)}
+                        checked={includedAddonSet.has(addon.key) || formData.addons.includes(addon.key)}
+                        disabled={includedAddonSet.has(addon.key)}
                         onChange={(e) => {
                           const list = e.target.checked 
                             ? [...formData.addons, addon.key]
                             : formData.addons.filter((item) => item !== addon.key)
                           setFormData({ ...formData, addons: list })
                         }}
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" 
+                        className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-70"
                       />
-                      <span>{addon.name} ({new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.price)}{addon.priceNote ? `, ${addon.priceNote}` : ''})</span>
+                      <span>
+                        <span className="block">{addon.name}</span>
+                        {includedAddonSet.has(addon.key) ? (
+                          <span className="text-xs font-bold text-emerald-700">Included in selected package — no additional charge</span>
+                        ) : (
+                          <span className="text-xs text-slate-500">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.price)}{addon.priceNote ? `, ${addon.priceNote}` : ''}</span>
+                        )}
+                      </span>
                     </label>
                   ))}
                 </div>
