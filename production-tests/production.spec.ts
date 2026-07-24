@@ -149,7 +149,11 @@ test.describe('DagangOS production readiness', () => {
     })
 
     await page.goto('/en/project-setup?package=landing_page', { waitUntil: 'domcontentloaded' })
-    await page.locator('[data-addon-key="crm"]').click()
+    const crmAddon = page.locator('[data-addon-key="crm"]')
+    await expect(async () => {
+      await crmAddon.click()
+      await expect(crmAddon).toHaveAttribute('aria-pressed', 'true', { timeout: 1_000 })
+    }).toPass({ timeout: 15_000 })
 
     const totalPanel = page.getByText('Total to pay', { exact: true }).locator('..')
     await expect(totalPanel).toContainText('Rp 7.000.000')
