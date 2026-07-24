@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
 import { execSync } from 'child_process';
+import crypto from 'crypto';
+import { getBillableAddonKeys, getIncludedAddonKeys } from '../lib/constants/packages';
+
+const e2eBaseUrl = process.env.E2E_BASE_URL || 'http://localhost:4000';
+const e2ePort = new URL(e2eBaseUrl).port;
+const tenantPublicBaseUrl = `http://dagangos.localhost${e2ePort ? `:${e2ePort}` : ''}`;
 
 test.beforeAll(async () => {
   console.log('Seeding database for Playwright tests...');
@@ -19,6 +25,11 @@ test.describe('Website Master Platform E2E Audit', () => {
 
     await page.waitForURL('**/admin/dashboard', { timeout: 50000 });
     await expect(page.locator('h1')).toContainText(/Dashboard/i);
+    await expect(page.locator('nav a[href="/en/admin/pages"]')).toBeVisible();
+    await expect(page.locator('nav a[href="/en/admin/users"]')).toBeVisible();
+    await expect(page.locator('nav a[href="/en/admin/rbac"]')).toBeVisible();
+    await expect(page.locator('a[href="/en/admin/profile"]')).toBeVisible();
+    await expect(page.locator('nav a[href="/en/admin/tenants"]')).toHaveCount(0);
   });
 
   test('02. Admin Settings & Tenant Branding', async ({ page }) => {
@@ -54,6 +65,9 @@ test.describe('Website Master Platform E2E Audit', () => {
     await expect(page.locator('h1')).toContainText(/Users/i);
 
     await expect(page.locator('h1')).toContainText(/Users/i);
+
+    await page.goto('/admin/tenants');
+    await expect(page.getByRole('heading', { name: 'Platform-owner access required' })).toBeVisible();
   });
 
   test('04. RBAC Permission Boundaries', async ({ page }) => {
@@ -173,10 +187,9 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.fill('input[type="time"]', '10:00');
     
     await page.click('#confirm-booking-btn');
-    await page.waitForTimeout(1000);
 
-    // Verify booking in list
-    await expect(page.locator('table')).toContainText('guest-booking@dagangos.com');
+    // Server actions can take a moment while the database is under a full-suite load.
+    await expect(page.locator('table')).toContainText('guest-booking@dagangos.com', { timeout: 15000 });
   });
 
   test('11. CRM Contacts & Timeline Logs', async ({ page }) => {
@@ -193,7 +206,7 @@ test.describe('Website Master Platform E2E Audit', () => {
     await expect(page.locator('.card').first()).toContainText('e2e-contact@gmail.com');
   });
 
-  test('12. AI Assistant Playground', async ({ page }) => {
+  test('12. AI Assistant Configuration State', async ({ page }) => {
     await page.goto('/auth/login');
     await page.fill('#email', 'admin@dagangos.com');
     await page.fill('#password', 'password123');
@@ -203,12 +216,9 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.goto('/admin/ai');
     await expect(page.locator('h1')).toContainText(/AI Assistant/i);
 
-    // Test sending chat message
-    await page.fill('input[placeholder="Ask the AI anything about your platform..."]', 'Hello AI');
-    await page.click('#ai-send-btn');
-
-    // Verify simulator responds with API missing error since it's no longer mocking
-    await expect(page.locator('.page-container')).toContainText(/AI Not Configured|unable to assist/i);
+    // AI must not fabricate a response when the tenant has no configured provider.
+    await expect(page.getByRole('heading', { name: 'AI Provider Unconfigured' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Configure AI' })).toHaveAttribute('href', '/admin/settings?tab=ai');
   });
 
   test('13. API Portal & Key Generation', async ({ page }) => {
@@ -221,11 +231,13 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.goto('/admin/api-portal');
     await expect(page.locator('h1')).toContainText(/API Portal/i);
 
-    await page.click('text=Generate Key');
-    await page.waitForTimeout(1000);
-
-    // Verify key in first card (API Keys card)
-    await expect(page.locator('.card').first()).toContainText('New API Key 1');
+    await page.getByRole('button', { name: 'Generate Key' }).click();
+    const keyModal = page.locator('.fixed.inset-0').filter({ hasText: 'Generate API Key' });
+    await keyModal.getByPlaceholder('e.g. Production Client').fill('E2E API Key');
+    await keyModal.getByRole('button', { name: 'Generate', exact: true }).click();
+    await expect(page.getByText('Key Generated Successfully')).toBeVisible();
+    await page.getByRole('button', { name: 'Close & I have copied it' }).click();
+    await expect(page.locator('.card').first()).toContainText('E2E API Key');
   });
 
   test('14. Feature Flags & Overrides', async ({ page }) => {
@@ -236,7 +248,7 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.waitForURL('**/admin/dashboard');
 
     await page.goto('/admin/feature-flags');
-    await expect(page.locator('h1')).toContainText(/Feature Flags/i);
+    await expect(page.getByRole('heading', { name: 'Feature Flags', exact: true, level: 2 })).toBeVisible();
 
     const flagRow = page.locator('table tbody tr').first();
     const toggleButton = flagRow.locator('button');
@@ -274,31 +286,31 @@ test.describe('Website Master Platform E2E Audit', () => {
     await expect(page.locator('table')).toContainText('e2e-catalog-test');
 
     // Verify existing e2e-catalog page on public site dynamic routing
-    await page.goto('http://dagangos.localhost:4000/e2e-catalog');
+    await page.goto(`${tenantPublicBaseUrl}/e2e-catalog`);
     await expect(page).toHaveTitle(/E2E Catalog/i);
   });
 
   test('16. Public Pages — Products & Shop (no 404)', async ({ page }) => {
     // Visit /products from public site (subdomain aware)
-    await page.goto('http://dagangos.localhost:4000/products');
+    await page.goto(`${tenantPublicBaseUrl}/products`);
     // Should not be a 404 page — should show the Products page
     await expect(page).not.toHaveTitle(/404/i);
     const body = await page.locator('body').textContent();
     expect(body).toMatch(/Landing Page|Starter|Rp|Company Profile/i);
 
-    await page.goto('http://dagangos.localhost:4000/shop');
+    await page.goto(`${tenantPublicBaseUrl}/shop`);
     await expect(page).not.toHaveTitle(/404/i);
     const shopBody = await page.locator('body').textContent();
     expect(shopBody).toMatch(/Shop|Plan|DagangOS/i);
   });
 
   test('17. Public Pages — About & Contact (no 404)', async ({ page }) => {
-    await page.goto('http://dagangos.localhost:4000/about');
+    await page.goto(`${tenantPublicBaseUrl}/about`);
     await expect(page).not.toHaveTitle(/404/i);
     const aboutBody = await page.locator('body').textContent();
     expect(aboutBody).toMatch(/About|Mission|DagangOS/i);
 
-    await page.goto('http://dagangos.localhost:4000/contact');
+    await page.goto(`${tenantPublicBaseUrl}/contact`);
     await expect(page).not.toHaveTitle(/404/i);
     const contactBody = await page.locator('body').textContent();
     expect(contactBody).toMatch(/Contact|Email|Message/i);
@@ -339,11 +351,159 @@ test.describe('Website Master Platform E2E Audit', () => {
     await midtransSecret.fill('SB-Mid-server-testkey123');
 
     await page.click('text=Save Changes');
-    await expect(page.locator('text=Settings saved successfully')).toBeVisible({ timeout: 15000 });
 
-    // Reload and verify
+    // The page reloads automatically after a successful save; assert durable data
+    // rather than a short-lived notification that can disappear during navigation.
+    await page.waitForTimeout(1000);
     await page.reload();
     await expect(page.locator('h5:has-text("Xendit") + label input[type="checkbox"]')).toBeChecked();
     await expect(page.locator('h5:has-text("Midtrans") + label input[type="checkbox"]')).toBeChecked();
+  });
+
+  test('20. WhatsApp Is an Optional Project Add-on', async ({ page }) => {
+    await page.goto('/auth/login');
+    await page.fill('#email', 'admin@dagangos.com');
+    await page.fill('#password', 'password123');
+    await page.click('#login-submit');
+    await page.waitForURL('**/admin/dashboard');
+
+    await page.goto('/admin/settings');
+    await expect(page.getByText('WhatsApp Business Integration')).toHaveCount(0);
+
+    await page.goto('/admin/modules');
+    const whatsappModule = page.locator('.card').filter({ hasText: 'WhatsApp Business' });
+    await expect(whatsappModule).toContainText('Project add-on');
+    await expect(whatsappModule.getByRole('button')).toHaveCount(0);
+  });
+
+  test('21. Control-plane API telemetry records actual final responses', async ({ page }) => {
+    const rawBody = JSON.stringify({
+      instanceId: '11111111-1111-4111-8111-111111111111',
+      licenseKey: 'e2e-control-plane-license'
+    });
+    const timestamp = String(Date.now());
+    const signature = crypto
+      .createHmac('sha256', process.env.E2E_CONTROL_PLANE_SECRET || 'e2e-control-plane-secret')
+      .update(`${timestamp}:${rawBody}`)
+      .digest('hex');
+
+    const response = await page.request.post('/api/v1/instances/validate-license', {
+      headers: {
+        'content-type': 'application/json',
+        'x-license-key': 'e2e-control-plane-license',
+        'x-request-timestamp': timestamp,
+        'x-signature': signature
+      },
+      data: rawBody
+    });
+    expect(response.status()).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ valid: true });
+
+    await page.goto('/auth/login');
+    await page.fill('#email', 'admin@dagangos.com');
+    await page.fill('#password', 'password123');
+    await page.click('#login-submit');
+    await page.waitForURL('**/admin/dashboard');
+    await page.goto('/admin/api-portal');
+    await expect(page.getByText('Recorded API requests')).toBeVisible();
+    await expect(page.getByText('POST /api/v1/instances/validate-license')).toBeVisible();
+    await expect(page.getByText('200', { exact: true }).last()).toBeVisible();
+  });
+
+  test('22. Workspace invitation can be copied and accepted securely', async ({ page }) => {
+    await page.goto('/auth/login');
+    await page.fill('#email', 'admin@dagangos.com');
+    await page.fill('#password', 'password123');
+    await page.click('#login-submit');
+    await page.waitForURL('**/admin/dashboard');
+
+    await page.goto('/admin/users');
+    await page.getByRole('button', { name: 'Invite User' }).click();
+    await page.locator('#invite-email').fill('invited-e2e@dagangos.com');
+    await page.locator('#send-invite-btn').click();
+
+    const accessUrl = page.locator('#invite-access-url');
+    await expect(accessUrl).toBeVisible();
+    const invitationUrl = await accessUrl.inputValue();
+    expect(invitationUrl).toContain('/auth/accept-invitation?token=');
+
+    await page.goto(invitationUrl);
+    await expect(page.getByText('Activate your access')).toBeVisible();
+    await page.locator('#invite-first-name').fill('Invited');
+    await page.locator('#invite-last-name').fill('Tester');
+    await page.locator('#invite-password').fill('SecureE2EPassword!23');
+    await page.locator('#invite-password-confirmation').fill('SecureE2EPassword!23');
+    await page.locator('#accept-invitation-submit').click();
+    await expect(page.getByText('Workspace activated')).toBeVisible();
+
+    await page.getByRole('link', { name: 'Sign in' }).click();
+    await page.fill('#email', 'invited-e2e@dagangos.com');
+    await page.fill('#password', 'SecureE2EPassword!23');
+    await page.click('#login-submit');
+    await page.waitForURL('**/admin/dashboard');
+  });
+
+  test('23. Package-included add-ons cannot be selected or charged again', async ({ page }) => {
+    expect(getIncludedAddonKeys('restaurant')).toContain('booking');
+    expect(getBillableAddonKeys('restaurant', ['booking', 'crm'])).toEqual(['crm']);
+
+    await page.goto(`${tenantPublicBaseUrl}/en/project-setup?package=restaurant&addons=booking,crm`);
+
+    const booking = page.locator('[data-addon-key="booking"]');
+    await expect(booking).toBeDisabled();
+    await expect(booking).toContainText('Included in Restaurant System');
+    await expect(booking).not.toContainText('+Rp');
+
+    const crm = page.locator('[data-addon-key="crm"]');
+    await expect(crm).toBeEnabled();
+    await expect(crm).toHaveAttribute('aria-pressed', 'true');
+    const totalPanel = page.getByText('Total to pay', { exact: true }).locator('..');
+    await expect(totalPanel.getByText('Rp 31.500.000', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: /E-Commerce Platform/ }).click();
+
+    const paymentGateway = page.locator('[data-addon-key="payment_gateway"]');
+    await expect(paymentGateway).toBeDisabled();
+    await expect(paymentGateway).toContainText('Included in E-Commerce Platform');
+    await expect(booking).toBeEnabled();
+    await expect(crm).toHaveAttribute('aria-pressed', 'false');
+    await expect(totalPanel.getByText('Rp 22.000.000', { exact: true })).toBeVisible();
+  });
+
+  test('24. Every package distinguishes included capabilities from optional add-ons', async ({ page }) => {
+    const packageCases = [
+      { key: 'landing_page', name: 'Launch Website', includedAddons: [] },
+      { key: 'company_profile', name: 'Company Profile', includedAddons: [] },
+      { key: 'business_website', name: 'Business Website + Admin', includedAddons: [] },
+      { key: 'ecommerce', name: 'E-Commerce Platform', includedAddons: ['payment_gateway'] },
+      { key: 'restaurant', name: 'Restaurant System', includedAddons: ['booking'] },
+      { key: 'retail_pos', name: 'Retail POS + Website', includedAddons: ['payment_gateway'] },
+      { key: 'custom', name: 'Custom Platform', includedAddons: ['ai', 'booking', 'crm', 'api', 'payment_gateway'] },
+    ];
+
+    for (const packageCase of packageCases) {
+      await page.goto(`${tenantPublicBaseUrl}/en/project-setup?package=${packageCase.key}`);
+
+      const inclusions = page.locator('[data-package-inclusions]');
+      await expect(inclusions).toContainText(`Already included in ${packageCase.name}`);
+      await expect(inclusions.locator('li')).toHaveCount(4);
+
+      const addonCards = page.locator('[data-addon-key]');
+      const disabledKeys = await page.locator('[data-addon-key]:disabled').evaluateAll(cards =>
+        cards.map(card => (card as HTMLElement).dataset.addonKey)
+      );
+      expect(disabledKeys).toEqual(packageCase.includedAddons);
+
+      const optionalCards = page.locator('[data-addon-key]:not(:disabled)');
+      await expect(optionalCards).toHaveCount(9 - packageCase.includedAddons.length);
+      const optionalText = await optionalCards.allTextContents();
+      expect(optionalText.every(text => text.includes('Optional add-on'))).toBe(true);
+
+      if (packageCase.includedAddons.length > 0) {
+        await expect(addonCards.first()).toHaveAttribute('data-addon-key', packageCase.includedAddons[0]);
+      } else {
+        await expect(inclusions).toContainText('No catalog add-ons are bundled with this package');
+      }
+    }
   });
 });

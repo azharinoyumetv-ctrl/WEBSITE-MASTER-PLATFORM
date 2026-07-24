@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 import { decrypt } from '@/lib/crypto'
 import crypto from 'crypto'
 import { sendOrderConfirmationEmail } from './notifications'
@@ -254,7 +255,8 @@ export async function createDokuCheckout(
   orderId: string,
   amount: number,
   currency: string,
-  customer?: { name?: string; email?: string; phone?: string }
+  customer?: { name?: string; email?: string; phone?: string },
+  returnBaseUrl?: string,
 ) {
   try {
     const auth = await getDokuAuth(tenantId);
@@ -263,14 +265,8 @@ export async function createDokuCheckout(
     });
     if (!tenant) throw new Error("Tenant not found");
 
-    let host = '';
-    if (tenant.customDomain) {
-      host = `https://${tenant.customDomain}`;
-    } else {
-      const subdomain = tenant.subdomain;
-      const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com';
-      host = `https://${subdomain}.${baseDomain}`;
-    }
+    let host = returnBaseUrl || '';
+    if (!host) host = getTenantPublicUrl(tenant)
     
     // Jokul Checkout API URL
     const baseUrl = auth.environment === 'production'
@@ -309,15 +305,20 @@ export async function createDokuCheckout(
       ];
     }
 
-    const uniqueInvoiceNumber = `${orderId.slice(0, 8)}_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`;
+    // A full UUID is accepted by DOKU and lets the webhook resolve the order
+    // without lossy prefix parsing. It is already unique per order.
+    const uniqueInvoiceNumber = orderId;
 
     const body = {
       order: {
         amount: Math.round(amount),
         invoice_number: uniqueInvoiceNumber,
         currency: 'IDR',
-        callback_url: `${host}/api/webhook/doku/result`,
-        callback_url_result: `${host}/api/webhook/doku/result`
+        callback_url: `${host}/api/webhook/doku`,
+        callback_url_result: `${host}/en/project-setup/confirmation?orderId=${encodeURIComponent(orderId)}`,
+        // DOKU Checkout requires this property. Keeping the hosted result page
+        // avoids redirecting a customer before they can review the result.
+        auto_redirect: false
       },
       payment: {
         payment_due_date: 60,
@@ -479,12 +480,26 @@ export async function handleDokuNotification(req: Request) {
     if (!rawInvoiceNumber) {
       return { status: 400, body: { error: 'Missing invoice number' } };
     }
-    const invoiceNumber = rawInvoiceNumber.includes('_') ? rawInvoiceNumber.split('_')[0] : rawInvoiceNumber;
 
-    // Look up the order to identify the tenant
-    const order = await prisma.tenantOrder.findFirst({
-      where: { id: invoiceNumber }
+    // New invoices use the complete order UUID. Older deployments generated
+    // `${uuid-prefix}_${timestamp}_${random}`; resolve that legacy prefix
+    // only when it is a valid UUID prefix.
+    let order = await prisma.tenantOrder.findUnique({
+      where: { id: rawInvoiceNumber },
     });
+    const legacyPrefix = rawInvoiceNumber.split('_')[0];
+    if (!order && /^[0-9a-f]{8}$/i.test(legacyPrefix)) {
+      const legacyMatches = await prisma.$queryRaw<Array<{ id: string }>>`
+        SELECT id FROM tenant_orders
+        WHERE id::text LIKE ${`${legacyPrefix}%`}
+        LIMIT 1
+      `;
+      if (legacyMatches[0]?.id) {
+        order = await prisma.tenantOrder.findUnique({
+          where: { id: legacyMatches[0].id },
+        });
+      }
+    }
     
     let tenantId = '';
     let orderId = '';
@@ -497,7 +512,7 @@ export async function handleDokuNotification(req: Request) {
     } else {
       // Fallback: search in TenantPayment by externalTransactionId
       const paymentRecord = await prisma.tenantPayment.findFirst({
-        where: { externalTransactionId: invoiceNumber }
+        where: { externalTransactionId: rawInvoiceNumber }
       });
       if (!paymentRecord) {
         return { status: 404, body: { error: 'Order/Payment not found' } };
@@ -544,7 +559,7 @@ export async function handleDokuNotification(req: Request) {
       paymentStatus = 'refunded';
     }
 
-    const externalTransactionId = body.transaction?.token || body.transaction?.reference_id || invoiceNumber;
+    const externalTransactionId = body.transaction?.token || body.transaction?.reference_id || rawInvoiceNumber;
 
     // Retrieve or create payment record
     const updated = await prisma.$transaction(async (tx) => {

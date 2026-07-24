@@ -1,22 +1,21 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
+import { resolvePublicTenant } from '@/lib/tenant-context'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
   try {
-    const url = new URL(req.url)
-    const tenantId = req.headers.get('x-tenant-id') || url.searchParams.get('tenantId')
-
-    if (!tenantId) {
+    const tenant = await resolvePublicTenant(req)
+    if (!tenant) {
       return NextResponse.json(
-        { success: false, error: 'Tenant context is required' },
-        { status: 400 }
+        { success: false, error: 'Storefront tenant was not found' },
+        { status: 404 }
       )
     }
 
     const items = await prisma.tenantCatalogItem.findMany({
-      where: { tenantId, isVisible: true },
+      where: { tenantId: tenant.id, isVisible: true },
       orderBy: { createdAt: 'desc' },
       include: { category: true }
     })

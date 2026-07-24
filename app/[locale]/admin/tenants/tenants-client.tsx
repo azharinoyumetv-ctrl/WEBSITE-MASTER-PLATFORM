@@ -5,12 +5,14 @@ import Link from 'next/link'
 import {
   Building2, Plus, Search, MoreHorizontal, Globe, ChevronRight,
   CheckCircle2, XCircle, AlertCircle, Settings2, Users,
-  Crown, Star, Zap, Loader2
+  Crown, Star, Zap, Loader2, Copy, ImageUp, Link2
 } from 'lucide-react'
 import { formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { createTenant } from '@/lib/actions/tenant'
 import { useLocale } from 'next-intl'
+import { addonsList, getBillableAddonKeys, getIncludedAddonKeys, packages } from '@/lib/constants/packages'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 
 const PLAN_CONFIG = {
   core: { label: 'Core', icon: Zap, color: 'text-slate-600', bg: 'bg-slate-100' },
@@ -23,6 +25,8 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
   const [tenants, setTenants] = useState(initialTenants)
   const [showModal, setShowModal] = useState(false)
   const [isCreating, setIsCreating] = useState(false)
+  const [logoDataUrl, setLogoDataUrl] = useState('')
+  const [accessLink, setAccessLink] = useState<{ companyName: string; email: string; workspaceUrl: string; accessUrl: string; invitationQueued: boolean } | null>(null)
   const locale = useLocale()
 
   const [formData, setFormData] = useState({
@@ -33,6 +37,10 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
     packageKey: 'landing_page',
     addons: [] as string[]
   })
+  const includedAddonSet = new Set(getIncludedAddonKeys(formData.packageKey))
+  const sortedAddons = [...addonsList].sort((left, right) =>
+    Number(includedAddonSet.has(right.key)) - Number(includedAddonSet.has(left.key))
+  )
 
   const filtered = tenants.filter(t =>
     t.companyName.toLowerCase().includes(search.toLowerCase()) ||
@@ -47,25 +55,35 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
   }
 
   const handleProvision = async () => {
-    if (!formData.companyName || !formData.subdomain) {
-      return toast.error('Company Name and Subdomain are required')
+    if (!formData.companyName || !formData.subdomain || !formData.adminEmail) {
+      return toast.error('Company name, subdomain, and administrator email are required')
     }
 
     setIsCreating(true)
     const res = await createTenant({
       companyName: formData.companyName,
       subdomain: formData.subdomain,
+      adminEmail: formData.adminEmail,
       packageKey: formData.packageKey,
       addons: formData.addons,
+      logoUrl: logoDataUrl || undefined,
     })
     setIsCreating(false)
 
     if (res.success) {
-      toast.success('Tenant provisioned successfully!')
+      toast.success('Workspace provisioned and secure access link created.')
       setShowModal(false)
       // Optimistic update
       setTenants([res.tenant, ...tenants])
       setFormData({ companyName: '', subdomain: '', plan: 'core', adminEmail: '', packageKey: 'landing_page', addons: [] })
+      setLogoDataUrl('')
+      setAccessLink({
+        companyName: formData.companyName,
+        email: formData.adminEmail,
+        workspaceUrl: res.workspaceUrl || '',
+        accessUrl: res.accessUrl || '',
+        invitationQueued: res.invitationQueued || false,
+      })
     } else {
       toast.error(res.error || 'Failed to provision tenant')
     }
@@ -77,7 +95,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
       <div className="section-header">
         <div>
           <h2 className="section-title">Tenant Management</h2>
-          <p className="section-desc">Provision and manage client workspaces across the platform</p>
+          <p className="section-desc">Provision and manage client workspaces across the platform. The DagangOS control workspace is excluded.</p>
         </div>
         <button
           onClick={() => setShowModal(true)}
@@ -87,6 +105,21 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
           New Tenant
         </button>
       </div>
+
+      {accessLink && (
+        <section className="mb-6 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <p className="text-sm font-black text-emerald-950">{accessLink.companyName} is ready to activate</p>
+              <p className="mt-1 text-xs text-emerald-800">Temporary domain: <a href={accessLink.workspaceUrl} target="_blank" rel="noreferrer" className="font-bold underline">{accessLink.workspaceUrl}</a></p>
+              <p className="mt-1 text-xs text-emerald-800">{accessLink.invitationQueued ? `An invitation was queued for ${accessLink.email}.` : 'Email delivery could not be queued; share the secure activation link manually.'}</p>
+            </div>
+            <button onClick={() => navigator.clipboard.writeText(accessLink.accessUrl).then(() => toast.success('Secure activation link copied'))} className="btn btn-secondary btn-sm shrink-0">
+              <Copy className="h-3.5 w-3.5" /> Copy activation link
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -131,7 +164,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
               <tr>
                 <th>Tenant</th>
                 <th>Domain</th>
-                <th>Plan</th>
+                <th>Deployment</th>
                 <th>Status</th>
                 <th>Created</th>
                 <th className="text-right">Actions</th>
@@ -152,7 +185,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                         </div>
                         <div>
                           <p className="font-semibold text-slate-900">{tenant.companyName}</p>
-                          <p className="text-xs text-slate-400 font-mono">{tenant.subdomain}.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'}</p>
+                          <p className="text-xs text-slate-400 font-mono">{getTenantPublicUrl(tenant).replace(/^https:\/\//, '')}</p>
                         </div>
                       </div>
                     </td>
@@ -169,7 +202,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                     <td>
                       <div className={cn('flex items-center gap-1.5 w-fit px-2.5 py-1 rounded-full text-xs font-medium', plan.bg, plan.color)}>
                         <plan.icon className="w-3 h-3" />
-                        {plan.label}
+                        {plan.label} deployment
                       </div>
                     </td>
                     <td>
@@ -261,39 +294,48 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                 <select 
                   className="form-select"
                   value={formData.packageKey}
-                  onChange={(e) => setFormData({ ...formData, packageKey: e.target.value })}
+                  onChange={(e) => {
+                    const packageKey = e.target.value
+                    setFormData({
+                      ...formData,
+                      packageKey,
+                      addons: getBillableAddonKeys(packageKey, formData.addons),
+                    })
+                  }}
                 >
-                  <option value="landing_page">Landing Page Package (Rp 2.500.000)</option>
-                  <option value="company_profile">Company Profile Package (Rp 4.000.000)</option>
-                  <option value="business_website">Business Website + Admin (Rp 8.000.000)</option>
-                  <option value="ecommerce">E-Commerce Platform (Rp 15.000.000)</option>
-                  <option value="restaurant">Restaurant System (Rp 20.000.000)</option>
-                  <option value="retail_pos">Retail POS + Website (Rp 25.000.000)</option>
-                  <option value="custom">Custom Business Platform (Rp 30.000.000+)</option>
+                  {Object.values(packages).map((pkg) => (
+                    <option key={pkg.key} value={pkg.key}>{pkg.name} ({new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(pkg.price)}{pkg.key === 'custom' ? '+' : ''})</option>
+                  ))}
                 </select>
               </div>
               <div>
                 <label className="form-label">Add-ons (Optional)</label>
                 <div className="space-y-2 mt-1.5 bg-slate-50 p-3 rounded-lg border border-slate-100">
-                  {[
-                    { key: 'ai', label: 'AI Copywriter Suite (+Rp 250k/mo)' },
-                    { key: 'booking', label: 'Booking & Scheduling (+Rp 500k/mo)' },
-                    { key: 'crm', label: 'CRM & Timelines (+Rp 400k/mo)' },
-                    { key: 'api', label: 'Developer API Webhooks (+Rp 750k/mo)' },
-                  ].map(addon => (
-                    <label key={addon.key} className="flex items-center gap-2 text-sm text-slate-700 font-normal">
+                  <p className="px-2 pb-1 text-xs text-slate-500">
+                    Included items are locked and moved to the top. Every selectable item is an additional paid implementation.
+                  </p>
+                  {sortedAddons.map(addon => (
+                    <label key={addon.key} className={`flex items-start gap-2 rounded-lg p-2 text-sm font-normal ${includedAddonSet.has(addon.key) ? 'bg-emerald-50 text-emerald-900' : 'text-slate-700'}`}>
                       <input 
                         type="checkbox" 
-                        checked={formData.addons.includes(addon.key)}
+                        checked={includedAddonSet.has(addon.key) || formData.addons.includes(addon.key)}
+                        disabled={includedAddonSet.has(addon.key)}
                         onChange={(e) => {
                           const list = e.target.checked 
                             ? [...formData.addons, addon.key]
-                            : formData.addons.filter((k: string) => k !== addon.key)
+                            : formData.addons.filter((item) => item !== addon.key)
                           setFormData({ ...formData, addons: list })
                         }}
-                        className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" 
+                        className="mt-0.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-70"
                       />
-                      <span>{addon.label}</span>
+                      <span>
+                        <span className="block">{addon.name}</span>
+                        {includedAddonSet.has(addon.key) ? (
+                          <span className="text-xs font-bold text-emerald-700">Included in selected package — no additional charge</span>
+                        ) : (
+                          <span className="text-xs text-slate-500">{new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', maximumFractionDigits: 0 }).format(addon.price)}{addon.priceNote ? `, ${addon.priceNote}` : ''}</span>
+                        )}
+                      </span>
                     </label>
                   ))}
                 </div>
@@ -307,6 +349,32 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                   placeholder="admin@yourcompany.com" 
                   className="form-input" 
                 />
+              </div>
+              <div>
+                <label className="form-label">Company Logo (optional)</label>
+                <div className="mt-1 flex items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 p-3">
+                  {logoDataUrl ? <img src={logoDataUrl} alt="Tenant logo preview" className="h-11 w-11 rounded-lg bg-white object-contain p-1" /> : <ImageUp className="h-5 w-5 text-slate-400" />}
+                  <div className="min-w-0 flex-1">
+                    <input
+                      type="file"
+                      accept="image/png,image/jpeg"
+                      className="block w-full text-xs text-slate-600 file:mr-3 file:rounded-lg file:border-0 file:bg-slate-900 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0]
+                        if (!file) return
+                        if (file.size > 500 * 1024) {
+                          toast.error('Use a PNG or JPG logo smaller than 500 KB.')
+                          event.target.value = ''
+                          return
+                        }
+                        const reader = new FileReader()
+                        reader.onload = () => setLogoDataUrl(String(reader.result || ''))
+                        reader.readAsDataURL(file)
+                      }}
+                    />
+                    <p className="mt-1 text-[10px] text-slate-500">Saved to the tenant workspace and used in its storefront header. PNG/JPG, max 500 KB.</p>
+                  </div>
+                </div>
               </div>
             </div>
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3">

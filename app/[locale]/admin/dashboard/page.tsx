@@ -23,7 +23,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
 
   let initialWidgets = null
   if (userId) {
-    const userProfile = await prisma.tenantUserProfile.findUnique({ where: { userId } })
+    const userProfile = await prisma.tenantUserProfile.findFirst({ where: { userId, tenantId } })
     if (userProfile?.preferences && typeof userProfile.preferences === 'object') {
       initialWidgets = (userProfile.preferences as any).dashboardWidgets || null
     }
@@ -56,7 +56,8 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
       id: order.id,
       createdAt: order.createdAt instanceof Date ? order.createdAt.toISOString() : order.createdAt,
       totalAmount: Number(order.totalAmount || 0),
-      paymentStatus: order.paymentStatus
+      orderStatus: order.orderStatus,
+      guestEmail: order.guestEmail,
     })),
     recentLogs: rawMetrics.recentLogs.map((log: any) => ({
       id: log.id,

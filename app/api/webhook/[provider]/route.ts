@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import crypto from 'crypto'
 import { decrypt } from '@/lib/crypto'
-import { sendWhatsAppTemplate } from '@/lib/whatsapp'
+import { getTenantWhatsAppConfig, sendWhatsAppTemplate } from '@/lib/whatsapp'
 import { sendOrderConfirmationEmail } from '@/lib/actions/notifications'
 
 const RATE_LIMIT_WINDOW = 60000 // 1 minute
@@ -252,20 +252,14 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
           sendOrderConfirmationEmail(order.tenantId, order.id, customerEmail)
             .catch(err => console.error("Failed to send async generic order confirmation email", err));
 
-          const website = await prisma.tenantWebsite.findUnique({
-            where: { tenantId: order.tenantId }
-          })
-          const themeConfig = website?.themeConfig as { whatsappPaNumber?: string, whatsappPhoneId?: string, whatsappToken?: string, whatsappTemplate?: string } | null
-          if (themeConfig) {
-            const { whatsappPaNumber, whatsappPhoneId, whatsappToken, whatsappTemplate } = themeConfig
-            if (whatsappPaNumber && whatsappPhoneId && whatsappToken && whatsappTemplate) {
-              await sendWhatsAppTemplate({
-                to: whatsappPaNumber,
-                templateName: whatsappTemplate,
-                parameters: [order.id, String(order.totalAmount)],
-                credentials: { token: whatsappToken, phoneNumberId: whatsappPhoneId }
-              }).catch(e => console.error("Failed to send WhatsApp notification on webhook", e))
-            }
+          const whatsAppConfig = await getTenantWhatsAppConfig(order.tenantId)
+          if (whatsAppConfig?.recipientNumber && whatsAppConfig.templateName) {
+            await sendWhatsAppTemplate({
+              to: whatsAppConfig.recipientNumber,
+              templateName: whatsAppConfig.templateName,
+              parameters: [order.id, String(order.totalAmount)],
+              credentials: whatsAppConfig,
+            }).catch(e => console.error("Failed to send WhatsApp notification on webhook", e))
           }
         }
       }
@@ -325,7 +319,7 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
               orderId: order.id,
               type: 'reversal',
               amount: order.totalAmount,
-              currency: order.currency || 'USD',
+              currency: order.currency || 'IDR',
               gateway: provider,
               gatewayTxId: body.id || body.transaction_id || 'unknown',
               status: 'failed',

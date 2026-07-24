@@ -4,7 +4,9 @@ import { getToken } from 'next-auth/jwt'
 
 export const config = {
   matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)',
+    // Public files must bypass locale routing; otherwise images such as the
+    // company logo are redirected to a non-existent localized path.
+    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\..*).*)',
   ],
 }
 
@@ -31,29 +33,53 @@ function getBaseUrl(request: NextRequest) {
 
 function getTenantFromHost(hostname: string): string {
   const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'
-  const hostnameWithoutPort = hostname.split(':')[0]
+  const hostnameWithoutPort = hostname.split(':')[0].toLowerCase()
+  const baseDomain = BASE_DOMAIN.toLowerCase()
   
-  if (hostname === BASE_DOMAIN || hostnameWithoutPort === 'localhost' || hostname.startsWith('www.')) {
+  if (hostnameWithoutPort === baseDomain || hostnameWithoutPort === 'localhost' || hostnameWithoutPort.startsWith('www.')) {
     return 'default'
-  } else if (hostname.endsWith(`.${BASE_DOMAIN}`)) {
-    return hostname.replace(`.${BASE_DOMAIN}`, '')
+  } else if (hostnameWithoutPort.endsWith(`.${baseDomain}`)) {
+    return hostnameWithoutPort.replace(`.${baseDomain}`, '')
   } else if (hostnameWithoutPort.endsWith('.localhost')) {
     return hostnameWithoutPort.replace('.localhost', '')
   } else {
-    return hostname
+    return hostnameWithoutPort
   }
 }
 
-function applySecurityHeaders(res: NextResponse) {
+function createContentSecurityPolicy(nonce: string) {
+  const isDevelopment = process.env.NODE_ENV === 'development'
   const csp = [
     "default-src 'self'",
-    "script-src 'self' 'unsafe-eval' https://challenges.cloudflare.com",
-    "style-src 'self'",
-    "img-src 'self' data: https:",
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic' https://challenges.cloudflare.com${isDevelopment ? " 'unsafe-eval'" : ''}`,
+    `style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com`,
+    "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
+    "style-src-attr 'unsafe-inline'",
+    "font-src 'self' https://fonts.gstatic.com",
+    "img-src 'self' data: blob: https:",
     "connect-src 'self' https://challenges.cloudflare.com",
+    "frame-src https://challenges.cloudflare.com",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
     "frame-ancestors 'none'",
   ].join('; ')
 
+  return csp
+}
+
+function applySecurityHeaders(res: NextResponse, csp: string) {
+  const cacheControl = res.headers.get('Cache-Control')
+  if (cacheControl) {
+    if (!cacheControl.includes('no-transform')) {
+      res.headers.set('Cache-Control', `${cacheControl}, no-transform`)
+    }
+  } else {
+    // Cloudflare's email obfuscation rewrites React's server HTML before
+    // hydration. Keeping dynamic responses private and non-transformable
+    // preserves the exact DOM React expects.
+    res.headers.set('Cache-Control', 'private, no-cache, no-store, max-age=0, must-revalidate, no-transform')
+  }
   res.headers.set('Content-Security-Policy', csp)
   res.headers.set('X-Frame-Options', 'DENY')
   res.headers.set('X-Content-Type-Options', 'nosniff')
@@ -62,8 +88,25 @@ function applySecurityHeaders(res: NextResponse) {
   return res
 }
 
+function preventAdminResponseCaching(res: NextResponse) {
+  // Admin Flight/HTML responses contain Server Action references. Serving one
+  // from a prior deployment leaves the dashboard unable to submit actions.
+  res.headers.set('Cache-Control', 'private, no-store, max-age=0, must-revalidate')
+  res.headers.set('CDN-Cache-Control', 'no-store')
+  res.headers.set('Cloudflare-CDN-Cache-Control', 'no-store')
+  return res
+}
+
 export default async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
+  const nonce = btoa(crypto.randomUUID())
+  const csp = createContentSecurityPolicy(nonce)
+  const requestHeaders = new Headers(request.headers)
+
+  // Next reads this request header during SSR and adds the nonce to its Flight
+  // bootstrap scripts. Without it, a strict CSP blocks hydration completely.
+  requestHeaders.set('Content-Security-Policy', csp)
+  requestHeaders.set('x-nonce', nonce)
 
   const isSecure = process.env.NEXTAUTH_URL?.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https'
   const hostname = request.headers.get('host') || ''
@@ -94,11 +137,11 @@ export default async function middleware(request: NextRequest) {
     if (token.tenantId !== hostTenantId && !isSuperAdmin) {
       console.warn(`Rejecting cross-tenant access from tenant ${token.tenantId} to target ${hostTenantId}`);
       if (request.headers.has('next-action') || pathname.startsWith('/api')) {
-        return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized tenant access' }, { status: 403 }))
+        return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized tenant access' }, { status: 403 }), csp)
       }
       const origin = getBaseUrl(request)
       const locale = parseAcceptLanguage(request) || defaultLocale
-      return applySecurityHeaders(NextResponse.redirect(new URL(`/${locale}/auth/login`, origin)))
+      return applySecurityHeaders(NextResponse.redirect(new URL(`/${locale}/auth/login`, origin)), csp)
     }
   }
 
@@ -120,7 +163,7 @@ export default async function middleware(request: NextRequest) {
     
     if (!isAuthorized) {
       if (request.headers.has('next-action') || pathname.startsWith('/api')) {
-        return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized' }, { status: 401 }))
+        return applySecurityHeaders(preventAdminResponseCaching(NextResponse.json({ error: 'Unauthorized' }, { status: 401 })), csp)
       }
 
       // Determine locale to redirect to
@@ -137,15 +180,23 @@ export default async function middleware(request: NextRequest) {
         const cookieName = isSecure ? '__Secure-next-auth.session-token' : 'next-auth.session-token'
         response.cookies.delete(cookieName)
       }
-      return applySecurityHeaders(response)
+      return applySecurityHeaders(preventAdminResponseCaching(response), csp)
     }
   }
 
   // 3. Run our routing logic (which extracts tenant and locale)
-  return applySecurityHeaders(handleRouting(request, token))
+  const response = handleRouting(request, token, requestHeaders)
+  if (isProtected) {
+    preventAdminResponseCaching(response)
+  }
+  return applySecurityHeaders(response, csp)
 }
 
-function handleRouting(request: NextRequest, token?: Awaited<ReturnType<typeof getToken>> | null) {
+function handleRouting(
+  request: NextRequest,
+  token: Awaited<ReturnType<typeof getToken>> | null | undefined,
+  requestHeaders: Headers,
+) {
   const url = request.nextUrl
   const hostname = request.headers.get('host') || ''
   const pathname = url.pathname
@@ -166,7 +217,6 @@ function handleRouting(request: NextRequest, token?: Awaited<ReturnType<typeof g
     tenantId = String((token as any).tenantId)
   }
 
-  const requestHeaders = new Headers(request.headers)
   requestHeaders.set('x-tenant-id', tenantId)
 
   if (pathname.startsWith('/api')) {
@@ -209,8 +259,11 @@ function handleRouting(request: NextRequest, token?: Awaited<ReturnType<typeof g
     }
     // Rewrite to /en/site or /en/site/about
     const targetPath = pathWithoutLocale === '/' ? '' : pathWithoutLocale
-    const origin = getBaseUrl(request)
-    const finalUrl = new URL(`/${localeInUrl}/site${targetPath}`, origin)
+    // Keep rewrites internal even when a local tenant is addressed through a
+    // Host header such as dagangos.localhost. Building a new absolute URL from
+    // that header makes Next proxy to DNS instead of rendering the local route.
+    const finalUrl = request.nextUrl.clone()
+    finalUrl.pathname = `/${localeInUrl}/site${targetPath}`
     return NextResponse.rewrite(finalUrl, {
       request: { headers: requestHeaders },
     })

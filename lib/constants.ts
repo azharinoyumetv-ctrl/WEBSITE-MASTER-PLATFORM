@@ -12,6 +12,7 @@ export const PLATFORM_MODULES = [
   { key: 'booking_module', name: 'Booking', description: 'Appointment and reservation engine', icon: 'CalendarCheck', category: 'operations', isEnabled: false, isCore: false },
   { key: 'ai_module', name: 'AI Assistant', description: 'LLM-powered content generation and search', icon: 'Sparkles', category: 'intelligence', isEnabled: false, isCore: false },
   { key: 'notification_module', name: 'Notifications', description: 'Multi-channel notification dispatch', icon: 'Bell', category: 'intelligence', isEnabled: true, isCore: false },
+  { key: 'whatsapp_module', name: 'WhatsApp Business', description: 'Tenant-owned Meta WhatsApp Business integration', icon: 'MessageCircle', category: 'intelligence', isEnabled: false, isCore: false, isAddOnOnly: true },
   { key: 'analytics_module', name: 'Analytics', description: 'Event tracking and business insights', icon: 'BarChart3', category: 'intelligence', isEnabled: true, isCore: false },
   { key: 'api_module', name: 'API Portal', description: 'Developer access keys and webhooks', icon: 'Code2', category: 'developer', isEnabled: true, isCore: false },
 ]

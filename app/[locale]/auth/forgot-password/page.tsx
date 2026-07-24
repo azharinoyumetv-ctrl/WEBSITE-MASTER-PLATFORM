@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Globe, Loader2, Mail, AlertCircle, ArrowLeft } from 'lucide-react'
+import { Loader2, Mail, AlertCircle, ArrowLeft } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { DagangOSBrand } from '@/components/DagangOSBrand'
 
 export default function ForgotPasswordPage() {
   const router = useRouter()
@@ -46,14 +47,7 @@ export default function ForgotPasswordPage() {
             <ArrowLeft className="w-4 h-4" /> Back to login
           </Link>
 
-          <div className="flex items-center gap-3 mb-8">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center shadow-lg">
-              <Globe className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-white font-bold text-xl leading-none">Master Platform</p>
-            </div>
-          </div>
+          <DagangOSBrand className="mb-8" dark />
 
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-white mb-2">Reset Password</h2>

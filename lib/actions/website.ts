@@ -3,9 +3,11 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { encrypt, decrypt } from '@/lib/crypto'
-import { requirePermission, getAuthenticatedUser } from '@/lib/rbac'
+import { requirePermission, getAuthenticatedUser, requireTenantUser } from '@/lib/rbac'
 import crypto from 'crypto'
 import { z } from 'zod'
+import { COMPANY } from '@/lib/company'
+import type { Prisma } from '@prisma/client'
 
 const layoutBlockSchema = z.array(z.object({
   type: z.enum(['hero', 'text', 'features', 'catalog_grid', 'contact_form']),
@@ -41,7 +43,7 @@ export async function getPublicWebsiteConfig(tenantDomain: string) {
             success: true,
             website: {
               tenantId: fallbackTenant.id,
-              siteTitle: fallbackTenant.companyName || 'Website Master Platform',
+              siteTitle: fallbackTenant.companyName || COMPANY.legalName,
               themeConfig: { colors: { primary: '#4f46e5' } },
               globalSeoMetadata: { keywords: [], description: '' },
               faviconUrl: null,
@@ -60,7 +62,12 @@ export async function getPublicWebsiteConfig(tenantDomain: string) {
       return { success: false, error: 'Website not found or inactive' }
     }
 
-    return { success: true, website: tenant.website, tenantId: tenant.id, tenant }
+    const rawPublicThemeConfig = (tenant.website.themeConfig as Record<string, unknown>) || {}
+    const { whatsappToken: _legacyWhatsAppToken, ...publicThemeConfig } = rawPublicThemeConfig
+    const { whatsappEncryptedAccessToken: _whatsAppSecret, ...publicWebsite } = tenant.website
+    const publicTenant = { ...tenant, website: { ...publicWebsite, themeConfig: publicThemeConfig } }
+
+    return { success: true, website: publicTenant.website, tenantId: tenant.id, tenant: publicTenant }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -91,6 +98,9 @@ export async function getPublicPage(tenantId: string, slug: string) {
 // Admin: Get all pages
 export async function getAdminPages(tenantId: string) {
   try {
+    const user = await requireTenantUser(tenantId)
+    await requirePermission(user.id, tenantId, 'website', 'read')
+
     const pages = await prisma.tenantPage.findMany({
       where: { tenantId, isDeleted: false },
       orderBy: { createdAt: 'desc' }
@@ -212,7 +222,11 @@ export async function getAdminWebsiteConfig(tenantId: string) {
     })
     
     if (website) {
-      // Return configured flags instead of raw placeholders
+      const rawThemeConfig = (website.themeConfig as Record<string, unknown>) || {}
+      const { whatsappToken: rawWhatsAppToken, ...themeConfig } = rawThemeConfig
+      const legacyWhatsAppToken = typeof rawWhatsAppToken === 'string' ? rawWhatsAppToken : '';
+
+      // Return configured flags instead of raw credentials.
       (website as any).isXenditSecretConfigured = !!website.xenditEncryptedSecret;
       (website as any).isXenditWebhookTokenConfigured = !!website.xenditEncryptedWebhookToken;
       (website as any).isMidtransServerKeyConfigured = !!website.midtransEncryptedServerKey;
@@ -220,6 +234,10 @@ export async function getAdminWebsiteConfig(tenantId: string) {
       (website as any).isDokuMerchantPublicKeyConfigured = !!website.dokuMerchantPublicKey;
       (website as any).isDokuSnapTokenUrlConfigured = !!website.dokuSnapTokenUrl;
       (website as any).isDokuSharedKeyConfigured = !!website.dokuSharedKey;
+      (website as any).isWhatsAppAccessTokenConfigured = !!website.whatsappEncryptedAccessToken || !!legacyWhatsAppToken;
+      // This value originates from Prisma's JSON column; removing the legacy
+      // credential preserves a JSON object that is safe to return to the client.
+      website.themeConfig = themeConfig as Prisma.JsonObject
       
       // Explicitly clear keys so they never travel to the client
       website.xenditEncryptedSecret = null
@@ -232,6 +250,7 @@ export async function getAdminWebsiteConfig(tenantId: string) {
       website.dokuMerchantPublicKey = null
       website.dokuSnapTokenUrl = null
       website.dokuSharedKey = null
+      website.whatsappEncryptedAccessToken = null
     }
 
     return { success: true, website }
@@ -247,20 +266,38 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
     await requirePermission(user.id, tenantId, 'website', 'write')
 
     const website = await prisma.$transaction(async (tx) => {
+      const currentWebsite = await tx.tenantWebsite.findUnique({ where: { tenantId } })
+      const currentTheme = (currentWebsite?.themeConfig as Record<string, unknown>) || {}
+      const rawIncomingTheme = (data.themeConfig as Record<string, unknown>) || {}
+      const { whatsappToken: submittedToken, ...incomingTheme } = rawIncomingTheme
+      const submittedWhatsAppToken = typeof submittedToken === 'string' ? submittedToken.trim() : ''
+      const legacyWhatsAppToken = typeof currentTheme.whatsappToken === 'string' ? currentTheme.whatsappToken.trim() : ''
+
+      let whatsappEncryptedAccessToken = currentWebsite?.whatsappEncryptedAccessToken || null
+      if (submittedWhatsAppToken && submittedWhatsAppToken !== '••••••••') {
+        whatsappEncryptedAccessToken = encrypt(submittedWhatsAppToken)
+      } else if (!whatsappEncryptedAccessToken && legacyWhatsAppToken) {
+        // Move credentials written by older versions out of public theme JSON on the next save.
+        whatsappEncryptedAccessToken = encrypt(legacyWhatsAppToken)
+      }
+
+      const safeData = { ...data, themeConfig: incomingTheme }
       const w = await tx.tenantWebsite.upsert({
         where: { tenantId },
         create: {
           tenantId,
-          siteTitle: data.siteTitle,
-          themeConfig: data.themeConfig,
-          globalSeoMetadata: data.globalSeoMetadata,
-          isActive: data.isActive
+          siteTitle: safeData.siteTitle,
+          themeConfig: safeData.themeConfig,
+          globalSeoMetadata: safeData.globalSeoMetadata,
+          isActive: safeData.isActive,
+          whatsappEncryptedAccessToken,
         },
         update: {
-          siteTitle: data.siteTitle,
-          themeConfig: data.themeConfig,
-          globalSeoMetadata: data.globalSeoMetadata,
-          isActive: data.isActive
+          siteTitle: safeData.siteTitle,
+          themeConfig: safeData.themeConfig,
+          globalSeoMetadata: safeData.globalSeoMetadata,
+          isActive: safeData.isActive,
+          whatsappEncryptedAccessToken,
         }
       })
       
@@ -268,7 +305,7 @@ export async function saveAdminWebsiteConfig(tenantId: string, data: any) {
         data: {
           tenantId,
           configType: 'website_theme',
-          snapshot: data,
+          snapshot: safeData,
           actorId: user.id
         }
       })
@@ -322,11 +359,12 @@ export async function restoreWebsiteConfigSnapshot(tenantId: string, snapshotId:
         where: { tenantId }
       })
       const currentTheme = (currentWebsite?.themeConfig as any) || {}
+      const rawSnapshotTheme = (data.themeConfig as Record<string, unknown>) || {}
+      const { whatsappToken: _snapshotWhatsAppToken, ...snapshotTheme } = rawSnapshotTheme
       const safeThemeConfig = {
-        ...data.themeConfig,
+        ...snapshotTheme,
         whatsappPaNumber: currentTheme.whatsappPaNumber,
         whatsappPhoneId: currentTheme.whatsappPhoneId,
-        whatsappToken: currentTheme.whatsappToken,
         whatsappTemplate: currentTheme.whatsappTemplate
       }
 
@@ -464,14 +502,16 @@ export async function savePaymentConfig(tenantId: string, data: {
     const user = await getAuthenticatedUser()
     await requirePermission(user.id, tenantId, 'settings', 'write')
     
-    // Validations
+    // DOKU Checkout uses the Client ID and Secret Key. The public-key and
+    // token-URL fields below are only required for specific SNAP/DIPC flows,
+    // so treating them as required would prevent a valid Checkout setup.
     if (data.dokuEnabled) {
-      if (!data.dokuClientId || data.dokuClientId.trim() === '' ||
-          !data.dokuMerchantPublicKey || data.dokuMerchantPublicKey.trim() === '' ||
-          !data.dokuSnapTokenUrl || data.dokuSnapTokenUrl.trim() === '' ||
-          !data.dokuSharedKey || data.dokuSharedKey.trim() === '') {
-        throw new Error('All DOKU key fields are required when DOKU is enabled');
+      const hasClientId = Boolean(data.dokuClientId?.trim())
+      const hasSecretKey = Boolean(data.dokuSharedKey?.trim())
+      if (!hasClientId || !hasSecretKey) {
+        throw new Error('DOKU Client ID and Secret Key are required when DOKU is enabled');
       }
+      data.dokuClientId = data.dokuClientId || ''
       
       if (data.dokuEnvironment === 'production') {
         const checkClientId = data.dokuClientId.includes('•') ? '' : data.dokuClientId;
@@ -511,7 +551,9 @@ export async function savePaymentConfig(tenantId: string, data: {
       updateData.midtransEncryptedServerKeyIv = ''
     }
 
-    // DOKU fields encryption
+    // DOKU credentials are encrypted at rest. The optional fields support
+    // future SNAP/DIPC flows, while DOKU Checkout itself only needs Client ID
+    // and Secret Key.
     if (data.dokuClientId && data.dokuClientId.trim() !== '' && !data.dokuClientId.includes('•')) {
       updateData.dokuClientId = encrypt(data.dokuClientId)
     }

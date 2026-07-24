@@ -1,123 +1,116 @@
 'use server'
 
 import prisma from "@/lib/prisma"
+import { getAuthenticatedUser, requirePermission } from "@/lib/rbac"
+import type { OrderStatus } from '@prisma/client'
 
 
 export async function getAnalytics(tenantId: string, rangeDays: number = 7) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'analytics', 'read')
+
+    const safeRangeDays = Number.isFinite(rangeDays)
+      ? Math.max(1, Math.min(365, Math.floor(rangeDays)))
+      : 7
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - rangeDays)
+    startDate.setUTCHours(0, 0, 0, 0)
+    startDate.setUTCDate(startDate.getUTCDate() - safeRangeDays + 1)
+    const successfulOrderStatuses: OrderStatus[] = ['paid', 'pending_fulfillment', 'processing', 'shipped', 'completed']
 
-    const dailySummaries = await prisma.tenantAnalyticsDailySummary.findMany({
-      where: {
-        tenantId,
-        summaryDate: { gte: startDate }
-      },
-      orderBy: [
-        { summaryDate: 'asc' },
-        { id: 'asc' }
-      ]
-    })
+    // Analytics is derived directly from recorded events and paid orders. The
+    // old daily-summary table required a manual test-data backfill, which made
+    // a production dashboard look empty or fabricated between runs.
+    const [pageviews, paidOrders] = await Promise.all([
+      prisma.tenantAnalyticsEvent.findMany({
+        where: { tenantId, eventName: 'pageview', createdAt: { gte: startDate } },
+        select: { pageUrl: true, sessionId: true, createdAt: true, deviceProperties: true },
+        orderBy: { createdAt: 'asc' },
+      }),
+      prisma.tenantOrder.findMany({
+        where: { tenantId, orderStatus: { in: successfulOrderStatuses }, createdAt: { gte: startDate } },
+        select: { createdAt: true, totalAmount: true },
+      }),
+    ])
 
-    let totalPageViews = 0
-    let totalUniqueVisitors = 0
-    let totalConversions = 0
-    let totalRevenue = 0
+    const daily = new Map<string, { date: string; pageViews: number; uniqueVisitors: number; orders: number; revenue: number; bounceRate: number }>()
+    for (let offset = 0; offset < safeRangeDays; offset++) {
+      const date = new Date(startDate)
+      date.setUTCDate(startDate.getUTCDate() + offset)
+      const key = date.toISOString().slice(0, 10)
+      daily.set(key, { date: key, pageViews: 0, uniqueVisitors: 0, orders: 0, revenue: 0, bounceRate: 0 })
+    }
+
+    const sessions = new Map<string, { count: number; first: number; last: number; device: string }>()
+    const pages = new Map<string, { views: number; sessions: Set<string> }>()
+    for (const pageview of pageviews) {
+      const dateKey = pageview.createdAt.toISOString().slice(0, 10)
+      const day = daily.get(dateKey)
+      if (day) day.pageViews++
+      const sessionKey = pageview.sessionId || `event-${pageview.createdAt.getTime()}`
+      const device = String((pageview.deviceProperties as any)?.deviceType || 'desktop').toLowerCase()
+      const existing = sessions.get(sessionKey)
+      sessions.set(sessionKey, existing
+        ? { ...existing, count: existing.count + 1, last: pageview.createdAt.getTime() }
+        : { count: 1, first: pageview.createdAt.getTime(), last: pageview.createdAt.getTime(), device })
+      const pageKey = pageview.pageUrl || '/'
+      const page = pages.get(pageKey) || { views: 0, sessions: new Set<string>() }
+      page.views++
+      page.sessions.add(sessionKey)
+      pages.set(pageKey, page)
+    }
+
+    const sessionDays = new Map<string, { visitors: number; bounces: number }>()
     let totalSessionSeconds = 0
-    
-    // Group by date
-    const groupedByDate: Record<string, any> = {}
-    
-    for (const d of dailySummaries) {
-      const dateStr = d.summaryDate.toISOString().split('T')[0]
-      if (!groupedByDate[dateStr]) {
-        groupedByDate[dateStr] = { date: dateStr, pageViews: 0, revenue: 0, orders: 0, bounceRate: 0, sessionSeconds: 0 }
-      }
-      
-      const val = Number(d.metricValue)
-      switch (d.metricKey) {
-        case 'pageViews':
-          groupedByDate[dateStr].pageViews = val
-          totalPageViews += val
-          break
-        case 'uniqueVisitors':
-          totalUniqueVisitors += val
-          break
-        case 'conversions':
-          groupedByDate[dateStr].orders = val
-          totalConversions += val
-          break
-        case 'revenue':
-          groupedByDate[dateStr].revenue = val
-          totalRevenue += val
-          break
-        case 'avgSessionSeconds':
-          groupedByDate[dateStr].sessionSeconds = val
-          totalSessionSeconds += val
-          break
-        case 'bounceRate':
-          groupedByDate[dateStr].bounceRate = val
-          break
+    let mobile = 0, desktop = 0, tablet = 0
+    for (const session of Array.from(sessions.values())) {
+      totalSessionSeconds += (session.last - session.first) / 1000
+      if (session.device === 'mobile') mobile++
+      else if (session.device === 'tablet') tablet++
+      else desktop++
+    }
+    for (const pageview of pageviews) {
+      const dayKey = pageview.createdAt.toISOString().slice(0, 10)
+      const sessionKey = pageview.sessionId || `event-${pageview.createdAt.getTime()}`
+      const session = sessions.get(sessionKey)
+      if (!session) continue
+      const value = sessionDays.get(`${dayKey}:${sessionKey}`) || { visitors: 0, bounces: 0 }
+      value.visitors = 1
+      value.bounces = session.count === 1 ? 1 : 0
+      sessionDays.set(`${dayKey}:${sessionKey}`, value)
+    }
+    for (const [key, value] of Array.from(sessionDays.entries())) {
+      const day = daily.get(key.slice(0, 10))
+      if (day) {
+        day.uniqueVisitors += value.visitors
+        day.bounceRate += value.bounces
       }
     }
-    
-    const dailyData = Object.values(groupedByDate)
-
-    if (dailyData.length === 0) {
-      return {
-        success: true,
-        analytics: {
-          pageViews: 0,
-          uniqueVisitors: 0,
-          conversions: 0,
-          revenue: 0,
-          bounceRate: 0,
-          avgSessionDuration: '0s',
-          topPages: [],
-          dailyData: [],
-          deviceBreakdown: [
-            { device: 'Mobile', sessions: 0, percentage: 0 },
-            { device: 'Desktop', sessions: 0, percentage: 0 },
-            { device: 'Tablet', sessions: 0, percentage: 0 }
-          ]
-        }
+    for (const day of Array.from(daily.values())) {
+      day.bounceRate = day.uniqueVisitors ? Math.round((day.bounceRate / day.uniqueVisitors) * 100) : 0
+    }
+    for (const order of paidOrders) {
+      const day = daily.get(order.createdAt.toISOString().slice(0, 10))
+      if (day) {
+        day.orders++
+        day.revenue += Number(order.totalAmount || 0)
       }
     }
 
-    const avgBounceRate = dailyData.reduce((acc, curr) => acc + curr.bounceRate, 0) / dailyData.length
-    const avgSecs = Math.round(totalSessionSeconds / dailyData.length)
-    const mins = Math.floor(avgSecs / 60)
-    const secs = avgSecs % 60
-    const avgSessionDuration = `${mins}m ${secs}s`
-
-    const topPages = await prisma.tenantAnalyticsEvent.groupBy({
-      by: ['pageUrl'],
-      where: { tenantId, createdAt: { gte: startDate }, eventName: 'pageview' },
-      _count: { pageUrl: true },
-      orderBy: { _count: { pageUrl: 'desc' } },
-      take: 5
-    })
-
-    const topPagesFormatted = topPages.map(p => ({
-      page: p.pageUrl || '/',
-      views: p._count.pageUrl,
-      uniqueVisitors: Math.round(p._count.pageUrl * 0.8) 
-    }))
-
-    const deviceEvents = await prisma.tenantAnalyticsEvent.findMany({
-      where: { tenantId, createdAt: { gte: startDate } },
-      select: { deviceProperties: true }
-    })
-    
-    let mobile = 0, desktop = 0, tablet = 0;
-    for (const ev of deviceEvents) {
-      const dp = ev.deviceProperties as any;
-      const t = (dp?.type || dp?.deviceType || dp?.device || 'desktop').toLowerCase();
-      if (t === 'mobile') mobile++;
-      else if (t === 'tablet') tablet++;
-      else desktop++; // default to desktop if unknown to avoid zero total
-    }
-    const totalDevices = (mobile + desktop + tablet) || 1;
+    const dailyData = Array.from(daily.values())
+    const totalPageViews = pageviews.length
+    const totalUniqueVisitors = sessions.size
+    const totalConversions = paidOrders.length
+    const totalRevenue = paidOrders.reduce((total, order) => total + Number(order.totalAmount || 0), 0)
+    const avgBounceRate = totalUniqueVisitors ? Math.round((Array.from(sessions.values()).filter(session => session.count === 1).length / totalUniqueVisitors) * 100) : 0
+    const avgSecs = totalUniqueVisitors ? Math.round(totalSessionSeconds / totalUniqueVisitors) : 0
+    const avgSessionDuration = `${Math.floor(avgSecs / 60)}m ${avgSecs % 60}s`
+    const topPagesFormatted = Array.from(pages.entries())
+      .map(([page, value]) => ({ page, views: value.views, uniqueVisitors: value.sessions.size }))
+      .sort((a, b) => b.views - a.views)
+      .slice(0, 5)
+    const totalDevices = mobile + desktop + tablet
 
     return {
       success: true,
@@ -131,9 +124,9 @@ export async function getAnalytics(tenantId: string, rangeDays: number = 7) {
         topPages: topPagesFormatted,
         dailyData: dailyData,
         deviceBreakdown: [
-          { device: 'Mobile', sessions: mobile, percentage: Math.round((mobile / totalDevices) * 100) },
-          { device: 'Desktop', sessions: desktop, percentage: Math.round((desktop / totalDevices) * 100) },
-          { device: 'Tablet', sessions: tablet, percentage: Math.round((tablet / totalDevices) * 100) }
+          { device: 'Mobile', sessions: mobile, percentage: totalDevices ? Math.round((mobile / totalDevices) * 100) : 0 },
+          { device: 'Desktop', sessions: desktop, percentage: totalDevices ? Math.round((desktop / totalDevices) * 100) : 0 },
+          { device: 'Tablet', sessions: tablet, percentage: totalDevices ? Math.round((tablet / totalDevices) * 100) : 0 }
         ]
       }
     }
@@ -191,8 +184,15 @@ export async function recordAnalyticsEvent(
  */
 export async function backfillAnalyticsSummaries(tenantId: string, days: number = 7) {
   try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'analytics', 'write')
+
+    const safeDays = Number.isFinite(days)
+      ? Math.max(1, Math.min(365, Math.floor(days)))
+      : 7
     const startDate = new Date()
-    startDate.setDate(startDate.getDate() - days)
+    startDate.setDate(startDate.getDate() - safeDays)
 
     // Fetch all orders in range — aggregate in-code by day for accuracy
     const orders = await prisma.tenantOrder.findMany({
@@ -240,7 +240,7 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
       metricValue: number
     }> = []
 
-    for (let i = 0; i < days; i++) {
+    for (let i = 0; i < safeDays; i++) {
       const date = new Date()
       date.setDate(date.getDate() - i)
       const dayStr = date.toISOString().split('T')[0]
@@ -314,8 +314,6 @@ export async function backfillAnalyticsSummaries(tenantId: string, days: number 
     return { success: false, error: error.message }
   }
 }
-
-import { getAuthenticatedUser, requirePermission } from "@/lib/rbac"
 
 export async function getReportSchedules(tenantId: string) {
   try {

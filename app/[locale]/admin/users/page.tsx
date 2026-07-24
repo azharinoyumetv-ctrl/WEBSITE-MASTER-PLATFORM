@@ -3,7 +3,7 @@ import { UsersClient } from './users-client'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
-import { AlertTriangle } from 'lucide-react'
+import { AdminState } from '../admin-state'
 
 export default async function UsersPage() {
   const session = await getServerSession(authOptions)
@@ -15,8 +15,7 @@ export default async function UsersPage() {
   const tenantId = (session.user as any).tenantId
   
   if (!tenantId) {
-    // If somehow a user has no tenant, redirect to an error or handle
-    return <div className="p-8 text-red-500">Error: No tenant context found for user.</div>
+    return <AdminState kind="context" title="Workspace context unavailable" description="Sign in through your assigned workspace before managing users." />
   }
 
   const [usersRes, rolesRes] = await Promise.all([
@@ -28,17 +27,8 @@ export default async function UsersPage() {
 
   if (hasError) {
     const errorMsg = (!usersRes.success ? (usersRes as any).error : (rolesRes as any).error) || 'Unknown error'
-    return (
-      <div className="page-container animate-slide-up">
-        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-5">
-          <AlertTriangle className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-red-700">Failed to load users data</p>
-            <p className="text-xs text-red-500 mt-1 font-mono">{errorMsg}</p>
-          </div>
-        </div>
-      </div>
-    )
+    console.error('[admin-users] Failed to load users:', errorMsg)
+    return <AdminState title="Users could not be loaded" description="User and role data is temporarily unavailable. Please retry shortly; no access assignments were changed." />
   }
 
   const initialUsers = usersRes.users!
@@ -49,7 +39,6 @@ export default async function UsersPage() {
       initialUsers={initialUsers} 
       initialRoles={initialRoles} 
       tenantId={tenantId}
-      currentUser={session.user}
     />
   )
 }

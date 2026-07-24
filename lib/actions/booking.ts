@@ -243,7 +243,7 @@ export async function createBookingPaymentLink(tenantId: string, bookingId: stri
       invoiceId = bookingId
     } else if (gateway === 'doku') {
       const { createDokuCheckout } = await import('./payments')
-      const res = await createDokuCheckout(tenantId, bookingId, amount, customerEmail)
+      const res = await createDokuCheckout(tenantId, bookingId, amount, 'IDR', { email: customerEmail })
       if (!res.success) throw new Error(res.error)
       paymentUrl = res.paymentUrl || ''
       invoiceId = res.invoiceId || ''

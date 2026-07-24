@@ -8,17 +8,30 @@ import {
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { saveAdminWebsiteConfig, saveTenantLogo, saveAiConfig, savePaymentConfig, getWebsiteConfigSnapshots, restoreWebsiteConfigSnapshot, createTempAiSecretToken } from '@/lib/actions/website'
-import { generateBillingInvoice, getBillingInvoices } from '@/lib/actions/billing'
+import { getBillingInvoices } from '@/lib/actions/billing'
 import { exportTenantData, importTenantData, getAuditLogsForExport, runTenantIsolationAudit } from '@/lib/actions/backup'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 
-export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig, tenantId }: { initialWebsite: any, initialTenant: any, initialAiConfig?: any, tenantId: string }) {
+const SECRET_MASK = '••••••••'
+
+function initialThemeConfig(website: any) {
+  const theme = { ...(website?.themeConfig || {
+    colors: { primary: '#4f46e5', secondary: '#10b981' },
+    typography: { base_font: 'Inter' },
+    baseCurrency: 'IDR'
+  }) }
+  if (website?.isWhatsAppAccessTokenConfigured) theme.whatsappToken = SECRET_MASK
+  return theme
+}
+
+export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig, hasWhatsAppIntegration, tenantId }: { initialWebsite: any, initialTenant: any, initialAiConfig?: any, hasWhatsAppIntegration: boolean, tenantId: string }) {
   const [activeTab, setActiveTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history' | 'security'>('general')
   const [logoPreview, setLogoPreview] = useState<string | null>(initialTenant?.logoUrl || null)
   const [isUploading, setIsUploading] = useState(false)
+  const publicTenantDomain = initialTenant ? getTenantPublicUrl(initialTenant).replace(/^https:\/\//, '') : ''
   const [snapshots, setSnapshots] = useState<any[]>([])
   const [isLoadingSnapshots, setIsLoadingSnapshots] = useState(false)
   const [diffSnapshot, setDiffSnapshot] = useState<any>(null)
-  const [billingSetupError, setBillingSetupError] = useState('')
   const [pendingTab, setPendingTab] = useState<'general' | 'theme' | 'billing' | 'ai' | 'history' | 'security' | null>(null)
   const [invoices, setInvoices] = useState<any[]>([])
   const [isLoadingInvoices, setIsLoadingInvoices] = useState(false)
@@ -192,11 +205,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
   const [websiteData, setWebsiteData] = useState({
     siteTitle: initialWebsite?.siteTitle || 'Website',
     isActive: initialWebsite?.isActive ?? true,
-    themeConfig: initialWebsite?.themeConfig || {
-      colors: { primary: '#4f46e5', secondary: '#10b981' },
-      typography: { base_font: 'Inter' },
-      baseCurrency: 'USD'
-    },
+    themeConfig: initialThemeConfig(initialWebsite),
     globalSeoMetadata: initialWebsite?.globalSeoMetadata || { description: '' }
   })
 
@@ -247,13 +256,14 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
 
   const isTabDirty = (tab: string) => {
     if (tab === 'general') {
-      const xenditSecretInit = initialWebsite?.isXenditSecretConfigured ? '••••••••' : ''
-      const xenditWebhookInit = initialWebsite?.isXenditWebhookTokenConfigured ? '••••••••' : ''
-      const midtransServerKeyInit = initialWebsite?.isMidtransServerKeyConfigured ? '••••••••' : ''
-      const dokuClientIdInit = initialWebsite?.isDokuClientIdConfigured ? '••••••••' : ''
-      const dokuMerchantPublicKeyInit = initialWebsite?.isDokuMerchantPublicKeyConfigured ? '••••••••' : ''
-      const dokuSnapTokenUrlInit = initialWebsite?.isDokuSnapTokenUrlConfigured ? '••••••••' : ''
-      const dokuSharedKeyInit = initialWebsite?.isDokuSharedKeyConfigured ? '••••••••' : ''
+      const xenditSecretInit = initialWebsite?.isXenditSecretConfigured ? SECRET_MASK : ''
+      const xenditWebhookInit = initialWebsite?.isXenditWebhookTokenConfigured ? SECRET_MASK : ''
+      const midtransServerKeyInit = initialWebsite?.isMidtransServerKeyConfigured ? SECRET_MASK : ''
+      const dokuClientIdInit = initialWebsite?.isDokuClientIdConfigured ? SECRET_MASK : ''
+      const dokuMerchantPublicKeyInit = initialWebsite?.isDokuMerchantPublicKeyConfigured ? SECRET_MASK : ''
+      const dokuSnapTokenUrlInit = initialWebsite?.isDokuSnapTokenUrlConfigured ? SECRET_MASK : ''
+      const dokuSharedKeyInit = initialWebsite?.isDokuSharedKeyConfigured ? SECRET_MASK : ''
+      const initialTheme = initialThemeConfig(initialWebsite)
       
       return paymentConfig.xenditEnabled !== (initialWebsite?.xenditEnabled || false) ||
         paymentConfig.xenditSecret !== xenditSecretInit ||
@@ -267,15 +277,13 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
         paymentConfig.dokuSnapTokenUrl !== dokuSnapTokenUrlInit ||
         paymentConfig.dokuSharedKey !== dokuSharedKeyInit ||
         paymentConfig.dokuPreferredChannel !== (initialWebsite?.dokuPreferredChannel || 'all') ||
-        websiteData.themeConfig.paymentGateway !== (initialWebsite?.themeConfig?.paymentGateway || 'unset');
+        (websiteData.themeConfig.paymentGateway || 'unset') !== (initialTheme.paymentGateway || 'unset') ||
+        (hasWhatsAppIntegration && ['whatsappPaNumber', 'whatsappPhoneId', 'whatsappToken', 'whatsappTemplate']
+          .some(key => (websiteData.themeConfig[key] || '') !== (initialTheme[key] || '')));
     }
     if (tab === 'theme') {
       const siteTitleInit = initialWebsite?.siteTitle || 'Website'
-      const themeConfigInit = initialWebsite?.themeConfig || {
-        colors: { primary: '#4f46e5', secondary: '#10b981' },
-        typography: { base_font: 'Inter' },
-        baseCurrency: 'USD'
-      }
+      const themeConfigInit = initialThemeConfig(initialWebsite)
       const seoInit = initialWebsite?.globalSeoMetadata || { description: '' }
       
       return websiteData.siteTitle !== siteTitleInit ||
@@ -383,28 +391,6 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
     }
   }
 
-  const handleUpgradePlan = async (planId: 'core' | 'professional' | 'enterprise') => {
-    try {
-      setIsSaving(true)
-      setBillingSetupError('')
-      const res = await generateBillingInvoice(tenantId, planId)
-      if (res.success && res.invoiceUrl) {
-        window.location.href = res.invoiceUrl
-      } else if (res.success && !res.invoiceUrl) {
-        toast.success(res.message || 'Plan is free.')
-      } else if (res.error === "BILLING_NOT_CONFIGURED") {
-        setBillingSetupError(res.message || '')
-        toast.error('Billing setup required.')
-      } else {
-        toast.error(res.error || 'Failed to generate invoice')
-      }
-    } catch (e: any) {
-      toast.error(e.message || 'Error occurred')
-    } finally {
-      setIsSaving(false)
-    }
-  }
-
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -506,10 +492,14 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                 <div className="space-y-4">
                   <div>
                     <label className="form-label">Platform Subdomain</label>
-                    <div className="flex">
-                      <input type="text" className="form-input rounded-r-none border-r-0 bg-slate-50 text-slate-500 font-mono" defaultValue={initialTenant?.subdomain || ''} disabled />
-                      <div className="px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-r-lg text-sm text-slate-500 font-mono">.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'}</div>
-                    </div>
+                    {initialTenant?.subdomain === 'default' ? (
+                      <input type="text" className="form-input bg-slate-50 text-slate-500 font-mono" value={publicTenantDomain} readOnly />
+                    ) : (
+                      <div className="flex">
+                        <input type="text" className="form-input rounded-r-none border-r-0 bg-slate-50 text-slate-500 font-mono" defaultValue={initialTenant?.subdomain || ''} disabled />
+                        <div className="px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-r-lg text-sm text-slate-500 font-mono">.{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'}</div>
+                      </div>
+                    )}
                     <p className="text-xs text-slate-400 mt-1">Contact support to change your base subdomain.</p>
                   </div>
                   <div className="divider text-xs text-slate-400">OR</div>
@@ -530,7 +520,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                     <label className="form-label">Base Currency</label>
                     <select 
                       className="form-select max-w-sm"
-                      value={websiteData.themeConfig.baseCurrency || 'USD'}
+                      value={websiteData.themeConfig.baseCurrency || 'IDR'}
                       onChange={(e) => setWebsiteData({
                         ...websiteData,
                         themeConfig: { ...websiteData.themeConfig, baseCurrency: e.target.value }
@@ -641,7 +631,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                             </div>
                             
                             <div className="relative group/field">
-                              <label className="form-label text-xs font-semibold text-slate-700">DOKU Client ID (Public Key)</label>
+                              <label className="form-label text-xs font-semibold text-slate-700">DOKU Client ID</label>
                               <input 
                                 type={hoveredField === 'dokuClientId' ? 'text' : 'password'}
                                 className="form-input text-sm pr-10" 
@@ -654,43 +644,48 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                             </div>
                             
                             <div className="relative group/field">
-                              <label className="form-label text-xs font-semibold text-slate-700">Merchant Public Key</label>
-                              <input 
-                                type={hoveredField === 'dokuMerchantPublicKey' ? 'text' : 'password'}
-                                className="form-input text-sm pr-10" 
-                                placeholder="MC-PUB-..."
-                                value={paymentConfig.dokuMerchantPublicKey}
-                                onChange={(e) => setPaymentConfig({...paymentConfig, dokuMerchantPublicKey: e.target.value})}
-                                onMouseEnter={() => setHoveredField('dokuMerchantPublicKey')}
-                                onMouseLeave={() => setHoveredField(null)}
-                              />
-                            </div>
-                            
-                            <div className="relative group/field">
-                              <label className="form-label text-xs font-semibold text-slate-700">SNAP Token URL</label>
-                              <input 
-                                type={hoveredField === 'dokuSnapTokenUrl' ? 'text' : 'password'}
-                                className="form-input text-sm pr-10" 
-                                placeholder="e.g. https://..."
-                                value={paymentConfig.dokuSnapTokenUrl}
-                                onChange={(e) => setPaymentConfig({...paymentConfig, dokuSnapTokenUrl: e.target.value})}
-                                onMouseEnter={() => setHoveredField('dokuSnapTokenUrl')}
-                                onMouseLeave={() => setHoveredField(null)}
-                              />
-                            </div>
-                            
-                            <div className="relative group/field">
-                              <label className="form-label text-xs font-semibold text-slate-700">Shared Key (Secret Key)</label>
+                              <label className="form-label text-xs font-semibold text-slate-700">DOKU Secret Key</label>
                               <input 
                                 type={hoveredField === 'dokuSharedKey' ? 'text' : 'password'}
                                 className="form-input text-sm pr-10" 
-                                placeholder="Shared Key from DOKU Dashboard"
+                                placeholder="Secret Key from DOKU Dashboard"
                                 value={paymentConfig.dokuSharedKey}
                                 onChange={(e) => setPaymentConfig({...paymentConfig, dokuSharedKey: e.target.value})}
                                 onMouseEnter={() => setHoveredField('dokuSharedKey')}
                                 onMouseLeave={() => setHoveredField(null)}
                               />
                             </div>
+
+                            <details className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">
+                              <summary className="cursor-pointer font-medium text-slate-700">Advanced SNAP settings (optional)</summary>
+                              <p className="mt-2 leading-5">Only configure these for a DOKU SNAP/DIPC flow. They are not needed for DOKU Checkout.</p>
+                              <div className="mt-3 space-y-3">
+                                <div className="relative group/field">
+                                  <label className="form-label text-xs font-semibold text-slate-700">Merchant Public Key</label>
+                                  <input
+                                    type={hoveredField === 'dokuMerchantPublicKey' ? 'text' : 'password'}
+                                    className="form-input text-sm pr-10"
+                                    placeholder="Merchant public key"
+                                    value={paymentConfig.dokuMerchantPublicKey}
+                                    onChange={(e) => setPaymentConfig({...paymentConfig, dokuMerchantPublicKey: e.target.value})}
+                                    onMouseEnter={() => setHoveredField('dokuMerchantPublicKey')}
+                                    onMouseLeave={() => setHoveredField(null)}
+                                  />
+                                </div>
+                                <div className="relative group/field">
+                                  <label className="form-label text-xs font-semibold text-slate-700">SNAP Token URL</label>
+                                  <input
+                                    type={hoveredField === 'dokuSnapTokenUrl' ? 'text' : 'password'}
+                                    className="form-input text-sm pr-10"
+                                    placeholder="https://..."
+                                    value={paymentConfig.dokuSnapTokenUrl}
+                                    onChange={(e) => setPaymentConfig({...paymentConfig, dokuSnapTokenUrl: e.target.value})}
+                                    onMouseEnter={() => setHoveredField('dokuSnapTokenUrl')}
+                                    onMouseLeave={() => setHoveredField(null)}
+                                  />
+                                </div>
+                              </div>
+                            </details>
                             
                             <div>
                               <label className="form-label text-xs font-semibold text-slate-700">Active Channels</label>
@@ -802,9 +797,9 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                 </div>
               </div>
 
-              <div className="card p-6">
+              {hasWhatsAppIntegration && <div className="card p-6">
                 <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <MessageSquare className="w-4 h-4 text-slate-400" /> WhatsApp API Integration (PA Handoff)
+                  <MessageSquare className="w-4 h-4 text-slate-400" /> WhatsApp Business Integration
                 </h3>
                 <div className="space-y-4">
                   <div>
@@ -816,7 +811,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       value={websiteData.themeConfig.whatsappPaNumber || ''}
                       onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, whatsappPaNumber: e.target.value }})}
                     />
-                    <p className="text-xs text-slate-400 mt-1">Number to receive contact form submissions and AI escalations.</p>
+                    <p className="text-xs text-slate-400 mt-1">Receive approved template notifications for website leads, orders, and support escalations.</p>
                   </div>
                   <div>
                     <label className="form-label">Phone Number ID</label>
@@ -837,6 +832,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       value={websiteData.themeConfig.whatsappToken || ''}
                       onChange={(e) => setWebsiteData({ ...websiteData, themeConfig: { ...websiteData.themeConfig, whatsappToken: e.target.value }})}
                     />
+                    <p className="text-xs text-slate-400 mt-1">Stored encrypted. Leave the masked value unchanged to retain the existing token.</p>
                   </div>
                   <div>
                     <label className="form-label">Template Name</label>
@@ -849,7 +845,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                     />
                   </div>
                 </div>
-              </div>
+              </div>}
             </div>
           )}
 
@@ -1078,7 +1074,7 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                       <option value="kimi">Moonshot (Kimi)</option>
                       <option value="custom">Custom (OpenAI Compatible)</option>
                     </select>
-                    <p className="text-xs text-slate-400 mt-1">If using your own API key, select the provider above.</p>
+                    <p className="text-xs text-slate-400 mt-1">Use a provider API key. ChatGPT subscriptions and browser logins cannot be used as API credentials.</p>
                   </div>
 
                   {aiData.providerKey === 'custom' && (
@@ -1145,8 +1141,8 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
                         )}
                         <p className="text-xs text-slate-400 mt-1">
                           {availableModels.length > 0 
-                            ? "Select an available model from your provider." 
-                            : "Type the exact model identifier."}
+                            ? "This list was fetched directly from the configured provider; select the model to use."
+                            : "Enter an API key to fetch the live provider list, or type the exact model identifier."}
                         </p>
                       </div>
                     </>
@@ -1161,47 +1157,22 @@ export function SettingsClient({ initialWebsite, initialTenant, initialAiConfig,
               <div className="card p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="text-sm font-semibold text-slate-900 flex items-center gap-2">
-                    <CreditCard className="w-4 h-4 text-slate-400" /> Subscription Plans
+                    <CreditCard className="w-4 h-4 text-slate-400" /> DagangOS Freedom License
                   </h3>
-                  <span className="badge badge-success uppercase tracking-wider">{initialTenant?.plan || 'core'}</span>
+                  <span className="badge badge-success uppercase tracking-wider">Perpetual</span>
                 </div>
                 
-                {billingSetupError && (
-                  <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-                    <h4 className="text-amber-800 font-semibold mb-1">Billing Not Configured</h4>
-                    <p className="text-sm text-amber-700">{billingSetupError}</p>
-                    <p className="text-xs text-amber-600 mt-2">To fix this, please provide XENDIT_SECRET_KEY or MIDTRANS_SERVER_KEY in your environment variables.</p>
-                  </div>
-                )}
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
-                  {['core', 'professional', 'enterprise'].map((plan) => (
-                    <div key={plan} className={cn("border rounded-xl p-6 relative flex flex-col", (initialTenant?.plan || 'core') === plan ? "border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50/10" : "border-slate-200")}>
-                      {(initialTenant?.plan || 'core') === plan && (
-                         <div className="absolute top-0 right-0 bg-indigo-500 text-white text-[10px] uppercase font-bold px-2 py-1 rounded-bl-lg rounded-tr-xl">Current</div>
-                      )}
-                      <h4 className="text-lg font-bold capitalize mb-2">{plan}</h4>
-                      <p className="text-sm text-slate-500 mb-6 flex-1">
-                        {plan === 'core' && 'Basic features for starting out.'}
-                        {plan === 'professional' && 'Advanced features and limits.'}
-                        {plan === 'enterprise' && 'Full access, priority support.'}
-                      </p>
-                      <button 
-                        onClick={() => handleUpgradePlan(plan as any)} 
-                        disabled={isSaving || (initialTenant?.plan || 'core') === plan} 
-                        className={cn("btn w-full justify-center", plan === 'professional' ? 'btn-primary' : 'btn-secondary')}
-                      >
-                        {(initialTenant?.plan || 'core') === plan ? 'Active' : 'Upgrade to ' + plan}
-                      </button>
-                    </div>
-                  ))}
+                <div className="mt-6 rounded-xl border border-emerald-200 bg-emerald-50/70 p-5">
+                  <h4 className="text-base font-bold text-emerald-950">Your deployed platform is not a subscription tier.</h4>
+                  <p className="mt-2 text-sm leading-relaxed text-emerald-900">DagangOS grants a perpetual, transferable self-hosted license for the deployed platform. Your business owns and controls its data, domain, VPS, and infrastructure. There is no mandatory platform renewal or transaction commission.</p>
+                  <p className="mt-3 text-xs leading-relaxed text-emerald-800">Optional maintenance, managed VPS administration, backup management, and priority support are separate services. Source-code and IP transfer, when required, is quoted separately.</p>
                 </div>
               </div>
 
               {/* Invoices List */}
               <div className="card p-6">
                 <h3 className="text-sm font-semibold text-slate-900 mb-4 flex items-center gap-2">
-                  <Save className="w-4 h-4 text-slate-400" /> Billing Invoice History
+                  <Save className="w-4 h-4 text-slate-400" /> Deployment & Service Invoice History
                 </h3>
                 {isLoadingInvoices ? (
                   <div className="py-4 text-sm text-slate-500 flex items-center gap-2">

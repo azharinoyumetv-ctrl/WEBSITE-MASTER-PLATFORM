@@ -2,11 +2,13 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
-
-
+import { requirePermission, requireTenantUser } from '@/lib/rbac'
 
 export async function getTenantModules(tenantId: string) {
   try {
+    const user = await requireTenantUser(tenantId)
+    await requirePermission(user.id, tenantId, 'system', 'read')
+
     const modules = await prisma.tenantModule.findMany({
       where: { tenantId }
     })
@@ -16,11 +18,12 @@ export async function getTenantModules(tenantId: string) {
   }
 }
 
-import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
-
 export async function toggleTenantModule(tenantId: string, moduleKey: string, isEnabled: boolean) {
   try {
-    const user = await getAuthenticatedUser()
+    if (moduleKey === 'whatsapp_module') {
+      return { success: false, error: 'WhatsApp Business is provisioned only through the selected project add-on.' }
+    }
+    const user = await requireTenantUser(tenantId)
     const userId = user.id
 
     await requirePermission(userId, tenantId, 'system', 'manage')

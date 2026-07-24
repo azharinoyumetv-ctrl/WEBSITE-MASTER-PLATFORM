@@ -1,72 +1,44 @@
 # Privacy Policy
 
-**Last Updated:** July 2026  
-**Company:** PT DagangOS Digital Indonesia
+**Effective date: 16 July 2026**
 
----
+**DagangOS Digital Indonesia** ("DagangOS", "we", "us", or "our") respects your privacy. This policy explains how we handle personal data collected through DagangOS Web, project enquiries, and related services.
 
-## 1. Introduction
+## 1. Personal data we collect
 
-PT DagangOS Digital Indonesia ("DagangOS", "we", "us") is committed to protecting the privacy of our clients ("you", "Client") and their end-users. This Privacy Policy explains how we collect, use, disclose, and safeguard information when you use our services, software, and platforms.
+We may collect contact and business details you submit, project requirements, account and support correspondence, billing information, and technical information such as device, browser, IP address, session, and security events.
 
-## 2. Information We Collect
+## 2. Why we use personal data
 
-We collect information that you voluntarily provide to us when you register for our services, express interest in obtaining information about us, or otherwise contact us.
+We use personal data to respond to enquiries, prepare proposals, deliver and support projects, process agreed payments, secure our services, prevent misuse, improve the website, and comply with legal obligations.
 
-### 2.1 Personal Data
-We may collect personal identification information, including but not limited to:
-- Full name
-- Email address
-- Phone number
-- Billing and corporate address
-- Job title and company name
+## 3. When we share data
 
-### 2.2 Business Data
-In the course of providing our Services, we may have temporary or administrative access to your business data, including inventory, transaction records, and customer lists. 
-> **Note:** Under our client-owned infrastructure model, this data primarily resides securely on your designated VPS and databases.
+We may share data with service providers that help us operate the website or deliver services, with providers you ask us to integrate, where required by law, or as part of a lawful business reorganisation. We do not sell personal data.
 
-### 2.3 Usage Data
-We automatically collect usage information when you interact with our administrative platforms. This may include IP addresses, browser types, operating systems, referring URLs, and telemetry data regarding module usage to help us improve the platform.
+## 4. Third-party services and international processing
 
-## 3. How We Use Your Information
+Hosting, payment, communications, analytics, and AI providers may process data under their own terms and privacy notices. Data may be processed in locations where those providers operate, subject to appropriate safeguards where required by applicable law.
 
-- **Cookies**: We use cookies and similar tracking technologies on our marketing websites and administrative dashboards to maintain sessions, store preferences, and track analytics. Please refer to our Cookie Policy for detailed information.
-- **Analytics**: We may partner with selected third-party vendors to allow tracking technologies and remarketing services on our platforms through the use of first-party cookies and third-party cookies, to analyze and track user activity and determine the popularity of certain content.
+## 5. Security and retention
 
-## 4. Payment Information
+We use reasonable technical and organisational measures to protect personal data. We retain information only for as long as needed for the purposes described here, to deliver the engagement, resolve disputes, or meet legal and accounting requirements.
 
-We do **not** store full credit card numbers on our servers. Payment processing for DagangOS services is handled exclusively by secure, PCI-compliant third-party payment gateways.
+## 6. Your choices and rights
 
-## 5. AI Data Processing
+Subject to applicable law, you may ask to access, correct, delete, or limit the use of your personal data, or withdraw consent where processing relies on consent. Contact us using the details below; we may need to verify your identity before acting on a request.
 
-If you utilize our AI Services module:
-- Data inputted into AI modules (prompts, context, product descriptions) may be processed by third-party LLM providers (e.g., OpenAI, Anthropic).
-- We do **not** use your proprietary business data to train our foundational models without explicit consent.
-- You are responsible for ensuring no sensitive personally identifiable information (PII) of your end-users is transmitted to AI endpoints unless specifically permitted by your own privacy policies.
+## 7. Cookies
 
-## 6. Website Logs & Security
+Our website may use essential cookies or similar technologies for sessions, security, and basic operation. You can control cookies through your browser settings; disabling essential cookies can affect site functionality.
 
-Our software generates standard server and application logs (error logs, access logs, audit logs). These logs are stored on the Client Infrastructure and are only accessed by DagangOS personnel when providing technical support or maintenance services.
+## 8. Children
 
-We implement commercially reasonable technical and organizational security measures designed to protect the security of any personal information we process. However, despite our safeguards, no electronic transmission over the Internet or information storage technology can be guaranteed to be 100% secure.
+Our services are not directed to children. Do not provide a child's personal data to us unless you are authorised to do so and it is necessary for an agreed service.
 
-## 7. Data Retention & Your Rights
+## 9. Updates and contact
 
-We retain Personal Data only for as long as is necessary for the purposes set out in this Privacy Policy. Depending on your location, you may have the right to:
-- Request access to your personal data.
-- Request correction of inaccurate data.
-- Request deletion of your personal data ("Right to be Forgotten").
-- Object to processing of your data.
+We may update this policy from time to time. For privacy requests or questions, contact **contact@dagangos.com**.
 
-To exercise these rights, please contact our Data Protection Officer.
-
-## 8. Third-Party Services & International Transfer
-
-Our services integrate with various third parties (payment processors, email providers). We are not responsible for the privacy practices of these third parties. Your information may also be transferred to — and maintained on — computers located outside of your state, province, country, or other governmental jurisdiction.
-
-## 9. Contact
-
-If you have questions or comments about this policy, please email our Data Protection Officer at:  
-**Email:** privacy@dagangos.com  
-**Address:** PT DagangOS Digital Indonesia, Jakarta, Indonesia
-
+**DagangOS Digital Indonesia**
+Subang, Jawa Barat, Indonesia

@@ -30,7 +30,7 @@ export function OrdersClient({ tenantId }: { tenantId: string }) {
   const handleCancel = async (orderId: string) => {
     if (!confirm('Are you sure you want to cancel this order?')) return
     setCancellingId(orderId)
-    const res = await cancelOrder(tenantId, orderId, 'Cancelled by customer')
+    const res = await cancelOrder(tenantId, orderId, 'Cancelled by customer', email)
     setCancellingId(null)
     if (res.success) {
       toast.success('Order cancelled')
@@ -114,7 +114,7 @@ export function OrdersClient({ tenantId }: { tenantId: string }) {
                     <span className="text-xs text-slate-400">No receipt available</span>
                   )}
                   
-                  {order.orderStatus === 'pending' && (
+                  {['pending', 'pending_requirements', 'awaiting_payment'].includes(order.orderStatus) && (
                     <button 
                       onClick={() => handleCancel(order.id)} 
                       disabled={cancellingId === order.id}

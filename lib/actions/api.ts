@@ -4,6 +4,12 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import crypto from 'crypto'
 import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
+import { getWebhookSigningSecret, storeWebhookSigningSecret } from '@/lib/webhook-signing'
+
+function toSafeWebhook<T extends { secretSigningToken?: string }>(webhook: T) {
+  const { secretSigningToken: _secretSigningToken, ...safeWebhook } = webhook
+  return safeWebhook
+}
 
 export async function getApiData(tenantId: string) {
   try {
@@ -11,17 +17,50 @@ export async function getApiData(tenantId: string) {
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'api', 'read')
 
-    const keys = await prisma.tenantApiKey.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' }
-    })
-    
-    const webhooks = await prisma.tenantApiWebhook.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' }
-    })
+    const telemetrySince = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+    const [keys, webhooks, requestLogs] = await Promise.all([
+      prisma.tenantApiKey.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, tenantId: true, createdBy: true, keyName: true, keyPrefix: true,
+          scopes: true, isActive: true, expiresAt: true, lastUsedAt: true, createdAt: true, updatedAt: true
+        }
+      }),
+      prisma.tenantApiWebhook.findMany({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true, tenantId: true, targetUrl: true, subscribedEvents: true, isActive: true,
+          failureCount: true, createdAt: true
+        }
+      }),
+      prisma.tenantApiRequestLog.findMany({
+        where: { tenantId, createdAt: { gte: telemetrySince } },
+        orderBy: { createdAt: 'desc' },
+        take: 1000,
+        select: { route: true, method: true, statusCode: true, latencyMs: true, createdAt: true }
+      })
+    ])
 
-    return { success: true, keys, webhooks }
+    const latencies = requestLogs.map((request) => request.latencyMs).sort((a, b) => a - b)
+    const errorCount = requestLogs.filter((request) => request.statusCode >= 400).length
+    const p95Index = latencies.length > 0 ? Math.ceil(latencies.length * 0.95) - 1 : 0
+
+    return {
+      success: true,
+      keys,
+      webhooks,
+      telemetry: {
+        windowDays: 30,
+        requestCount: requestLogs.length,
+        errorCount,
+        averageLatencyMs: latencies.length ? Math.round(latencies.reduce((sum, latency) => sum + latency, 0) / latencies.length) : null,
+        p95LatencyMs: latencies.length ? latencies[p95Index] : null,
+        latestRequestAt: requestLogs[0]?.createdAt ?? null,
+        recentRequests: requestLogs.slice(0, 8)
+      }
+    }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -147,14 +186,16 @@ export async function createWebhook(tenantId: string, targetUrl: string, events:
       data: {
         tenantId,
         targetUrl,
-        secretSigningToken,
+        secretSigningToken: storeWebhookSigningSecret(secretSigningToken),
         subscribedEvents: events,
         isActive: true
       }
     })
     
     revalidatePath('/admin/api-portal')
-    return { success: true, webhook }
+    // A webhook signing secret is only sent in this creation response. It is
+    // deliberately omitted from later dashboard loads and list responses.
+    return { success: true, webhook: toSafeWebhook(webhook), signingSecret: secretSigningToken }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -215,7 +256,7 @@ export async function testWebhookDispatch(tenantId: string, webhookId: string) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-webhook-signature': crypto.createHmac('sha256', webhook.secretSigningToken).update(JSON.stringify(payload)).digest('hex')
+        'x-webhook-signature': crypto.createHmac('sha256', getWebhookSigningSecret(webhook.secretSigningToken)).update(JSON.stringify(payload)).digest('hex')
       },
       body: JSON.stringify(payload)
     })

@@ -73,8 +73,10 @@ async function main() {
       permissions: {
         system: ['read', 'write'],
         catalog: ['read', 'write', 'delete'],
+        website: ['read', 'write'],
+        settings: ['read', 'write'],
         orders: ['read', 'write'],
-        payments: ['read'],
+        payments: ['read', 'write'],
         inventory: ['read', 'write'],
         pos: ['read', 'write'],
         crm: ['read', 'write'],
@@ -84,8 +86,9 @@ async function main() {
   })
 
   // 6. Map User to Role
-  await prisma.userRole.create({
+  await prisma.tenantUserRole.create({
     data: {
+      tenantId: tenant.id,
       userId: adminUser.id,
       roleId: adminRole.id
     }
@@ -113,6 +116,17 @@ async function main() {
         keywords: ['digital commerce', 'e-commerce', 'Indonesia', 'DagangOS', 'platform']
       },
       isActive: true
+    }
+  })
+
+  // Control-plane instance used by the API telemetry integration test.
+  await prisma.tenantInstance.create({
+    data: {
+      tenantId: tenant.id,
+      instanceId: '11111111-1111-4111-8111-111111111111',
+      instanceUrl: 'https://e2e-control-plane.dagangos.test',
+      licenseKeyHash: 'e2e-control-plane-license',
+      status: 'active'
     }
   })
 

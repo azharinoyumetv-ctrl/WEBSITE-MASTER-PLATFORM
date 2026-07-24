@@ -41,16 +41,23 @@ export async function getMonitoringStatus(tenantId: string) {
       resolved: a.status === 'resolved'
     })) : []
 
-    const activeSessions = await prisma.tenantPosSession.count({ where: { status: 'open' } })
-    const activeOrders = await prisma.tenantOrder.count({ where: { orderStatus: 'pending' } })
+    const activeSessions = await prisma.tenantPosSession.count({ where: { tenantId, status: 'open' } })
+    const activeOrders = await prisma.tenantOrder.count({
+      where: {
+        tenantId,
+        // Keep this compatible with older production enum definitions while
+        // the one-time schema repair adds the newer project-order states.
+        orderStatus: { notIn: ['completed', 'cancelled'] },
+      },
+    })
     
     return {
       success: true,
       monitoring: {
         systemStatus: dbStatus === 'up' ? 'healthy' : 'degraded',
         nodes: [
-          { service: 'postgres_rls', status: dbStatus, connections: dbConnections, uptime: '99.99%', latency: dbLatency },
-          { service: 'nextjs_edge', status: 'up', connections: activeSessions, uptime: '100%', latency: nextjsLatency }
+          { service: 'postgresql', status: dbStatus, connections: dbConnections, latency: dbLatency },
+          { service: 'application_request', status: 'up', connections: activeSessions, latency: nextjsLatency }
         ],
         alertHistory: formattedAlerts,
         liveMetrics: {

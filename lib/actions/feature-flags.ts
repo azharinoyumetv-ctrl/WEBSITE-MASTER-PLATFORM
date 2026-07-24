@@ -3,12 +3,14 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
+import { ensureDefaultFeatureFlags } from '@/lib/feature-flags'
 
 export async function getFeatureFlags(tenantId: string) {
   try {
     const user = await getAuthenticatedUser()
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'settings', 'read')
+    await ensureDefaultFeatureFlags()
 
     const systemFlags = await prisma.systemFeatureFlag.findMany({
       orderBy: { flagKey: 'asc' }
@@ -106,6 +108,13 @@ export async function updateFeatureFlagRollout(tenantId: string, flagId: string,
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'settings', 'write')
 
+    if (!Number.isInteger(rolloutPercentage) || rolloutPercentage < 0 || rolloutPercentage > 100) {
+      throw new Error('Rollout percentage must be between 0 and 100.')
+    }
+
+    const systemFlag = await prisma.systemFeatureFlag.findUnique({ where: { id: flagId } })
+    if (!systemFlag) throw new Error('Feature flag not found')
+
     const flag = await prisma.tenantFeatureOverride.upsert({
       where: {
         tenantId_flagId: { tenantId, flagId }
@@ -116,7 +125,7 @@ export async function updateFeatureFlagRollout(tenantId: string, flagId: string,
       create: {
         tenantId,
         flagId,
-        isEnabled: false,
+        isEnabled: systemFlag.defaultState,
         rolloutPercentage
       },
       include: {

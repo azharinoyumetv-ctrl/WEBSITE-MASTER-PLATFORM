@@ -1,9 +1,9 @@
 # Acceptable Use Policy (AUP)
 
 **Last Updated:** July 2026
-**Company:** PT DagangOS Digital Indonesia
+**Company:** DagangOS Digital Indonesia
 
-This AUP governs the use of software, APIs, and platforms provided by PT DagangOS Digital Indonesia. Violation of this policy may result in immediate suspension or termination of your software license and support agreements.
+This AUP governs the use of software, APIs, and platforms provided by DagangOS Digital Indonesia. Violation of this policy may result in immediate suspension or termination of your software license and support agreements.
 
 ## Illegal Content
 You may not use our software to publish, transmit, or facilitate any content that is illegal under Indonesian law or the laws of the jurisdiction in which your business operates. This includes, but is not limited to, the sale of illegal drugs, unverified pharmaceuticals, or contraband.

@@ -8,19 +8,22 @@ import {
   CreditCard, Monitor, Warehouse, Users2, CalendarCheck, Sparkles,
   Bell, BarChart3, Code2, Settings, ChevronLeft, ChevronRight,
   LogOut, Building2, Menu, X, ToggleLeft,
-  Activity, Zap, Sun, Moon,
+  Activity, Zap, Sun, Moon, FileText,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { getUnreadAlertCount, getMonitoringStatus } from '@/lib/actions/monitoring'
-import { useTranslations } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { signOut } from 'next-auth/react'
+import { DagangOSBrand } from '@/components/DagangOSBrand'
+import { AdminLocaleBridge } from '@/components/AdminLocaleBridge'
 
 type NavItem = {
   href: string
   icon: React.ElementType
   label: string
   requiredModule?: string
+  platformOnly?: boolean
 }
 
 type NavGroup = {
@@ -28,12 +31,22 @@ type NavGroup = {
   items: NavItem[]
 }
 
+type ThemeMode = 'system' | 'light' | 'dark'
+type ResolvedTheme = Exclude<ThemeMode, 'system'>
+
+const THEME_MODES: ThemeMode[] = ['system', 'light', 'dark']
+
+function isThemeMode(value: string | null): value is ThemeMode {
+  return value !== null && THEME_MODES.includes(value as ThemeMode)
+}
+
 const NAVIGATION_GROUPS: NavGroup[] = [
   {
     label: 'Core',
     items: [
       { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-      { href: '/admin/tenants', icon: Building2, label: 'Tenants', requiredModule: 'admin_module' },
+      { href: '/admin/pages', icon: FileText, label: 'Pages', requiredModule: 'website_module' },
+      { href: '/admin/tenants', icon: Building2, label: 'Tenants', requiredModule: 'admin_module', platformOnly: true },
       { href: '/admin/modules', icon: ToggleLeft, label: 'Modules', requiredModule: 'admin_module' },
     ],
   },
@@ -89,45 +102,46 @@ const NAVIGATION_GROUPS: NavGroup[] = [
 type SidebarProps = {
   collapsed: boolean
   onToggle: () => void
+  onNavigate?: () => void
   navGroups: NavGroup[]
   user?: { name: string, role: string }
 }
 
-function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
+function Sidebar({ collapsed, onToggle, onNavigate, navGroups, user }: SidebarProps) {
   const pathname = usePathname()
+  const locale = useLocale()
   const t = useTranslations('AdminSidebar')
+  const normalizedPathname = pathname.replace(/^\/(en|id)(?=\/)/, '')
 
   return (
     <aside
       className={cn(
-        'h-screen flex flex-col bg-slate-900 border-r border-white/5 transition-all duration-300 ease-in-out',
+        'relative h-screen flex flex-col overflow-hidden bg-[#06142d] border-r border-white/10 transition-all duration-300 ease-in-out shadow-[18px_0_45px_rgba(2,6,23,.12)]',
         collapsed ? 'w-16' : 'w-64'
       )}
     >
+      <div className="pointer-events-none absolute -left-24 top-16 h-64 w-64 rounded-full bg-emerald-400/10 blur-3xl dagangos-orb" />
+      <div className="pointer-events-none absolute -right-24 bottom-32 h-64 w-64 rounded-full bg-sky-400/10 blur-3xl dagangos-orb-delayed" />
       {/* Logo */}
-      <div className={cn('flex items-center h-16 border-b border-white/10 px-4', collapsed ? 'justify-center' : 'gap-3')}>
-        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center flex-shrink-0">
-          <Globe className="w-4 h-4 text-white" />
-        </div>
-        {!collapsed && (
-          <div className="overflow-hidden">
-            <h2 className="text-white font-bold text-lg leading-tight truncate">Website Master</h2>
-            <p className="text-slate-400 text-[10px] uppercase tracking-wider mt-0.5 truncate"><span className="text-indigo-400 font-semibold">Platform</span> / DagangOS</p>
-          </div>
-        )}
+      <div className={cn('relative flex items-center h-20 border-b border-white/10 px-4', collapsed ? 'justify-center' : 'gap-3')}>
+        <DagangOSBrand compact dark showName={!collapsed} />
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-1">
-        {navGroups.map((group) => (
-          <div key={group.label} className="mb-2">
+      <nav className="relative flex-1 overflow-y-auto py-4 px-2 space-y-1">
+        {navGroups.map((group) => {
+          const groupKey = `group_${group.label.toLowerCase()}` as any
+          let translatedGroup = group.label
+          try { translatedGroup = t(groupKey) } catch {}
+
+          return <div key={group.label} className="mb-2">
             {!collapsed && (
-              <p className="text-slate-500 text-[10px] font-semibold uppercase tracking-widest px-3 py-1 mb-1">
-                {group.label}
+              <p className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.18em] px-3 py-1.5 mb-1">
+                {translatedGroup}
               </p>
             )}
             {group.items.map((item) => {
-              const isActive = pathname === item.href || pathname.startsWith(item.href + '/')
+              const isActive = normalizedPathname === item.href || normalizedPathname.startsWith(item.href + '/')
               // Extract a translation key from the label (e.g. "Access Control" -> "access_control")
               const tKey = item.label.toLowerCase().replace(/ /g, '_').replace('-', '') as any
               // Fallback to item.label if translation is missing (though we've added them all)
@@ -137,14 +151,15 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={`/${locale}${item.href}`}
+                  onClick={onNavigate}
                   title={collapsed ? translatedLabel : undefined}
                   className={cn(
-                    'flex items-center rounded-lg transition-all duration-150 mb-0.5',
+                    'flex items-center rounded-xl transition-all duration-200 mb-1',
                     collapsed ? 'justify-center px-2 py-2.5' : 'gap-3 px-3 py-2.5',
                     isActive
-                      ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
-                      : 'text-slate-400 hover:text-white hover:bg-white/8'
+                      ? 'bg-gradient-to-r from-emerald-500 to-cyan-500 text-slate-950 shadow-lg shadow-emerald-950/30'
+                      : 'text-slate-400 hover:text-white hover:bg-white/10'
                   )}
                 >
                   <item.icon className="w-4 h-4 flex-shrink-0" />
@@ -153,45 +168,48 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
               )
             })}
           </div>
-        ))}
+        })}
       </nav>
 
       {/* Footer */}
-      <div className="border-t border-white/10 p-2 flex items-center justify-between">
+      <div className="relative border-t border-white/10 p-2 flex items-center justify-between bg-slate-950/20">
         <Link
-          href="/admin/settings"
+          href={`/${locale}/admin/profile`}
+          onClick={onNavigate}
           className={cn(
-            'flex items-center gap-3 rounded-lg px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/8 transition-all duration-150 flex-1',
+            'flex items-center gap-3 rounded-xl px-3 py-2.5 text-slate-400 hover:text-white hover:bg-white/10 transition-all duration-150 flex-1',
             collapsed ? 'justify-center px-2' : ''
           )}
         >
-          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-blue-500 flex items-center justify-center flex-shrink-0">
-            <span className="text-white text-xs font-bold">{user?.name ? user.name.substring(0, 2).toUpperCase() : 'AD'}</span>
+          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-300 to-sky-400 flex items-center justify-center flex-shrink-0">
+            <span className="text-slate-950 text-xs font-black">{user?.name ? user.name.substring(0, 2).toUpperCase() : 'AD'}</span>
           </div>
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-white text-sm font-medium truncate">{user?.name || 'Admin User'}</p>
-              <p className="text-slate-400 text-xs truncate">{t('tenant_admin')}</p>
+              <p className="text-slate-400 text-xs truncate">{user?.role || t('tenant_admin')}</p>
             </div>
           )}
         </Link>
         {!collapsed && (
           <button 
-            onClick={() => signOut({ callbackUrl: '/auth/login' })}
+            onClick={() => signOut({ callbackUrl: `/${locale}/auth/login` })}
             className="p-2 text-slate-500 hover:text-red-400 hover:bg-white/5 rounded-lg transition-colors"
-            title="Log out"
+            title={t('logout')}
+            aria-label={t('logout')}
           >
             <LogOut className="w-4 h-4" />
           </button>
         )}
       </div>
-      <div className="border-t border-white/10 p-2">
+      <div className="relative border-t border-white/10 p-2">
         {/* Collapse toggle */}
         <button
           onClick={onToggle}
           className={cn(
-            'mt-1 w-full flex items-center justify-center rounded-lg py-2 text-slate-500 hover:text-white hover:bg-white/8 transition-all duration-150'
+            'mt-1 w-full flex items-center justify-center rounded-xl py-2 text-slate-500 hover:text-white hover:bg-white/10 transition-all duration-150'
           )}
+          aria-label={collapsed ? t('expand_navigation') : t('collapse_navigation')}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
         </button>
@@ -200,13 +218,18 @@ function Sidebar({ collapsed, onToggle, navGroups, user }: SidebarProps) {
   )
 }
 
-export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onMobileMenuToggle: () => void, tenant?: any, theme: string, toggleTheme: () => void }) {
+export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggleTheme }: { onMobileMenuToggle: () => void, tenant?: any, theme: ThemeMode, resolvedTheme: ResolvedTheme, toggleTheme: () => void }) {
   const pathname = usePathname()
+  const locale = useLocale()
   const t = useTranslations('AdminSidebar')
   const [unreadCount, setUnreadCount] = useState(0)
   const [sysStatus, setSysStatus] = useState('operational')
   const [recentAlerts, setRecentAlerts] = useState<any[]>([])
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const nextTheme = THEME_MODES[(THEME_MODES.indexOf(theme) + 1) % THEME_MODES.length]
+  const themeLabel = theme === 'system'
+    ? `System (${resolvedTheme})`
+    : theme.charAt(0).toUpperCase() + theme.slice(1)
   
   useEffect(() => {
     if (!tenant?.id) return
@@ -232,6 +255,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
 
   const getPageTitle = () => {
     if (pathname.includes('/dashboard')) return t('dashboard')
+    if (pathname.includes('/pages')) return t('pages')
     if (pathname.includes('/tenants')) return t('tenants')
     if (pathname.includes('/modules')) return t('modules')
     if (pathname.includes('/users')) return t('users')
@@ -248,41 +272,50 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
     if (pathname.includes('/notifications')) return t('notifications')
     if (pathname.includes('/analytics')) return t('analytics')
     if (pathname.includes('/api-portal')) return t('api_portal')
-    if (pathname.includes('/monitoring')) return 'System Monitoring'
+    if (pathname.includes('/monitoring')) return t('system_monitoring')
+    if (pathname.includes('/feature-flags')) return t('feature_flags')
+    if (pathname.includes('/profile')) return t('profile')
     if (pathname.includes('/settings')) return t('settings')
-    return 'Admin Console'
+    return t('admin_console')
   }
 
   return (
-    <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-6 flex-shrink-0">
-      <div className="flex items-center gap-3">
+    <header className="relative h-20 overflow-visible bg-[#06142d] border-b border-white/10 flex items-center justify-between px-4 sm:px-6 flex-shrink-0 shadow-lg shadow-slate-950/10">
+      <div className="pointer-events-none absolute inset-0 dagangos-grid opacity-[0.12]" />
+      <div className="relative flex items-center gap-3">
         <button
           onClick={onMobileMenuToggle}
-          className="md:hidden p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+          className="md:hidden min-h-10 min-w-10 p-2 rounded-xl text-slate-300 hover:bg-white/10 transition-colors"
+          aria-label={t('open_navigation')}
         >
           <Menu className="w-5 h-5" />
         </button>
         <div>
-          <h1 className="text-base font-semibold text-slate-900">{getPageTitle()}</h1>
+          <h1 className="text-base font-bold text-white">{getPageTitle()}</h1>
           <p className="text-xs text-slate-400 hidden sm:block">{tenant?.companyName || 'DagangOS'} · {tenant?.plan || 'enterprise'} plan</p>
         </div>
       </div>
       
-      <div className="flex items-center gap-3">
-        <LanguageSwitcher />
+      <div className="relative flex items-center gap-2 sm:gap-3">
+        <LanguageSwitcher variant="dark" />
 
         <button
           onClick={toggleTheme}
-          className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors focus:ring-2 focus:ring-indigo-500 focus:outline-none"
-          aria-label="Toggle Theme"
+          className="p-2 rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 transition-colors focus:ring-2 focus:ring-emerald-400 focus:outline-none"
+          aria-label={`Theme: ${themeLabel}. Switch to ${nextTheme}.`}
+          title={`Theme: ${themeLabel}. Click to use ${nextTheme}.`}
         >
-          {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+          {theme === 'system'
+            ? <Monitor className="w-5 h-5" />
+            : theme === 'dark'
+              ? <Moon className="w-5 h-5" />
+              : <Sun className="w-5 h-5" />}
         </button>
 
         {/* Status indicator */}
         <div className={cn(
-          "hidden sm:flex items-center gap-2 px-3 py-1.5 border rounded-full",
-          sysStatus === 'operational' ? "bg-emerald-50 border-emerald-200" : "bg-amber-50 border-amber-200"
+          "hidden xl:flex items-center gap-2 px-3 py-1.5 border rounded-full",
+          sysStatus === 'operational' ? "bg-emerald-400/10 border-emerald-300/20" : "bg-amber-400/10 border-amber-300/20"
         )}>
           <div className={cn(
             "w-1.5 h-1.5 rounded-full animate-pulse",
@@ -290,9 +323,9 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
           )} />
           <span className={cn(
             "text-xs font-medium",
-            sysStatus === 'operational' ? "text-emerald-700" : "text-amber-700"
+            sysStatus === 'operational' ? "text-emerald-200" : "text-amber-200"
           )}>
-            {sysStatus === 'operational' ? 'All Systems Operational' : 'Active Incidents'}
+            {sysStatus === 'operational' ? t('all_systems_operational') : t('active_incidents')}
           </span>
         </div>
 
@@ -300,7 +333,8 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
         <div className="relative">
           <button 
             onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-            className="relative p-2 rounded-lg text-slate-500 hover:bg-slate-100 transition-colors"
+            className="relative p-2 rounded-xl border border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 transition-colors"
+            aria-label={isDropdownOpen ? t('close_notifications') : t('open_notifications')}
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
@@ -313,8 +347,8 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
           {isDropdownOpen && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setIsDropdownOpen(false)} />
-              <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-lg border border-slate-200 z-50 overflow-hidden">
-                <div className="p-3 border-b border-slate-100 font-medium text-sm">Recent Notifications</div>
+              <div className="absolute right-0 mt-2 w-80 bg-white rounded-2xl shadow-xl border border-slate-200 z-50 overflow-hidden">
+                <div className="p-3 border-b border-slate-100 font-medium text-sm">{t('recent_notifications')}</div>
                 <div className="max-h-64 overflow-y-auto">
                   {recentAlerts.length > 0 ? (
                     recentAlerts.map(alert => (
@@ -324,12 +358,12 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
                       </div>
                     ))
                   ) : (
-                    <div className="p-4 text-center text-sm text-slate-500">No recent notifications</div>
+                    <div className="p-4 text-center text-sm text-slate-500">{t('no_recent_notifications')}</div>
                   )}
                 </div>
                 <div className="p-2 border-t border-slate-100 bg-slate-50 text-center">
-                  <Link href="/admin/notifications" className="text-xs font-medium text-indigo-600 hover:text-indigo-700" onClick={() => setIsDropdownOpen(false)}>
-                    View all notifications
+                  <Link href={`/${locale}/admin/notifications`} className="text-xs font-medium text-indigo-600 hover:text-indigo-700" onClick={() => setIsDropdownOpen(false)}>
+                    {t('view_all_notifications')}
                   </Link>
                 </div>
               </div>
@@ -339,42 +373,60 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, toggleTheme }: { onM
 
         {/* Public site link */}
         <Link
-          href="/site"
+          href={`/${locale}`}
           target="_blank"
-          className="hidden sm:flex items-center gap-2 btn btn-secondary btn-sm"
+          rel="noopener noreferrer"
+          className="hidden sm:flex items-center gap-2 rounded-xl border border-white/15 bg-white/10 px-3 py-2 text-xs font-bold text-white transition-colors hover:bg-white/15"
         >
           <Globe className="w-3.5 h-3.5" />
-          <span>View Site</span>
+          <span>{t('view_site')}</span>
         </Link>
       </div>
     </header>
   )
 }
 
-export default function AdminLayoutClient({ children, enabledModules, user, tenant }: { children: React.ReactNode, enabledModules: string[], user?: { name: string, role: string }, tenant?: any }) {
+export default function AdminLayoutClient({ children, enabledModules, canManageTenants = false, user, tenant }: { children: React.ReactNode, enabledModules: string[], canManageTenants?: boolean, user?: { name: string, role: string }, tenant?: any }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
   const router = useRouter()
+  const locale = useLocale()
+  const t = useTranslations('AdminSidebar')
 
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
+  const [theme, setTheme] = useState<ThemeMode>('system')
+  const [resolvedTheme, setResolvedTheme] = useState<ResolvedTheme>('light')
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark'
-    if (savedTheme) {
-      setTheme(savedTheme)
-      document.documentElement.classList.toggle('dark', savedTheme === 'dark')
-    } else if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-      setTheme('dark')
-      document.documentElement.classList.add('dark')
-    }
+    const savedTheme = localStorage.getItem('theme')
+    setTheme(isThemeMode(savedTheme) ? savedTheme : 'system')
   }, [])
 
+  useEffect(() => {
+    const systemPreference = window.matchMedia('(prefers-color-scheme: dark)')
+
+    const applyTheme = () => {
+      const nextResolvedTheme: ResolvedTheme = theme === 'system'
+        ? (systemPreference.matches ? 'dark' : 'light')
+        : theme
+
+      setResolvedTheme(nextResolvedTheme)
+      document.documentElement.classList.toggle('dark', nextResolvedTheme === 'dark')
+      document.documentElement.style.colorScheme = nextResolvedTheme
+    }
+
+    applyTheme()
+
+    if (theme !== 'system') return
+
+    systemPreference.addEventListener('change', applyTheme)
+    return () => systemPreference.removeEventListener('change', applyTheme)
+  }, [theme])
+
   const toggleTheme = () => {
-    const newTheme = theme === 'light' ? 'dark' : 'light'
-    setTheme(newTheme)
-    localStorage.setItem('theme', newTheme)
-    document.documentElement.classList.toggle('dark', newTheme === 'dark')
+    const nextTheme = THEME_MODES[(THEME_MODES.indexOf(theme) + 1) % THEME_MODES.length]
+    setTheme(nextTheme)
+    localStorage.setItem('theme', nextTheme)
   }
 
   useEffect(() => {
@@ -395,19 +447,19 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
       if (e.altKey) {
         switch (e.key.toLowerCase()) {
           case 'd':
-            router.push('/admin/dashboard')
+            router.push(`/${locale}/admin/dashboard`)
             break
           case 's':
-            router.push('/admin/settings')
+            router.push(`/${locale}/admin/settings`)
             break
           case 'p':
-            router.push('/admin/pos')
+            router.push(`/${locale}/admin/pos`)
             break
           case 'i':
-            router.push('/admin/inventory')
+            router.push(`/${locale}/admin/inventory`)
             break
           case 'b':
-            router.push('/admin/booking')
+            router.push(`/${locale}/admin/booking`)
             break
         }
       }
@@ -415,21 +467,25 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [router])
+  }, [locale, router])
 
   // Filter navigation groups based on enabled modules
   const filteredNavGroups = NAVIGATION_GROUPS.map(group => ({
     ...group,
-    items: group.items.filter(item => !item.requiredModule || enabledModules.includes(item.requiredModule))
+    items: group.items.filter(item =>
+      (!item.requiredModule || enabledModules.includes(item.requiredModule)) &&
+      (!item.platformOnly || canManageTenants)
+    )
   })).filter(group => group.items.length > 0)
 
   return (
-    <div className="flex h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 overflow-hidden">
+    <div className="flex h-screen bg-[#edf4f8] dark:bg-slate-950 text-slate-900 dark:text-slate-100 overflow-hidden">
+      <AdminLocaleBridge />
       <a 
         href="#main-content" 
         className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-50 focus:bg-white dark:focus:bg-slate-800 focus:text-indigo-600 dark:focus:text-indigo-400 focus:px-4 focus:py-2 focus:rounded-lg focus:shadow-md focus:ring-2 focus:ring-indigo-500 focus:outline-none"
       >
-        Skip to main content
+        {t('skip_to_main')}
       </a>
 
       {/* Desktop sidebar */}
@@ -442,10 +498,11 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
         <div className="fixed inset-0 z-50 md:hidden flex">
           <div className="fixed inset-0 bg-black/50" onClick={() => setMobileOpen(false)} />
           <div className="relative flex-shrink-0">
-            <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} navGroups={filteredNavGroups} user={user} />
+            <Sidebar collapsed={false} onToggle={() => setMobileOpen(false)} onNavigate={() => setMobileOpen(false)} navGroups={filteredNavGroups} user={user} />
             <button
               onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-4 p-1 rounded text-white/60 hover:text-white"
+              className="absolute top-4 right-4 min-h-10 min-w-10 p-2 rounded-xl text-white/60 hover:text-white hover:bg-white/10"
+              aria-label={t('close_navigation')}
             >
               <X className="w-4 h-4" />
             </button>
@@ -455,8 +512,8 @@ export default function AdminLayoutClient({ children, enabledModules, user, tena
 
       {/* Main content */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        <TopBar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} tenant={tenant} theme={theme} toggleTheme={toggleTheme} />
-        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none bg-slate-50 dark:bg-slate-900">
+        <TopBar onMobileMenuToggle={() => setMobileOpen(!mobileOpen)} tenant={tenant} theme={theme} resolvedTheme={resolvedTheme} toggleTheme={toggleTheme} />
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-y-auto focus:outline-none bg-[radial-gradient(circle_at_90%_0%,rgba(56,189,248,.13),transparent_25%),radial-gradient(circle_at_15%_15%,rgba(16,185,129,.08),transparent_20%),#edf4f8] dark:bg-slate-900">
           {!mounted ? (
             <div className="p-6 space-y-6 animate-pulse">
               <div className="h-8 bg-slate-200 dark:bg-slate-800 rounded w-1/4" />
