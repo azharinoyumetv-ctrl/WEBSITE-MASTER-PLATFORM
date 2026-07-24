@@ -131,7 +131,9 @@ export async function POST(request: NextRequest) {
 
   const endpoint = apiUrl.endsWith('/v1') ? `${apiUrl}/chat/completions` : `${apiUrl}/v1/chat/completions`
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 12_000)
+  // Free inference routes can have a cold-start queue. Keep the timeout below
+  // the edge proxy limit while allowing enough time for a grounded response.
+  const timeout = setTimeout(() => controller.abort(), 30_000)
 
   try {
     const response = await fetch(endpoint, {
