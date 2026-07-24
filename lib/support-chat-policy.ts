@@ -1,4 +1,4 @@
-export const SUPPORT_CHAT_POLICY_VERSION = '2026-07-15.1'
+export const SUPPORT_CHAT_POLICY_VERSION = '2026-07-24.1'
 
 export const SUPPORT_CHAT_SCOPE = {
   assignment: 'Public DagangOS pre-sales support and project-setup guidance only.',

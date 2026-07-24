@@ -202,4 +202,34 @@ test.describe('DagangOS production readiness', () => {
       'I cannot access accounts, perform changes, use tools, or handle credentials.'
     )
   })
+
+  test('support chat recommends the exact commerce package for a snack marketplace seller', async ({ page }) => {
+    await page.goto('/id/site/support', { waitUntil: 'domcontentloaded' })
+    const openChat = page.locator('main').getByRole('button', { name: 'Buka chat dukungan' })
+    const chatRegion = page.getByRole('region', { name: 'DagangOS support chat' })
+    await expect(async () => {
+      await openChat.click()
+      await expect(chatRegion).toBeVisible({ timeout: 1_000 })
+    }).toPass({ timeout: 15_000 })
+
+    await page.locator('#dagangos-support-message').fill(
+      'Saya punya usaha snack. Dulu hanya jualan di Shopee dan Tokopedia tetapi potongannya besar. Paket website mana yang paling cocok kalau saya ingin menerima pesanan langsung?'
+    )
+    const [response] = await Promise.all([
+      page.waitForResponse(candidate => candidate.url().endsWith('/api/support-chat') && candidate.request().method() === 'POST'),
+      page.getByRole('button', { name: 'Kirim pesan' }).click(),
+    ])
+
+    expect(response.status()).toBe(200)
+    const payload = await response.json()
+    expect(payload).toMatchObject({
+      success: true,
+    })
+    expect(payload.policyBlocked).not.toBe(true)
+    expect(payload.reply).toContain('E-Commerce Platform')
+    expect(payload.reply).toContain('Rp 22.000.000')
+    expect(payload.reply).toContain('https://store.dagangos.com/id/project-setup?package=ecommerce')
+    expect(payload.reply).not.toMatch(/\bDapurOS\b/i)
+    await expect(chatRegion).toContainText('E-Commerce Platform')
+  })
 })
