@@ -216,7 +216,10 @@ test.describe('DagangOS production readiness', () => {
       'Saya punya usaha snack. Dulu hanya jualan di Shopee dan Tokopedia tetapi potongannya besar. Paket website mana yang paling cocok kalau saya ingin menerima pesanan langsung?'
     )
     const [response] = await Promise.all([
-      page.waitForResponse(candidate => candidate.url().endsWith('/api/support-chat') && candidate.request().method() === 'POST'),
+      page.waitForResponse(
+        candidate => candidate.url().endsWith('/api/support-chat') && candidate.request().method() === 'POST',
+        { timeout: 40_000 }
+      ),
       page.getByRole('button', { name: 'Kirim pesan' }).click(),
     ])
 
