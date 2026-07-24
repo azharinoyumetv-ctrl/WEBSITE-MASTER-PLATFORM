@@ -239,4 +239,47 @@ test.describe('DagangOS production readiness', () => {
     expect(payload.reply).not.toMatch(/\bDapurOS\b/i)
     await expect(chatRegion).toContainText('E-Commerce Platform')
   })
+
+  test('support chat answers an Indonesian website-build request directly without repeating prior advice', async ({ request }) => {
+    const response = await request.post('/api/support-chat', {
+      data: {
+        conversationId: `palm-oil-regression-${Date.now()}`,
+        message: 'tolong buatkan saya website nya',
+        messages: [
+          {
+            role: 'user',
+            content: 'Saya punya kebun kelapa sawit dan ingin calon mitra dari luar Indonesia dapat menghubungi saya.',
+          },
+          {
+            role: 'assistant',
+            content: 'Rekomendasi utama: Company Profile — Rp 6.000.000.',
+          },
+          {
+            role: 'user',
+            content: 'harus di tambah add-on tidak? kalo iya rekomendasinya apa?',
+          },
+          {
+            role: 'assistant',
+            content: 'Tidak perlu menambahkan add-on untuk tahap awal.',
+          },
+          {
+            role: 'user',
+            content: 'tolong buatkan saya website nya',
+          },
+        ],
+      },
+    })
+
+    expect(response.status()).toBe(200)
+    const payload = await response.json()
+    expect(payload).toMatchObject({
+      success: true,
+      policyBlocked: true,
+    })
+    expect(payload.reply).toBe(
+      'Saya tidak bisa membuat atau men-deploy website langsung dari chat ini. Untuk memulai pengerjaan, buka Project Setup di https://store.dagangos.com/id/project-setup atau hubungi tim DagangOS melalui halaman Contact.'
+    )
+    expect(payload.reply).not.toMatch(/Company Profile|Launch Website|Rp 6\.000\.000/)
+    expect(payload.reply.split(/\s+/).length).toBeLessThan(35)
+  })
 })
