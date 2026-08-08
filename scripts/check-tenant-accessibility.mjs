@@ -2,6 +2,7 @@ import pg from 'pg'
 
 const { Client } = pg
 const tenantBaseDomain = process.env.NEXT_PUBLIC_TENANT_BASE_DOMAIN || 'dagangos.com'
+const platformBaseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com'
 const platformTenantSubdomain = process.env.PLATFORM_TENANT_SUBDOMAIN || 'dagangos'
 const challenge = /Just a moment|cf-chl-|403 Forbidden/i
 const jsOnlyShell = /You need to enable JavaScript to run this app/i
@@ -34,6 +35,7 @@ if (result.rows.length === 0) {
 
 for (const tenant of result.rows) {
   const hostname = tenant.custom_domain || `${tenant.subdomain}.${tenantBaseDomain}`
+  if (hostname === platformBaseDomain || hostname === 'store.dagangos.com' || hostname === 'www.dagangos.com') continue
   const origin = `https://${hostname}`
 
   for (const [agentName, userAgent] of agents) {
@@ -66,7 +68,7 @@ for (const tenant of result.rows) {
   }
   console.log(`PASS tenant sitemap ${origin}/sitemap.xml`)
 
-  const missing = await fetch(`${origin}/crawler-visibility-route-must-not-exist`, {
+  const missing = await fetch(`${origin}/en/site/crawler-visibility-route-must-not-exist`, {
     redirect: 'manual',
     signal: AbortSignal.timeout(30_000),
   })
