@@ -21,13 +21,19 @@ export async function getPublicWebsiteConfig(tenantDomain: string) {
     // Attempt to match domain or subdomain
     const tenant = await prisma.systemTenant.findFirst({
       where: {
+        status: 'active',
         OR: [
           { subdomain: tenantDomain },
           { customDomain: tenantDomain }
         ]
       },
       include: {
-        website: true
+        website: true,
+        pages: {
+          where: { isPublished: true, isDeleted: false },
+          select: { slug: true, title: true },
+          orderBy: { createdAt: 'asc' }
+        }
       }
     })
 

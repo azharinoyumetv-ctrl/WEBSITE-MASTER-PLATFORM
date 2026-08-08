@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import { getTenantKeyFromHostname } from './lib/tenant-host'
 
 export const config = {
   matcher: [
@@ -29,23 +30,6 @@ function getBaseUrl(request: NextRequest) {
     return `${proto}://${host}`
   }
   return process.env.NEXTAUTH_URL || request.nextUrl.origin
-}
-
-function getTenantFromHost(hostname: string): string {
-  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com'
-  const hostnameWithoutPort = hostname.split(':')[0].toLowerCase()
-  const baseDomain = BASE_DOMAIN.toLowerCase()
-  const canonicalAliases = new Set(['store.dagangos.com'])
-  
-  if (hostnameWithoutPort === baseDomain || canonicalAliases.has(hostnameWithoutPort) || hostnameWithoutPort === 'localhost' || hostnameWithoutPort.startsWith('www.')) {
-    return 'default'
-  } else if (hostnameWithoutPort.endsWith(`.${baseDomain}`)) {
-    return hostnameWithoutPort.replace(`.${baseDomain}`, '')
-  } else if (hostnameWithoutPort.endsWith('.localhost')) {
-    return hostnameWithoutPort.replace('.localhost', '')
-  } else {
-    return hostnameWithoutPort
-  }
 }
 
 function createContentSecurityPolicy(nonce: string) {
@@ -119,7 +103,7 @@ export default async function middleware(request: NextRequest) {
   requestHeaders.set('x-nonce', nonce)
 
   const isSecure = process.env.NEXTAUTH_URL?.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https'
-  const hostTenantId = getTenantFromHost(hostname)
+  const hostTenantId = getTenantKeyFromHostname(hostname)
 
   const nextAction = request.headers.get('next-action')
   const referer = request.headers.get('referer') || ''
@@ -221,7 +205,7 @@ function handleRouting(
 
   let tenantId = 'default'
   if (isPublicSite || pathname.startsWith('/api')) {
-    tenantId = getTenantFromHost(hostname)
+    tenantId = getTenantKeyFromHostname(hostname)
   } else if ((token as any)?.tenantId) {
     tenantId = String((token as any).tenantId)
   }

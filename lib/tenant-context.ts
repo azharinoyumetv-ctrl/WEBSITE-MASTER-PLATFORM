@@ -1,4 +1,5 @@
 import prisma from '@/lib/prisma'
+import { getPlatformBaseDomain, getTenantKeyFromHostname } from '@/lib/tenant-host'
 
 /**
  * Resolves a public request to the same active tenant that renders the
@@ -15,9 +16,9 @@ export async function resolvePublicTenant(request: Request) {
 
 export async function resolvePublicTenantFromHost(hostHeader: string, tenantContext: string | null) {
   const host = hostHeader.split(':')[0].toLowerCase()
-  const context = (tenantContext || '').toLowerCase()
-  const baseDomain = (process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com').toLowerCase()
-  const isDefaultHost = context === 'default' || host === baseDomain || host === 'localhost' || host === '127.0.0.1' || host.startsWith('www.')
+  const context = (tenantContext || getTenantKeyFromHostname(host)).toLowerCase()
+  const baseDomain = getPlatformBaseDomain()
+  const isDefaultHost = context === 'default' || host === baseDomain || host === 'localhost' || host === '127.0.0.1' || host === 'www.dagangos.com' || host === 'store.dagangos.com'
 
   if (isDefaultHost) {
     return prisma.systemTenant.findFirst({

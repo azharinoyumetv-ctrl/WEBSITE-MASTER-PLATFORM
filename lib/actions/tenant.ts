@@ -117,6 +117,10 @@ export async function createTenant(data: { companyName: string, subdomain: strin
       data: {
         tenantId: tenant.id,
         siteTitle: companyName,
+        globalSeoMetadata: {
+          description: `${companyName} official website. Learn about its products, services, and ways to get in touch.`,
+          keywords: [companyName, packages[packageKey].name]
+        },
         themeConfig: {
           colors: {
             primary: '#4f46e5',
@@ -139,72 +143,68 @@ export async function createTenant(data: { companyName: string, subdomain: strin
       }
     })
 
-    // Provision page templates depending on the package
-    if (packageKey === 'landing_page') {
-      await prisma.tenantPage.create({
-        data: {
-          tenantId: tenant.id,
-          slug: 'home',
-          title: 'Welcome',
-          isPublished: true,
-          layoutBlocks: [
-            {
-              type: 'hero',
-              sortOrder: 1,
-              config: {
-                title: `Welcome to ${companyName}`,
-                subtitle: 'Your modern conversion-focused landing page template setup.',
-                ctaText: 'Get Started Today',
-                ctaUrl: '/contact'
-              }
-            },
-            {
-              type: 'features',
-              sortOrder: 2,
-              config: {
-                title: 'Our Premium Offerings',
-                items: [
-                  { title: 'Modular Blocks', description: 'Plug-and-play layout elements.' },
-                  { title: 'RLS Security', description: 'Fully isolated tenant transactions.' }
-                ]
-              }
-            }
-          ]
-        }
-      })
-    } else if (packageKey === 'ecommerce' || packageKey === 'retail_pos') {
-      // Seed E-commerce pages
-      await prisma.tenantPage.createMany({
-        data: [
+    // Every package receives a published, server-rendered homepage. Previously
+    // only three package types got one, leaving other new tenant hosts online
+    // but empty for users and verification crawlers.
+    const isCommercePackage = packageKey === 'ecommerce' || packageKey === 'retail_pos'
+    const homeBlocks = isCommercePackage
+      ? [
           {
-            tenantId: tenant.id,
-            slug: 'home',
-            title: 'Store Home',
-            isPublished: true,
-            layoutBlocks: [
-              {
-                type: 'hero',
-                sortOrder: 1,
-                config: {
-                  title: `Discover ${companyName} store`,
-                  subtitle: 'Explore our catalog and order premium products online.',
-                  ctaText: 'Shop Catalog Now',
-                  ctaUrl: '/shop'
-                }
-              },
-              {
-                type: 'catalog_grid',
-                sortOrder: 2,
-                config: {
-                  title: 'Featured Inventory',
-                  limit: 4
-                }
-              }
-            ] as any
+            type: 'hero',
+            sortOrder: 1,
+            config: {
+              title: `Discover ${companyName}`,
+              subtitle: 'Explore our catalog and order products online.',
+              ctaText: 'Shop Catalog Now',
+              ctaUrl: '/shop'
+            }
+          },
+          {
+            type: 'catalog_grid',
+            sortOrder: 2,
+            config: {
+              title: 'Featured Products',
+              limit: 4
+            }
           }
         ]
-      })
-    }
+      : [
+          {
+            type: 'hero',
+            sortOrder: 1,
+            config: {
+              title: `Welcome to ${companyName}`,
+              subtitle: `Explore ${companyName} products and services.`,
+              ctaText: 'Contact Us',
+              ctaUrl: '/contact'
+            }
+          },
+          {
+            type: 'features',
+            sortOrder: 2,
+            config: {
+              title: 'What We Offer',
+              items: [
+                { title: 'Products and Services', description: 'Clear information about what our business provides.' },
+                { title: 'Direct Contact', description: 'Get in touch with our team through this website.' },
+                { title: 'Business Updates', description: 'Follow our latest information and announcements.' }
+              ]
+            }
+          }
+        ]
+
+    await prisma.tenantPage.create({
+      data: {
+        tenantId: tenant.id,
+        slug: 'home',
+        title: companyName,
+        isPublished: true,
+        layoutBlocks: homeBlocks as any,
+        seoMetadata: {
+          description: `${companyName} official website. Learn about its products, services, and ways to get in touch.`
+        }
+      }
+    })
 
     // Issue access only after an administrator provisions the workspace. The
     // user receives a one-time set-password link rather than a shared password.

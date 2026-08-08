@@ -9,10 +9,11 @@ export type TenantPublicAddress = {
  */
 export function getTenantPublicUrl(
   tenant: TenantPublicAddress,
-  baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com',
+  platformBaseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com',
+  tenantBaseDomain = process.env.NEXT_PUBLIC_TENANT_BASE_DOMAIN || 'dagangos.com',
 ) {
   const domain = tenant.customDomain || (
-    tenant.subdomain === 'default' ? baseDomain : `${tenant.subdomain}.${baseDomain}`
+    tenant.subdomain === 'default' ? platformBaseDomain : `${tenant.subdomain}.${tenantBaseDomain}`
   )
 
   return `https://${domain}`

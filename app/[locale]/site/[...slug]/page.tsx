@@ -15,6 +15,7 @@ import type { Metadata } from 'next'
 export async function generateMetadata({ params }: { params: { slug?: string[], locale: string } }): Promise<Metadata> {
   const headersList = headers()
   const tenantId = headersList.get('x-tenant-id')
+  const isCompanyStorefront = tenantId === 'default'
   const locale = params.locale === 'id' ? 'id' : 'en'
   const isIndonesian = locale === 'id'
   const slug = params.slug ? params.slug.join('/') : 'home'
@@ -90,18 +91,20 @@ export async function generateMetadata({ params }: { params: { slug?: string[], 
       alternateLocale: isIndonesian ? ['en_US'] : ['id_ID'],
       title: resolvedTitle,
       description,
-      images: [{
-        url: '/og.png',
-        width: 1200,
-        height: 630,
-        alt: 'DagangOS Web — self-hosted digital business platforms',
-      }],
+      ...(isCompanyStorefront ? {
+        images: [{
+          url: '/og.png',
+          width: 1200,
+          height: 630,
+          alt: 'DagangOS Web — self-hosted digital business platforms',
+        }],
+      } : {}),
     },
     twitter: {
       card: 'summary_large_image',
       title: resolvedTitle,
       description,
-      images: ['/og.png'],
+      ...(isCompanyStorefront ? { images: ['/og.png'] } : {}),
     },
   })
 
@@ -123,7 +126,7 @@ export async function generateMetadata({ params }: { params: { slug?: string[], 
   }
 
   if (!pageRes.success || !pageRes.page) {
-    if (!['shop', 'products', 'about', 'contact', 'support', 'terms', 'privacy'].includes(slug)) {
+    if (!isCompanyStorefront || !['shop', 'products', 'about', 'contact', 'support', 'terms', 'privacy'].includes(slug)) {
       notFound()
     }
     return createMetadata(`${pageLabel} | ${siteTitle}`, defaultDescription)
@@ -132,7 +135,7 @@ export async function generateMetadata({ params }: { params: { slug?: string[], 
   const pageSeo = pageRes.page.seoMetadata as any || {}
   const globalSeo = websiteRes.website.globalSeoMetadata as any || {}
 
-  if (['shop', 'products', 'about', 'contact', 'support', 'catalog', 'terms', 'privacy'].includes(slug)) {
+  if (isCompanyStorefront && ['shop', 'products', 'about', 'contact', 'support', 'catalog', 'terms', 'privacy'].includes(slug)) {
     const standardDescription = isIndonesian
       ? defaultDescription
       : pageSeo.description || globalSeo.description || defaultDescription
@@ -335,6 +338,7 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
 export default async function SitePage({ params }: { params: { slug?: string[], locale: string } }) {
   const headersList = headers()
   const tenantId = headersList.get('x-tenant-id')
+  const isCompanyStorefront = tenantId === 'default'
   const t = await getTranslations('Storefront')
 
   const slug = params.slug ? params.slug.join('/') : 'home'
@@ -373,7 +377,7 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
   }
 
   // Force standard pages to use fallback templates for absolute localization
-  if (['shop', 'products', 'about', 'contact', 'support'].includes(slug)) {
+  if (isCompanyStorefront && ['shop', 'products', 'about', 'contact', 'support'].includes(slug)) {
     return renderFallbackPage(slug, siteTitle, primaryColor, resolvedTenantId, params.locale, t)
   }
 
@@ -447,7 +451,7 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
   }
 
   // If it's a standard page, render the built-in fallback template
-  if (standardPages.includes(slug)) {
+  if (isCompanyStorefront && standardPages.includes(slug)) {
     return renderFallbackPage(slug, siteTitle, primaryColor, resolvedTenantId, params.locale, t)
   }
 

@@ -10,6 +10,7 @@ import { getTranslations } from 'next-intl/server'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
 import { SupportChatWidget } from './support-chat-widget'
 import { AnalyticsTracker } from '@/components/AnalyticsTracker'
+import { notFound } from 'next/navigation'
 
 export default async function SiteLayout({
   children,
@@ -45,14 +46,7 @@ export default async function SiteLayout({
       customDomain: null
     }
   } else {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Site Not Found</h1>
-          <p className="text-slate-500">This website is currently inactive or does not exist.</p>
-        </div>
-      </div>
-    )
+    notFound()
   }
   
   // Parse theme configuration
@@ -92,14 +86,26 @@ export default async function SiteLayout({
     }
   }
 
-  const navigationTree = [
-    { label: t('home'), target: `/${locale}` },
-    { label: t('about'), target: `/${locale}/site/about` },
-    { label: t('catalog'), target: `/${locale}/site/catalog` },
-    { label: locale === 'id' ? 'Harga' : 'Pricing', target: `/${locale}/pricing` },
-    { label: t('shop'), target: `/${locale}/site/shop` },
-    { label: t('contact'), target: `/${locale}/site/contact` },
-  ]
+  const tenantPages = Array.isArray(tenant.pages) ? tenant.pages : []
+  const tenantPageSlugs = new Set(tenantPages.map((page: { slug: string }) => page.slug))
+  const navigationTree = isCompanyStorefront
+    ? [
+        { label: t('home'), target: `/${locale}` },
+        { label: t('about'), target: `/${locale}/site/about` },
+        { label: t('catalog'), target: `/${locale}/site/catalog` },
+        { label: locale === 'id' ? 'Harga' : 'Pricing', target: `/${locale}/pricing` },
+        { label: t('shop'), target: `/${locale}/site/shop` },
+        { label: t('contact'), target: `/${locale}/site/contact` },
+      ]
+    : [
+        { label: t('home'), target: `/${locale}` },
+        ...tenantPages
+          .filter((page: { slug: string }) => page.slug !== 'home' && page.slug !== 'catalog')
+          .map((page: { slug: string, title: string }) => ({
+            label: page.title,
+            target: `/${locale}/site/${page.slug}`,
+          })),
+      ]
 
   return (
     <div 
@@ -137,12 +143,14 @@ export default async function SiteLayout({
           <div className="flex items-center gap-2 sm:gap-3">
             <LanguageSwitcher variant="dark" />
             
-            <Link 
-              href={`/${locale}/project-setup?package=landing_page&v=v2`}
-              className="dagangos-cta-gradient hidden md:inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-black"
-            >
-              {tStore('shop_now')}
-            </Link>
+            {isCompanyStorefront && (
+              <Link
+                href={`/${locale}/project-setup?package=landing_page&v=v2`}
+                className="dagangos-cta-gradient hidden md:inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-black"
+              >
+                {tStore('shop_now')}
+              </Link>
+            )}
           </div>
         </div>
         <nav aria-label="Storefront navigation" className="absolute left-1/2 top-0 hidden h-[4.5rem] -translate-x-1/2 items-center lg:flex">
@@ -185,9 +193,13 @@ export default async function SiteLayout({
             <div className="md:col-span-2">
               {isCompanyStorefront ? <DagangOSBrand dark /> : <h3 className="text-white font-bold text-lg mb-3">{tenant.companyName}</h3>}
               <p className="text-slate-400 text-sm leading-relaxed">
-                {tStore('footer_desc')}
+                {isCompanyStorefront
+                  ? tStore('footer_desc')
+                  : website.globalSeoMetadata?.description || `${tenant.companyName} official website.`}
               </p>
-              <Link href={`/${locale}/site/support`} className="dagangos-cta-gradient mt-5 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold">{tStore('support_chat_cta')} <span aria-hidden>↗</span></Link>
+              {isCompanyStorefront && (
+                <Link href={`/${locale}/site/support`} className="dagangos-cta-gradient mt-5 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold">{tStore('support_chat_cta')} <span aria-hidden>↗</span></Link>
+              )}
             </div>
             <div>
               <h4 className="text-white font-semibold mb-3 text-sm">{tStore('quick_links')}</h4>
@@ -201,24 +213,34 @@ export default async function SiteLayout({
                 ))}
               </ul>
             </div>
-            <div>
-              <h4 className="text-white font-semibold mb-3 text-sm">{tStore('platform')}</h4>
-              <ul className="space-y-2">
-                <li><Link href={`/${locale}/project-setup?package=landing_page&v=v2`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('shop_now')}</Link></li>
-                <li><Link href={`/${locale}/business`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{locale === 'id' ? 'Informasi Bisnis' : 'Business Information'}</Link></li>
-                <li><Link href={`/${locale}/site/refund`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{locale === 'id' ? 'Pembatalan & Refund' : 'Cancellation & Refunds'}</Link></li>
-                <li><Link href={`/${locale}/site/support`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('support')}</Link></li>
-              </ul>
-            </div>
+            {isCompanyStorefront && (
+              <div>
+                <h4 className="text-white font-semibold mb-3 text-sm">{tStore('platform')}</h4>
+                <ul className="space-y-2">
+                  <li><Link href={`/${locale}/project-setup?package=landing_page&v=v2`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('shop_now')}</Link></li>
+                  <li><Link href={`/${locale}/business`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{locale === 'id' ? 'Informasi Bisnis' : 'Business Information'}</Link></li>
+                  <li><Link href={`/${locale}/site/refund`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{locale === 'id' ? 'Pembatalan & Refund' : 'Cancellation & Refunds'}</Link></li>
+                  <li><Link href={`/${locale}/site/support`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('support')}</Link></li>
+                </ul>
+              </div>
+            )}
           </div>
           <div className="relative border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex flex-col md:flex-row items-center gap-4">
               <p className="text-sm">&copy; {new Date().getFullYear()} {isCompanyStorefront ? COMPANY.legalName : tenant.companyName}. {tStore('all_rights')}</p>
-              <div className="flex items-center gap-3">
-                <Link href={`/${locale}/site/terms`} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('terms')}</Link>
-                <span className="text-slate-700 text-xs">&bull;</span>
-                <Link href={`/${locale}/site/privacy`} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('privacy')}</Link>
-              </div>
+              {(isCompanyStorefront || tenantPageSlugs.has('terms') || tenantPageSlugs.has('privacy')) && (
+                <div className="flex items-center gap-3">
+                  {(isCompanyStorefront || tenantPageSlugs.has('terms')) && (
+                    <Link href={`/${locale}/site/terms`} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('terms')}</Link>
+                  )}
+                  {(isCompanyStorefront || (tenantPageSlugs.has('terms') && tenantPageSlugs.has('privacy'))) && (
+                    <span className="text-slate-700 text-xs">&bull;</span>
+                  )}
+                  {(isCompanyStorefront || tenantPageSlugs.has('privacy')) && (
+                    <Link href={`/${locale}/site/privacy`} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('privacy')}</Link>
+                  )}
+                </div>
+              )}
             </div>
             <p className="text-xs opacity-50">{tStore('powered_by')}</p>
           </div>

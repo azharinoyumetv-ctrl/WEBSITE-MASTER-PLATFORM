@@ -5,8 +5,45 @@ import { headers } from 'next/headers'
 import { getPublicWebsiteConfig, getPublicPage } from '@/lib/actions/website'
 import { getCatalogItems } from '@/lib/actions/catalog'
 import { LandingClient } from './landing-client'
+import type { Metadata } from 'next'
 
 import { notFound } from 'next/navigation'
+
+export async function generateMetadata({ params: { locale } }: { params: { locale: string } }): Promise<Metadata> {
+  const tenantKey = headers().get('x-tenant-id') || 'default'
+  if (tenantKey === 'default') return {}
+
+  const websiteRes = await getPublicWebsiteConfig(tenantKey)
+  if (!websiteRes.success || !websiteRes.website || !websiteRes.tenant) {
+    return { robots: { index: false, follow: false } }
+  }
+
+  const siteTitle = websiteRes.website.siteTitle || websiteRes.tenant.companyName
+  const globalSeo = (websiteRes.website.globalSeoMetadata as any) || {}
+  const description = globalSeo.description || `${siteTitle} official website.`
+  const canonical = `/${locale}`
+  const alternateLocale = locale === 'id' ? 'en' : 'id'
+
+  return {
+    title: { absolute: siteTitle },
+    description,
+    keywords: Array.isArray(globalSeo.keywords) ? globalSeo.keywords : undefined,
+    alternates: {
+      canonical,
+      languages: { en: '/en', id: '/id', 'x-default': '/en' },
+    },
+    openGraph: {
+      type: 'website',
+      url: canonical,
+      locale: locale === 'id' ? 'id_ID' : 'en_US',
+      alternateLocale: [alternateLocale === 'id' ? 'id_ID' : 'en_US'],
+      title: siteTitle,
+      description,
+      siteName: siteTitle,
+    },
+    twitter: { card: 'summary', title: siteTitle, description },
+  }
+}
 
 export default async function SiteHomePage() {
   const headersList = await headers()
@@ -32,9 +69,12 @@ export default async function SiteHomePage() {
   const tenantId = websiteRes.tenantId
 
   // Get home page
-  const pageRes = await getPublicPage(tenantId, '/')
+  const pageRes = await getPublicPage(tenantId, 'home')
   
   if (pageRes.isDraft) {
+    notFound()
+  }
+  if (!pageRes.success || !pageRes.page) {
     notFound()
   }
 
@@ -51,10 +91,7 @@ export default async function SiteHomePage() {
   const catalogRes = await getCatalogItems(tenantId)
   const catalogItems = catalogRes.success ? catalogRes.items : []
 
-  if (blocks.length === 0) {
-    // Other tenants that don't have a configured landing page get a basic fallback
-    return <div className="p-20 text-center text-slate-500">Welcome to this store. This page is currently empty.</div>
-  }
+  if (blocks.length === 0) notFound()
 
   return (
     <div className="w-full">
