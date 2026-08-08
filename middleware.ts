@@ -35,8 +35,9 @@ function getTenantFromHost(hostname: string): string {
   const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com'
   const hostnameWithoutPort = hostname.split(':')[0].toLowerCase()
   const baseDomain = BASE_DOMAIN.toLowerCase()
+  const canonicalAliases = new Set(['store.dagangos.com'])
   
-  if (hostnameWithoutPort === baseDomain || hostnameWithoutPort === 'localhost' || hostnameWithoutPort.startsWith('www.')) {
+  if (hostnameWithoutPort === baseDomain || canonicalAliases.has(hostnameWithoutPort) || hostnameWithoutPort === 'localhost' || hostnameWithoutPort.startsWith('www.')) {
     return 'default'
   } else if (hostnameWithoutPort.endsWith(`.${baseDomain}`)) {
     return hostnameWithoutPort.replace(`.${baseDomain}`, '')
@@ -104,17 +105,12 @@ export default async function middleware(request: NextRequest) {
   const requestHeaders = new Headers(request.headers)
   const hostname = (request.headers.get('host') || '').split(':')[0].toLowerCase()
 
-  // Keep legacy/conventional hostnames useful without allowing them to become
-  // parallel canonical sites. Cloudflare Tunnel sends only these exact aliases
-  // here; the redirect preserves the complete path and query string.
-  const canonicalAlias = hostname === 'www.dagangos.com'
-    ? 'https://dagangos.com'
-    : hostname === 'store.dagangos.com'
-      ? 'https://wmp.dagangos.com'
-      : null
-  if (canonicalAlias) {
-    const target = new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, canonicalAlias)
-    return applySecurityHeaders(NextResponse.redirect(target, 308), csp)
+  // www is normally handled by the DagangOS Worker route. Keep this origin
+  // fallback crawler-safe as well: proxy the canonical portal instead of
+  // returning another redirect if traffic reaches the WMP tunnel directly.
+  if (hostname === 'www.dagangos.com') {
+    const target = new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, 'https://dagangos.com')
+    return applySecurityHeaders(NextResponse.rewrite(target), csp)
   }
 
   // Next reads this request header during SSR and adds the nonce to its Flight
@@ -237,7 +233,20 @@ function handleRouting(
     return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
-  // Redirect to localized URL if missing
+  // Render roots directly so basic verification clients receive useful HTML
+  // with HTTP 200 even when they do not follow locale redirects. The canonical
+  // metadata still points at the localized WMP URL.
+  if (!localeInUrl && pathname === '/') {
+    const locale = parseAcceptLanguage(request) || defaultLocale
+    requestHeaders.set('X-Next-Intl-Locale', locale)
+    const finalUrl = request.nextUrl.clone()
+    finalUrl.pathname = `/${locale}/site`
+    return NextResponse.rewrite(finalUrl, {
+      request: { headers: requestHeaders },
+    })
+  }
+
+  // Redirect other convenience paths to their localized URL if missing
   if (!localeInUrl) {
     const locale = parseAcceptLanguage(request) || defaultLocale
     const origin = getBaseUrl(request)
