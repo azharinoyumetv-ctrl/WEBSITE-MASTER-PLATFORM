@@ -96,6 +96,7 @@ export default async function SiteLayout({
     { label: t('home'), target: `/${locale}` },
     { label: t('about'), target: `/${locale}/site/about` },
     { label: t('catalog'), target: `/${locale}/site/catalog` },
+    { label: locale === 'id' ? 'Harga' : 'Pricing', target: `/${locale}/pricing` },
     { label: t('shop'), target: `/${locale}/site/shop` },
     { label: t('contact'), target: `/${locale}/site/contact` },
   ]
@@ -204,6 +205,8 @@ export default async function SiteLayout({
               <h4 className="text-white font-semibold mb-3 text-sm">{tStore('platform')}</h4>
               <ul className="space-y-2">
                 <li><Link href={`/${locale}/project-setup?package=landing_page&v=v2`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('shop_now')}</Link></li>
+                <li><Link href={`/${locale}/business`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{locale === 'id' ? 'Informasi Bisnis' : 'Business Information'}</Link></li>
+                <li><Link href={`/${locale}/site/refund`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{locale === 'id' ? 'Pembatalan & Refund' : 'Cancellation & Refunds'}</Link></li>
                 <li><Link href={`/${locale}/site/support`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('support')}</Link></li>
               </ul>
             </div>

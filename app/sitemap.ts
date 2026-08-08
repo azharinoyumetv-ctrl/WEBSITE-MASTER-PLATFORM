@@ -5,7 +5,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ? `https://${process.env.NEXT_PUBLIC_BASE_DOMAIN}` 
     : 'https://store.dagangos.com'
 
-  const routes = ['', '/site/about', '/site/catalog', '/site/shop', '/site/contact', '/site/support', '/site/terms', '/site/privacy']
+  const routes = ['', '/pricing', '/business', '/site/about', '/site/catalog', '/site/shop', '/site/contact', '/site/support', '/site/terms', '/site/privacy', '/site/refund']
   const locales = ['en', 'id'] as const
 
   return locales.flatMap((locale) => routes.map((route) => {

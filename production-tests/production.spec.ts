@@ -282,4 +282,29 @@ test.describe('DagangOS production readiness', () => {
     expect(payload.reply).not.toMatch(/Company Profile|Launch Website|Rp 6\.000\.000/)
     expect(payload.reply.split(/\s+/).length).toBeLessThan(35)
   })
+
+  test('public verification routes expose pricing, business identity, refund terms, and registration', async ({ request }) => {
+    const pricing = await request.get('/id/pricing')
+    expect(pricing.status()).toBe(200)
+    const pricingHtml = await pricing.text()
+    expect(pricingHtml).toContain('PT DagangOS Digital Indonesia')
+    expect(pricingHtml).toContain('E-Commerce Platform')
+    expect(pricingHtml).toContain('22.000.000')
+    expect(pricingHtml).not.toMatch(/You need to enable JavaScript/i)
+
+    const business = await request.get('/en/business')
+    expect(business.status()).toBe(200)
+    const businessHtml = await business.text()
+    expect(businessHtml).toContain('PT DagangOS Digital Indonesia')
+    expect(businessHtml).toContain('How ordering works')
+
+    const refund = await request.get('/refund-policy')
+    expect(refund.status()).toBe(200)
+    expect(refund.url()).toMatch(/\/en\/site\/refund$/)
+    expect(await refund.text()).toContain('Cancellation and Refund Policy')
+
+    const register = await request.get('/register')
+    expect(register.status()).toBe(200)
+    expect(register.url()).toMatch(/\/en\/auth\/register$/)
+  })
 })

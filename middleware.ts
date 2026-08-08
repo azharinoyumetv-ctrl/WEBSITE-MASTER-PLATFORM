@@ -242,6 +242,16 @@ function handleRouting(
     return NextResponse.redirect(redirectUrl)
   }
 
+  if (pathWithoutLocale === '/register') {
+    const origin = getBaseUrl(request)
+    return NextResponse.redirect(new URL(`/${localeInUrl}/auth/register${request.nextUrl.search}`, origin))
+  }
+
+  if (pathWithoutLocale === '/refund' || pathWithoutLocale === '/refund-policy') {
+    const origin = getBaseUrl(request)
+    return NextResponse.redirect(new URL(`/${localeInUrl}/site/refund`, origin))
+  }
+
   if (isPublicSite) {
     // Prevent double rewrite and exclude fixed public routes
     if (
