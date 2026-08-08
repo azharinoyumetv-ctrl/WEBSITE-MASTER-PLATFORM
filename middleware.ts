@@ -102,6 +102,20 @@ export default async function middleware(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID())
   const csp = createContentSecurityPolicy(nonce)
   const requestHeaders = new Headers(request.headers)
+  const hostname = (request.headers.get('host') || '').split(':')[0].toLowerCase()
+
+  // Keep legacy/conventional hostnames useful without allowing them to become
+  // parallel canonical sites. Cloudflare Tunnel sends only these exact aliases
+  // here; the redirect preserves the complete path and query string.
+  const canonicalAlias = hostname === 'www.dagangos.com'
+    ? 'https://dagangos.com'
+    : hostname === 'shop.dagangos.com'
+      ? 'https://store.dagangos.com'
+      : null
+  if (canonicalAlias) {
+    const target = new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, canonicalAlias)
+    return applySecurityHeaders(NextResponse.redirect(target, 308), csp)
+  }
 
   // Next reads this request header during SSR and adds the nonce to its Flight
   // bootstrap scripts. Without it, a strict CSP blocks hydration completely.
@@ -109,7 +123,6 @@ export default async function middleware(request: NextRequest) {
   requestHeaders.set('x-nonce', nonce)
 
   const isSecure = process.env.NEXTAUTH_URL?.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https'
-  const hostname = request.headers.get('host') || ''
   const hostTenantId = getTenantFromHost(hostname)
 
   const nextAction = request.headers.get('next-action')
