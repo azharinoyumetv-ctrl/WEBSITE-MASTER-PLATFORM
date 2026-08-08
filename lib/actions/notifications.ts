@@ -504,7 +504,7 @@ export async function dispatchNotification(
 
       if (templateKey === 'order_confirmation') {
         defaultSubject = 'Order Confirmation - #{{order_id}}'
-        defaultBody = '<h2>Order Confirmed!</h2><p>Hello {{customer_name}},</p><p>Thank you for your order. We have successfully received your payment of Rp {{amount}}.</p><p><a href="https://store.dagangos.com/orders/{{order_id}}/receipt">View Receipt</a></p>'
+        defaultBody = '<h2>Order Confirmed!</h2><p>Hello {{customer_name}},</p><p>Thank you for your order. We have successfully received your payment of Rp {{amount}}.</p><p><a href="https://wmp.dagangos.com/orders/{{order_id}}/receipt">View Receipt</a></p>'
       } else if (templateKey === 'workspace_invitation') {
         defaultSubject = 'Your DagangOS workspace is ready'
         defaultBody = '<h2>Welcome to DagangOS</h2><p>Your workspace for <strong>{{company_name}}</strong> is ready.</p><p><strong>Temporary domain:</strong> <a href="{{workspace_url}}">{{workspace_url}}</a></p><p>Use this secure, one-time link to set your password and activate access:</p><p><a href="{{access_url}}">Set your password</a></p><p>This link expires on {{expires_at}}. If you did not expect this invitation, please contact DagangOS Digital Indonesia.</p>'
@@ -735,7 +735,7 @@ export async function sendOrderConfirmationEmail(tenantId: string, orderId: stri
         </table>
         
         <div style="margin-top: 30px; text-align: center;">
-          <a href="https://store.dagangos.com/orders/${orderId}/receipt" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Receipt</a>
+          <a href="https://wmp.dagangos.com/orders/${orderId}/receipt" style="background-color: #4F46E5; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; font-weight: bold;">View Receipt</a>
         </div>
       </div>
     `

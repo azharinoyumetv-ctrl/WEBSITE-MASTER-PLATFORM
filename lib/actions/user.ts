@@ -107,7 +107,7 @@ export async function inviteUser(tenantId: string, email: string, roleId: string
       }
     })
 
-    const origin = (process.env.NEXTAUTH_URL || 'https://store.dagangos.com').replace(/\/$/, '')
+    const origin = (process.env.NEXTAUTH_URL || 'https://wmp.dagangos.com').replace(/\/$/, '')
     const accessUrl = `${origin}/id/auth/accept-invitation?token=${encodeURIComponent(token)}`
     const emailGateway = await getActiveGatewayWithRouting(tenantId, 'email')
 

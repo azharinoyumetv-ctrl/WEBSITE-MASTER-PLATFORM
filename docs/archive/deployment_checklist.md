@@ -22,7 +22,7 @@ Follow this checklist to provision, configure, and go live with the Website Mast
     An unescaped `#` is treated as a URL fragment separator by the Node URL parser,
     which corrupts the hostname and causes Prisma to throw `EAI_AGAIN` at runtime.
     Example: `postgresql://postgres:MyPass%23Word@localhost:5432/mydb?schema=public`
-  - `NEXTAUTH_URL` (Your production domain, e.g., `https://store.dagangos.com`).
+  - `NEXTAUTH_URL` (Your production domain, e.g., `https://wmp.dagangos.com`).
   - `NEXTAUTH_SECRET`, `JWT_SECRET`, `JWT_REFRESH_SECRET` (Generate secure random 32-byte hex strings).
   - `ENCRYPTION_KEY` (Required for Xendit/Midtrans API key encryption at rest; must be 32 bytes).
   - `CONTROL_PLANE_SECRET` (Required for `/api/v1` HMAC auth; generate with `openssl rand -hex 32`).

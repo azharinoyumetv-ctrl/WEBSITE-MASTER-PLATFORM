@@ -25,7 +25,7 @@ const moduleKeys = [
 ]
 
 async function main() {
-  const defaultDomain = 'store.dagangos.com'
+  const defaultDomain = 'wmp.dagangos.com'
   let tenant = await prisma.systemTenant.findFirst({
     where: { OR: [{ subdomain: 'default' }, { customDomain: defaultDomain }] },
   })

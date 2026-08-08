@@ -32,7 +32,7 @@ function getBaseUrl(request: NextRequest) {
 }
 
 function getTenantFromHost(hostname: string): string {
-  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'
+  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com'
   const hostnameWithoutPort = hostname.split(':')[0].toLowerCase()
   const baseDomain = BASE_DOMAIN.toLowerCase()
   
@@ -109,8 +109,8 @@ export default async function middleware(request: NextRequest) {
   // here; the redirect preserves the complete path and query string.
   const canonicalAlias = hostname === 'www.dagangos.com'
     ? 'https://dagangos.com'
-    : hostname === 'shop.dagangos.com'
-      ? 'https://store.dagangos.com'
+    : hostname === 'store.dagangos.com'
+      ? 'https://wmp.dagangos.com'
       : null
   if (canonicalAlias) {
     const target = new URL(`${request.nextUrl.pathname}${request.nextUrl.search}`, canonicalAlias)

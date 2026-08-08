@@ -284,7 +284,7 @@ export function TenantsClient({ initialTenants }: { initialTenants: any[] }) {
                     className="form-input flex-1" 
                   />
                   <div className="px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-500 whitespace-nowrap">
-                    .{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'}
+                    .{process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com'}
                   </div>
                 </div>
                 <p className="text-xs text-slate-400 mt-1">Alphanumeric + hyphens only. Cannot be: admin, api, system</p>

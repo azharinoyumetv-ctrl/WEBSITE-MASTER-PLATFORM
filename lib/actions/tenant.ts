@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma"
 import { requireSuperAdmin } from "@/lib/rbac"
 import { dispatchNotification } from '@/lib/actions/notifications'
 import { getTenantPublicUrl } from '@/lib/tenant-url'
+import { isReservedTenantSubdomain } from '@/lib/tenant-subdomains'
 import bcrypt from 'bcryptjs'
 import crypto from 'crypto'
 import { addonModuleMap, addonsList, getBillableAddonKeys, packageModuleMap, packages } from '@/lib/constants/packages'
@@ -38,6 +39,9 @@ export async function createTenant(data: { companyName: string, subdomain: strin
     const logoUrl = data.logoUrl?.trim() || ''
     if (!companyName || companyName.length > 255 || !/^[a-z0-9-]{2,63}$/.test(subdomain)) {
       return { success: false, error: 'Provide a company name and a valid subdomain (lowercase letters, numbers, and hyphens).' }
+    }
+    if (isReservedTenantSubdomain(subdomain)) {
+      return { success: false, error: 'This subdomain is reserved for DagangOS platform services.' }
     }
     if (adminEmail.length > 255 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
       return { success: false, error: 'Provide a valid workspace administrator email.' }

@@ -28,7 +28,7 @@ const actionOrSecretPatterns = [
 ]
 
 export const OUT_OF_SCOPE_REPLY = 'I can help with DagangOS packages and Project Setup guidance, but I cannot access accounts, perform changes, use tools, or handle credentials. Please use the Contact page for a human DagangOS representative.'
-export const OUT_OF_SCOPE_REPLY_ID = 'Saya tidak bisa membuat atau men-deploy website langsung dari chat ini. Untuk memulai pengerjaan, buka Project Setup di https://store.dagangos.com/id/project-setup atau hubungi tim DagangOS melalui halaman Contact.'
+export const OUT_OF_SCOPE_REPLY_ID = 'Saya tidak bisa membuat atau men-deploy website langsung dari chat ini. Untuk memulai pengerjaan, buka Project Setup di https://wmp.dagangos.com/id/project-setup atau hubungi tim DagangOS melalui halaman Contact.'
 
 function prefersIndonesian(message: string) {
   return /\b(saya|anda|tolong|mohon|bisa|bisakah|buatkan|bikinkan|yang|untuk|usaha|website\s*nya)\b/i.test(message)

@@ -235,7 +235,7 @@ test.describe('DagangOS production readiness', () => {
     expect(payload.policyBlocked).not.toBe(true)
     expect(payload.reply).toContain('E-Commerce Platform')
     expect(payload.reply).toContain('Rp 22.000.000')
-    expect(payload.reply).toContain('https://store.dagangos.com/id/project-setup?package=ecommerce')
+    expect(payload.reply).toContain('https://wmp.dagangos.com/id/project-setup?package=ecommerce')
     expect(payload.reply).not.toMatch(/\bDapurOS\b/i)
     await expect(chatRegion).toContainText('E-Commerce Platform')
   })
@@ -277,7 +277,7 @@ test.describe('DagangOS production readiness', () => {
       policyBlocked: true,
     })
     expect(payload.reply).toBe(
-      'Saya tidak bisa membuat atau men-deploy website langsung dari chat ini. Untuk memulai pengerjaan, buka Project Setup di https://store.dagangos.com/id/project-setup atau hubungi tim DagangOS melalui halaman Contact.'
+      'Saya tidak bisa membuat atau men-deploy website langsung dari chat ini. Untuk memulai pengerjaan, buka Project Setup di https://wmp.dagangos.com/id/project-setup atau hubungi tim DagangOS melalui halaman Contact.'
     )
     expect(payload.reply).not.toMatch(/Company Profile|Launch Website|Rp 6\.000\.000/)
     expect(payload.reply.split(/\s+/).length).toBeLessThan(35)

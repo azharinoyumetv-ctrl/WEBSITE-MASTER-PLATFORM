@@ -3,7 +3,7 @@ import { MetadataRoute } from 'next'
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = process.env.NEXT_PUBLIC_BASE_DOMAIN 
     ? `https://${process.env.NEXT_PUBLIC_BASE_DOMAIN}` 
-    : 'https://store.dagangos.com'
+    : 'https://wmp.dagangos.com'
 
   const routes = ['', '/pricing', '/business', '/site/about', '/site/catalog', '/site/shop', '/site/contact', '/site/support', '/site/terms', '/site/privacy', '/site/refund']
   const locales = ['en', 'id'] as const

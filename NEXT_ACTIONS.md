@@ -27,7 +27,7 @@ This task list outlines the steps required to transition the **Website Master Pl
     ```
   - `[ ]` Install dependencies on the server (`npm ci --production`)
   - `[ ]` Set up the production `.env` file with secure secrets and DATABASE_URL
-  - `[ ]` Configure `NEXT_PUBLIC_BASE_DOMAIN="store.dagangos.com"` in `.env` (Matches your live platform domain)
+  - `[ ]` Configure `NEXT_PUBLIC_BASE_DOMAIN="wmp.dagangos.com"` in `.env` (Matches your live platform domain)
   - `[ ]` Build the Next.js application:
     ```bash
     npm run build
@@ -40,7 +40,7 @@ This task list outlines the steps required to transition the **Website Master Pl
     ```
 
 - `[x]` **4. HTTPS & Multi-Tenant Routing**
-  - `[x]` Cloudflare Tunnel is configured to route `store.dagangos.com` to `localhost:4000`
+  - `[x]` Cloudflare Tunnel is configured to route `wmp.dagangos.com` to `localhost:4000`
   - `[x]` SSL/TLS is handled via Cloudflare; no Nginx reverse proxy needed
   - `[x]` Wildcard/tenant routing handled by application middleware and `NEXT_PUBLIC_BASE_DOMAIN`
 

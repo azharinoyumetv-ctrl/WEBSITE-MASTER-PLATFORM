@@ -26,12 +26,12 @@ function getMetadataBase() {
   const host = headersList.get('x-forwarded-host') || headersList.get('host')
   const protocol = headersList.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
   const fallback = process.env.NEXT_PUBLIC_SITE_URL
-    || (process.env.NEXT_PUBLIC_BASE_DOMAIN ? `https://${process.env.NEXT_PUBLIC_BASE_DOMAIN}` : 'https://store.dagangos.com')
+    || (process.env.NEXT_PUBLIC_BASE_DOMAIN ? `https://${process.env.NEXT_PUBLIC_BASE_DOMAIN}` : 'https://wmp.dagangos.com')
 
   try {
     return new URL(host ? `${protocol}://${host}` : fallback)
   } catch {
-    return new URL('https://store.dagangos.com')
+    return new URL('https://wmp.dagangos.com')
   }
 }
 

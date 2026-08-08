@@ -9,7 +9,7 @@ export type TenantPublicAddress = {
  */
 export function getTenantPublicUrl(
   tenant: TenantPublicAddress,
-  baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com',
+  baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com',
 ) {
   const domain = tenant.customDomain || (
     tenant.subdomain === 'default' ? baseDomain : `${tenant.subdomain}.${baseDomain}`

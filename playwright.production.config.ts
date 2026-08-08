@@ -13,7 +13,7 @@ export default defineConfig({
     ['html', { outputFolder: '.playwright-production-report', open: 'never' }],
   ],
   use: {
-    baseURL: process.env.PRODUCTION_BASE_URL || 'https://store.dagangos.com',
+    baseURL: process.env.PRODUCTION_BASE_URL || 'https://wmp.dagangos.com',
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
     trace: 'retain-on-failure',

@@ -16,7 +16,7 @@ export async function resolvePublicTenant(request: Request) {
 export async function resolvePublicTenantFromHost(hostHeader: string, tenantContext: string | null) {
   const host = hostHeader.split(':')[0].toLowerCase()
   const context = (tenantContext || '').toLowerCase()
-  const baseDomain = (process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com').toLowerCase()
+  const baseDomain = (process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com').toLowerCase()
   const isDefaultHost = context === 'default' || host === baseDomain || host === 'localhost' || host === '127.0.0.1' || host.startsWith('www.')
 
   if (isDefaultHost) {
