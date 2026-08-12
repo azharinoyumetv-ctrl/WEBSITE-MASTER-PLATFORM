@@ -1,9 +1,8 @@
 import { MetadataRoute } from 'next'
+import { getWmpBaseDomain } from '@/lib/wmp-domain'
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_DOMAIN 
-    ? `https://${process.env.NEXT_PUBLIC_BASE_DOMAIN}` 
-    : 'https://store.dagangos.com'
+  const baseUrl = `https://${getWmpBaseDomain()}`
 
   const routes = ['', '/site/about', '/site/catalog', '/site/shop', '/site/contact', '/site/support', '/site/terms', '/site/privacy']
   const locales = ['en', 'id'] as const
