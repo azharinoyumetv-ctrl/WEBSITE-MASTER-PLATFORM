@@ -1,0 +1,90 @@
+name: WMP Validation
+
+on:
+  pull_request:
+    branches:
+      - main
+      - codex/fix-storefront-runtime
+  push:
+    branches:
+      - codex/wmp-payment-hardening
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: wmp_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d wmp_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      CI: true
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/wmp_ci
+      NEXTAUTH_URL: http://127.0.0.1:4000
+      NEXTAUTH_SECRET: ci-nextauth-secret-not-for-production
+      ENCRYPTION_KEY: ci-encryption-key-not-for-production
+      XENDIT_WEBHOOK_TOKEN: ci-xendit-webhook-token
+      E2E_BASE_URL: http://127.0.0.1:4000
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Create CI database schema
+        run: npx prisma db push
+
+      - name: Seed CI database
+        run: node prisma/seed-test.js
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Start WMP
+        run: |
+          npm run dev > /tmp/wmp.log 2>&1 &
+          echo $! > /tmp/wmp.pid
+          for i in {1..60}; do
+            if curl --fail --silent http://127.0.0.1:4000/en > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/wmp.log
+          exit 1
+
+      - name: Payment webhook regression tests
+        run: npx playwright test tests/payment-webhook-security.spec.ts tests/tenant-url.spec.ts --reporter=line
+
+      - name: Print server log on failure
+        if: failure()
+        run: cat /tmp/wmp.log || true
