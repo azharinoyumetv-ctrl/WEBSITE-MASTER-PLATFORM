@@ -11,6 +11,12 @@ export const config = {
 }
 
 import { locales, defaultLocale } from './i18n'
+import {
+  getCanonicalWmpUrl,
+  getWmpBaseDomain,
+  isLegacyWmpHostname,
+  normalizeHostname,
+} from './lib/wmp-domain'
 
 function parseAcceptLanguage(request: NextRequest): string | null {
   const raw = request.headers.get('accept-language')
@@ -32,10 +38,9 @@ function getBaseUrl(request: NextRequest) {
 }
 
 function getTenantFromHost(hostname: string): string {
-  const BASE_DOMAIN = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'
-  const hostnameWithoutPort = hostname.split(':')[0].toLowerCase()
-  const baseDomain = BASE_DOMAIN.toLowerCase()
-  
+  const baseDomain = getWmpBaseDomain()
+  const hostnameWithoutPort = normalizeHostname(hostname)
+
   if (hostnameWithoutPort === baseDomain || hostnameWithoutPort === 'localhost' || hostnameWithoutPort.startsWith('www.')) {
     return 'default'
   } else if (hostnameWithoutPort.endsWith(`.${baseDomain}`)) {
@@ -110,6 +115,16 @@ export default async function middleware(request: NextRequest) {
 
   const isSecure = process.env.NEXTAUTH_URL?.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https'
   const hostname = request.headers.get('host') || ''
+
+  // WMP has exactly one canonical platform hostname. Legacy storefront names
+  // must never render a second copy of WMP, including login/admin routes.
+  if (isLegacyWmpHostname(hostname)) {
+    return applySecurityHeaders(
+      NextResponse.redirect(getCanonicalWmpUrl(request.nextUrl.pathname, request.nextUrl.search), 308),
+      csp,
+    )
+  }
+
   const hostTenantId = getTenantFromHost(hostname)
 
   const nextAction = request.headers.get('next-action')
@@ -117,12 +132,12 @@ export default async function middleware(request: NextRequest) {
   const isProtectedAction = nextAction && referer.includes('/admin')
 
   const isProtected = (
-    (pathname.match(/^\/(en|id)\/admin/) || pathname.startsWith('/admin')) && 
+    (pathname.match(/^\/(en|id)\/admin/) || pathname.startsWith('/admin')) &&
     !pathname.includes('/auth/login')
   ) || isProtectedAction
 
   const token = (hostTenantId !== 'default' || isProtected)
-    ? await getToken({ 
+    ? await getToken({
         req: request,
         secret: process.env.NEXTAUTH_SECRET,
         secureCookie: isSecure
@@ -133,9 +148,9 @@ export default async function middleware(request: NextRequest) {
   if (token && hostTenantId !== 'default') {
     const userRoles = (token.roles as string[]) || []
     const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super-admin')
-    
+
     if (token.tenantId !== hostTenantId && !isSuperAdmin) {
-      console.warn(`Rejecting cross-tenant access from tenant ${token.tenantId} to target ${hostTenantId}`);
+      console.warn(`Rejecting cross-tenant access from tenant ${token.tenantId} to target ${hostTenantId}`)
       if (request.headers.has('next-action') || pathname.startsWith('/api')) {
         return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized tenant access' }, { status: 403 }), csp)
       }
@@ -146,36 +161,33 @@ export default async function middleware(request: NextRequest) {
   }
 
   // 2. Auth check for protected admin routes and admin server actions
-
   if (isProtected) {
     let isAuthorized = false
-    
+
     if (token) {
       const userRoles = (token.roles as string[]) || []
       const hasAnyRole = userRoles.length > 0
       const isPlatformOwner = userRoles.some(r => r.toLowerCase() === 'platform_owner' || r.toLowerCase() === 'platform owner')
       const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super-admin')
-      
+
       if (hasAnyRole && (hostTenantId === 'default' || token.tenantId === hostTenantId || isPlatformOwner || isSuperAdmin)) {
         isAuthorized = true
       }
     }
-    
+
     if (!isAuthorized) {
       if (request.headers.has('next-action') || pathname.startsWith('/api')) {
         return applySecurityHeaders(preventAdminResponseCaching(NextResponse.json({ error: 'Unauthorized' }, { status: 401 })), csp)
       }
 
-      // Determine locale to redirect to
       const localeMatch = pathname.match(/^\/(en|id)(\/|$)/)
       const locale = localeMatch ? localeMatch[1] : parseAcceptLanguage(request) || defaultLocale
       const origin = getBaseUrl(request)
       const redirectUrl = new URL(`/${locale}/auth/login`, origin)
       const callback = new URL(request.nextUrl.pathname + request.nextUrl.search, origin).href
       redirectUrl.searchParams.set('callbackUrl', callback)
-      
+
       const response = NextResponse.redirect(redirectUrl)
-      // Force clearing of the session cookie if they are logged in but unauthorized
       if (token) {
         const cookieName = isSecure ? '__Secure-next-auth.session-token' : 'next-auth.session-token'
         response.cookies.delete(cookieName)
@@ -201,12 +213,10 @@ function handleRouting(
   const hostname = request.headers.get('host') || ''
   const pathname = url.pathname
 
-  // Parse Locale from URL
   const localeMatch = pathname.match(/^\/(en|id)(\/|$)/)
   const localeInUrl = localeMatch ? localeMatch[1] : null
   const pathWithoutLocale = localeInUrl ? pathname.replace(`/${localeInUrl}`, '') || '/' : pathname
 
-  // Domain parsing
   const isAdminSubdomain = hostname.startsWith('admin.') || pathWithoutLocale.startsWith('/auth') || pathWithoutLocale.startsWith('/admin')
   const isPublicSite = !isAdminSubdomain
 
@@ -220,11 +230,9 @@ function handleRouting(
   requestHeaders.set('x-tenant-id', tenantId)
 
   if (pathname.startsWith('/api')) {
-    // API routes bypass locale redirects and rewriting
     return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
-  // Redirect to localized URL if missing
   if (!localeInUrl) {
     const locale = parseAcceptLanguage(request) || defaultLocale
     const origin = getBaseUrl(request)
@@ -232,8 +240,6 @@ function handleRouting(
     return NextResponse.redirect(redirectUrl)
   }
 
-  // We have a locale in the URL.
-  // Set X-Next-Intl-Locale for next-intl server components
   requestHeaders.set('X-Next-Intl-Locale', localeInUrl)
 
   if (pathWithoutLocale === '/login') {
@@ -243,9 +249,8 @@ function handleRouting(
   }
 
   if (isPublicSite) {
-    // Prevent double rewrite and exclude fixed public routes
     if (
-      pathWithoutLocale === '/site' || 
+      pathWithoutLocale === '/site' ||
       pathWithoutLocale.startsWith('/site/') ||
       pathWithoutLocale.startsWith('/checkout') ||
       pathWithoutLocale.startsWith('/project-setup') ||
@@ -257,11 +262,8 @@ function handleRouting(
     ) {
       return NextResponse.next({ request: { headers: requestHeaders } })
     }
-    // Rewrite to /en/site or /en/site/about
+
     const targetPath = pathWithoutLocale === '/' ? '' : pathWithoutLocale
-    // Keep rewrites internal even when a local tenant is addressed through a
-    // Host header such as dagangos.localhost. Building a new absolute URL from
-    // that header makes Next proxy to DNS instead of rendering the local route.
     const finalUrl = request.nextUrl.clone()
     finalUrl.pathname = `/${localeInUrl}/site${targetPath}`
     return NextResponse.rewrite(finalUrl, {
