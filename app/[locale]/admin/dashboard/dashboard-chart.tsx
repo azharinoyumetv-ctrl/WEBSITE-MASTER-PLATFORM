@@ -20,8 +20,8 @@ export function DashboardChart({ data }: { data: any[] }) {
           </linearGradient>
         </defs>
         <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => new Date(v).toLocaleDateString('en', { month: 'short', day: 'numeric' })} />
-        <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => `$${(v/1000).toFixed(1)}k`} />
+        <XAxis dataKey="date" minTickGap={24} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => new Date(v).toLocaleDateString('id-ID', { month: 'short', day: 'numeric' })} />
+        <YAxis yAxisId="left" width={54} tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => v === 0 ? 'Rp 0' : `Rp ${Math.round(v / 1000)}rb`} />
         <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#94a3b8' }} />
         <Tooltip formatter={(val, name) => [name === 'revenue' ? formatCurrency(Number(val)) : val, name === 'revenue' ? 'Revenue' : 'Orders']} />
         <Area yAxisId="left" type="monotone" dataKey="revenue" stroke="#4F46E5" strokeWidth={2} fill="url(#revenueGrad)" dot={{ fill: '#4F46E5', strokeWidth: 0, r: 3 }} />

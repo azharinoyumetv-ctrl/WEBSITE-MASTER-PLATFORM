@@ -4,9 +4,15 @@ import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import * as OTPAuth from 'otpauth'
 import { encrypt } from '@/lib/crypto'
+import { requirePermission, requireTenantUser } from '@/lib/rbac'
 
 export async function getProfile(tenantId: string, userId: string) {
   try {
+    const currentUser = await requireTenantUser(tenantId)
+    if (currentUser.id !== userId) {
+      await requirePermission(currentUser.id, tenantId, 'user_management', 'read')
+    }
+
     const user = await prisma.user.findUnique({
       where: { id: userId, tenantId },
       include: { profile: true }
@@ -19,6 +25,11 @@ export async function getProfile(tenantId: string, userId: string) {
 
 export async function updateProfile(tenantId: string, userId: string, data: { firstName: string, lastName: string, phoneNumber: string }) {
   try {
+    const currentUser = await requireTenantUser(tenantId)
+    if (currentUser.id !== userId) {
+      await requirePermission(currentUser.id, tenantId, 'user_management', 'write')
+    }
+
     const user = await prisma.user.update({
       where: { id: userId, tenantId },
       data: {
@@ -43,6 +54,11 @@ export async function updateProfile(tenantId: string, userId: string, data: { fi
 
 export async function generateMfaSecret(tenantId: string, userId: string) {
   try {
+    const currentUser = await requireTenantUser(tenantId)
+    if (currentUser.id !== userId) {
+      throw new Error('Forbidden: MFA can only be configured for the signed-in user')
+    }
+
     const user = await prisma.user.findUnique({ where: { id: userId, tenantId } })
     if (!user) throw new Error("User not found")
     
@@ -64,6 +80,11 @@ export async function generateMfaSecret(tenantId: string, userId: string) {
 
 export async function verifyAndEnableMfa(tenantId: string, userId: string, secret: string, token: string) {
   try {
+    const currentUser = await requireTenantUser(tenantId)
+    if (currentUser.id !== userId) {
+      throw new Error('Forbidden: MFA can only be configured for the signed-in user')
+    }
+
     let totp = new OTPAuth.TOTP({
       issuer: "DagangOS",
       algorithm: "SHA1",
@@ -75,17 +96,11 @@ export async function verifyAndEnableMfa(tenantId: string, userId: string, secre
     let delta = totp.validate({ token, window: 1 })
     if (delta === null) throw new Error("Invalid MFA token")
     
-    await prisma.tenantAuthCredential.upsert({
-      where: { userId },
-      update: { mfaSecretEncrypted: encrypt(secret), isMfaEnabled: true },
-      create: {
-        userId,
-        tenantId,
-        passwordHash: "",
-        mfaSecretEncrypted: encrypt(secret),
-        isMfaEnabled: true
-      }
+    const credential = await prisma.tenantAuthCredential.updateMany({
+      where: { userId, tenantId },
+      data: { mfaSecretEncrypted: encrypt(secret), isMfaEnabled: true }
     })
+    if (credential.count !== 1) throw new Error('Authentication credential was not found')
     
     revalidatePath('/admin/profile')
     return { success: true }

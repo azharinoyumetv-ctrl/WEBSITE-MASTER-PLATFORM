@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { validateV1Request } from '@/lib/v1-auth'
+import { withTenantApiTelemetry } from '@/lib/api-telemetry'
 
 export async function POST(req: Request) {
+  const startedAt = Date.now()
   const authError = await validateV1Request(req)
   if (authError) return authError
 
@@ -13,6 +15,7 @@ export async function POST(req: Request) {
     if (!instanceId || !tenantId || !instanceUrl || !licenseKey) {
       return NextResponse.json({ success: false, error: 'Missing registration details' }, { status: 400 })
     }
+    const respond = (response: NextResponse) => withTenantApiTelemetry({ tenantId, request: req, response, startedAt })
 
     // Ensure tenant exists to prevent Foreign Key constraint crash on fresh tenants
     await prisma.systemTenant.upsert({
@@ -83,7 +86,7 @@ export async function POST(req: Request) {
       }
     })
 
-    return NextResponse.json({
+    return respond(NextResponse.json({
       status: 'registered',
       entitlements: {
         modules: enabledModules,
@@ -91,7 +94,7 @@ export async function POST(req: Request) {
         storageQuotaGB: quota.storageQuotaGB
       },
       syncInterval: 300
-    })
+    }))
   } catch (error: any) {
     console.error('[v1/instances/register] Internal error:', error)
     return NextResponse.json({ success: false, error: 'Internal server error' }, { status: 500 })

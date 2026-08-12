@@ -1,9 +1,24 @@
 'use server'
 
-import { PrismaClient, OrderStatus } from '@prisma/client'
+import { OrderStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import prisma from "@/lib/prisma"
 import { requirePermission, getAuthenticatedUser } from "@/lib/rbac"
+import { headers } from 'next/headers'
+import { z } from 'zod'
+import { resolvePublicTenantFromHost } from '@/lib/tenant-context'
+
+const publicOrderSchema = z.object({
+  email: z.string().trim().email().max(255),
+  name: z.string().trim().min(1).max(255),
+  phone: z.string().trim().min(3).max(64),
+  companyName: z.string().trim().max(255).optional(),
+  notes: z.string().trim().max(5000).optional(),
+  items: z.array(z.object({
+    id: z.string().uuid(),
+    quantity: z.number().int().min(1).max(100),
+  })).min(1).max(100),
+})
 
 export async function getOrders(tenantId: string) {
   try {
@@ -116,7 +131,7 @@ export async function bulkUpdateOrderStatus(tenantId: string, orderIds: string[]
   }
 }
 
-export async function cancelOrder(tenantId: string, orderId: string, reason?: string) {
+export async function cancelOrder(tenantId: string, orderId: string, reason?: string, guestEmail?: string) {
   try {
     const user = await getAuthenticatedUser().catch(() => null)
     const order = await prisma.tenantOrder.findUnique({
@@ -135,7 +150,21 @@ export async function cancelOrder(tenantId: string, orderId: string, reason?: st
         }
       }
     } else {
-      if (order.orderStatus === 'pending') hasAccess = true
+      const normalizedEmail = z.string().trim().email().max(255).safeParse(guestEmail)
+      const requestHeaders = headers()
+      const publicTenant = await resolvePublicTenantFromHost(
+        requestHeaders.get('host') || '',
+        requestHeaders.get('x-tenant-id'),
+      )
+      const cancellableStatuses: OrderStatus[] = ['pending', 'pending_requirements', 'awaiting_payment']
+      if (
+        normalizedEmail.success &&
+        publicTenant?.id === tenantId &&
+        order.guestEmail?.toLowerCase() === normalizedEmail.data.toLowerCase() &&
+        cancellableStatuses.includes(order.orderStatus)
+      ) {
+        hasAccess = true
+      }
     }
 
     if (!hasAccess) throw new Error("Unauthorized order access")
@@ -166,8 +195,24 @@ export async function createOrder(
   }
 ) {
   try {
+    const parsed = publicOrderSchema.safeParse(data)
+    if (!parsed.success) throw new Error('Invalid order details')
+    data = parsed.data
+
+    const requestHeaders = headers()
+    const publicTenant = await resolvePublicTenantFromHost(
+      requestHeaders.get('host') || '',
+      requestHeaders.get('x-tenant-id'),
+    )
+    if (!publicTenant || publicTenant.id !== tenantId) {
+      throw new Error('Invalid storefront tenant')
+    }
+
+    const uniqueItemIds = Array.from(new Set(data.items.map(item => item.id)))
+    if (uniqueItemIds.length !== data.items.length) throw new Error('Duplicate catalog items are not allowed')
+
     const catalogItems = await prisma.tenantCatalogItem.findMany({
-      where: { id: { in: data.items.map(i => i.id) }, tenantId }
+      where: { id: { in: uniqueItemIds }, tenantId: publicTenant.id, isVisible: true }
     })
     
     let totalAmount = 0
@@ -178,7 +223,7 @@ export async function createOrder(
       const total = Number(unitPrice) * i.quantity
       totalAmount += total
       return {
-        tenantId,
+        tenantId: publicTenant.id,
         catalogItemId: i.id,
         quantity: i.quantity,
         unitPrice: unitPrice,
@@ -188,7 +233,7 @@ export async function createOrder(
 
     const order = await prisma.tenantOrder.create({
       data: {
-        tenantId,
+        tenantId: publicTenant.id,
         guestEmail: data.email,
         totalAmount,
         orderStatus: 'pending',
@@ -214,8 +259,20 @@ export async function createOrder(
 
 export async function getUserOrders(tenantId: string, email: string) {
   try {
+    const normalizedEmail = z.string().trim().email().max(255).safeParse(email)
+    if (!normalizedEmail.success) throw new Error('A valid email address is required')
+
+    const requestHeaders = headers()
+    const publicTenant = await resolvePublicTenantFromHost(
+      requestHeaders.get('host') || '',
+      requestHeaders.get('x-tenant-id'),
+    )
+    if (!publicTenant || publicTenant.id !== tenantId) {
+      throw new Error('Invalid storefront tenant')
+    }
+
     const orders = await prisma.tenantOrder.findMany({
-      where: { tenantId, guestEmail: email },
+      where: { tenantId: publicTenant.id, guestEmail: normalizedEmail.data },
       orderBy: { createdAt: 'desc' },
       include: {
         items: {
@@ -249,12 +306,22 @@ export async function advanceProjectOrderStatus(
     })
     if (!current) throw new Error('Order not found')
 
-    // Build updated notes: parse existing JSON array or start fresh
+    // Preserve the structured project brief written by /api/project-setup.
+    // Earlier code replaced that object with an array on the first fulfilment
+    // update, which silently discarded the customer's requirements.
     let notesArray: Array<{ ts: string; status: string; note: string }> = []
+    let projectBrief: Record<string, unknown> | null = null
     try {
       if (current.notes) {
         const parsed = JSON.parse(current.notes)
-        if (Array.isArray(parsed)) notesArray = parsed
+        if (Array.isArray(parsed)) {
+          notesArray = parsed
+        } else if (parsed && typeof parsed === 'object') {
+          projectBrief = parsed as Record<string, unknown>
+          if (Array.isArray(projectBrief.statusHistory)) {
+            notesArray = projectBrief.statusHistory as Array<{ ts: string; status: string; note: string }>
+          }
+        }
       }
     } catch {
       // Legacy plain-text note — wrap it
@@ -273,7 +340,7 @@ export async function advanceProjectOrderStatus(
 
     const validTransitions: Record<OrderStatus, OrderStatus[]> = {
       pending: ['pending_requirements', 'paid', 'cancelled'],
-      pending_requirements: ['quoted', 'cancelled'],
+      pending_requirements: ['quoted', 'awaiting_payment', 'cancelled'],
       quoted: ['awaiting_payment', 'cancelled'],
       awaiting_payment: ['pending_fulfillment', 'paid', 'cancelled'],
       paid: ['pending_fulfillment', 'processing', 'cancelled'],
@@ -289,11 +356,15 @@ export async function advanceProjectOrderStatus(
       throw new Error(`Invalid transition from ${current.orderStatus} to ${newStatus}`)
     }
 
+    const nextNotes = projectBrief
+      ? JSON.stringify({ ...projectBrief, statusHistory: notesArray })
+      : JSON.stringify(notesArray)
+
     const updated = await prisma.tenantOrder.update({
       where: { id: orderId, tenantId },
       data: {
         orderStatus: newStatus,
-        notes: JSON.stringify(notesArray),
+        notes: nextNotes,
       },
     })
 

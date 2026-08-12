@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { getAuthenticatedUser, requirePermission } from "@/lib/rbac"
+import { getTenantWhatsAppConfig, sendWhatsAppText } from '@/lib/whatsapp'
 
 export async function getCrmData(tenantId: string) {
   try {
@@ -141,31 +142,15 @@ export async function sendTimelineWhatsApp(tenantId: string, contactId: string, 
     })
     if (!contact || !contact.phoneNumber) throw new Error('Contact has no phone number')
 
-    const token = process.env.META_WA_TOKEN
-    const phoneId = process.env.META_WA_PHONE_ID
-    
-    if (token && phoneId) {
-      const response = await fetch(`https://graph.facebook.com/v17.0/${phoneId}/messages`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          messaging_product: 'whatsapp',
-          to: contact.phoneNumber.replace(/\D/g, ''),
-          type: 'text',
-          text: { body: message }
-        })
-      })
-      if (!response.ok) {
-        const err = await response.text()
-        console.error('WhatsApp API Error:', err)
-        throw new Error('WhatsApp API delivery failed')
-      }
-    } else {
-      console.warn('WhatsApp API not configured, simulating delivery')
-    }
+    const whatsAppConfig = await getTenantWhatsAppConfig(tenantId)
+    if (!whatsAppConfig) throw new Error('WhatsApp Business is not configured for this workspace.')
+
+    const delivery = await sendWhatsAppText({
+      to: contact.phoneNumber,
+      message,
+      credentials: whatsAppConfig,
+    })
+    if (!delivery.success) throw new Error(delivery.error || 'WhatsApp API delivery failed')
 
     const event = await prisma.tenantCrmTimeline.create({
       data: {
@@ -173,7 +158,7 @@ export async function sendTimelineWhatsApp(tenantId: string, contactId: string, 
         contactId,
         eventType: 'whatsapp_sent',
         sourceModule: 'crm',
-        eventPayload: { message, status: 'sent' },
+        eventPayload: { message, status: 'sent', providerMessageId: delivery.data?.messages?.[0]?.id || null },
         occurredAt: new Date()
       }
     })

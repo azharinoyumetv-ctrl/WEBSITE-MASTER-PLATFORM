@@ -1,18 +1,23 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Monitor, ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, QrCode, Search, Wifi, Clock, FileText, ArrowDownCircle, ArrowUpCircle, Download, LayoutList, X } from 'lucide-react'
+import { Monitor, ShoppingCart, Plus, Minus, Trash2, CreditCard, Banknote, QrCode, Search, Wifi, Clock, ArrowDownCircle, ArrowUpCircle, Download, LayoutList, X, Pencil, Check } from 'lucide-react'
 import { formatCurrency, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { processPosPayment, openSession, closeCashDrawerSession, generateReceipt, openCashDrawer, recordCashDrop, recordCashPayout, getEndOfDayReport, getCashDrawerEvents } from '@/lib/actions/pos'
+import { processPosPayment, openSession, closeCashDrawerSession, generateReceipt, openCashDrawer, recordCashDrop, recordCashPayout, getEndOfDayReport, getCashDrawerEvents, renameTerminal } from '@/lib/actions/pos'
 
-export function PosClient({ initialTerminal, initialCatalogItems, initialSession, tenantId, userId, baseCurrency = 'USD' }: { initialTerminal: any, initialCatalogItems: any[], initialSession: any, tenantId: string, userId: string, baseCurrency?: string }) {
+export function PosClient({ initialTerminal, initialCatalogItems, initialSession, tenantId, userId, baseCurrency = 'IDR' }: { initialTerminal: any, initialCatalogItems: any[], initialSession: any, tenantId: string, userId: string, baseCurrency?: string }) {
   const [cart, setCart] = useState<Array<{id: string; title: string; price: number; qty: number}>>([])
   const [paymentMethod, setPaymentMethod] = useState<'card' | 'cash' | 'qr'>('card')
   const [isProcessing, setIsProcessing] = useState(false)
   const [time, setTime] = useState(new Date())
   const [search, setSearch] = useState('')
   const [activeSession, setActiveSession] = useState(initialSession)
+  const initialTerminalName = initialTerminal?.terminalName?.trim() || 'Main Register'
+  const [terminalName, setTerminalName] = useState(initialTerminalName)
+  const [terminalNameDraft, setTerminalNameDraft] = useState(initialTerminalName)
+  const [isEditingTerminalName, setIsEditingTerminalName] = useState(false)
+  const [isSavingTerminalName, setIsSavingTerminalName] = useState(false)
   
   // Shift & Drawer state
   const [shiftAmount, setShiftAmount] = useState('0')
@@ -31,6 +36,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
   const [receiptHtml, setReceiptHtml] = useState<string | null>(null)
   const [isScanningCamera, setIsScanningCamera] = useState(false)
   const [manualScanInput, setManualScanInput] = useState('')
+  const currencyPrefix = baseCurrency === 'IDR' ? 'Rp' : baseCurrency === 'JPY' ? '¥' : baseCurrency === 'EUR' ? '€' : baseCurrency === 'GBP' ? '£' : '$'
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
@@ -96,7 +102,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
             return
           }
         }
-      } catch (err) {
+      } catch {
         // Ignore detection errors during frame drops
       }
 
@@ -124,7 +130,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement
       const isInput = target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT'
-      if (isInput && target.id === 'pos-search') return
+      if (isInput) return
 
       const currentTime = Date.now()
       if (currentTime - lastKeyTime > 50) {
@@ -203,6 +209,38 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
       setShowShiftModal(false)
       toast.success('Shift opened successfully')
     } else toast.error(res.error)
+  }
+
+  const handleSaveTerminalName = async () => {
+    const nextName = terminalNameDraft.trim().replace(/\s+/g, ' ')
+    if (!nextName) {
+      toast.error('Register name is required')
+      return
+    }
+
+    if (nextName === terminalName) {
+      setTerminalNameDraft(terminalName)
+      setIsEditingTerminalName(false)
+      return
+    }
+
+    setIsSavingTerminalName(true)
+    const res = await renameTerminal(tenantId, initialTerminal.id, nextName)
+    setIsSavingTerminalName(false)
+
+    if (res.success && res.terminal) {
+      setTerminalName(res.terminal.terminalName)
+      setTerminalNameDraft(res.terminal.terminalName)
+      setIsEditingTerminalName(false)
+      toast.success('Register name updated')
+    } else {
+      toast.error(res.error || 'Failed to update register name')
+    }
+  }
+
+  const handleCancelTerminalNameEdit = () => {
+    setTerminalNameDraft(terminalName)
+    setIsEditingTerminalName(false)
   }
 
   const handlePrepareCloseShift = async () => {
@@ -297,8 +335,57 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
             <div className="w-12 h-12 rounded-xl bg-emerald-600/20 flex items-center justify-center">
               <Monitor className="w-6 h-6 text-emerald-500" />
             </div>
-            <div>
-              <h2 className="text-xl font-bold text-white">{initialTerminal?.terminalName || 'Terminal'}</h2>
+            <div className="min-w-0 flex-1">
+              {isEditingTerminalName ? (
+                <div className="flex items-center gap-2">
+                  <label htmlFor="pos-terminal-name" className="sr-only">Register name</label>
+                  <input
+                    id="pos-terminal-name"
+                    autoFocus
+                    maxLength={100}
+                    value={terminalNameDraft}
+                    onChange={event => setTerminalNameDraft(event.target.value)}
+                    onKeyDown={event => {
+                      if (event.key === 'Enter') handleSaveTerminalName()
+                      if (event.key === 'Escape') handleCancelTerminalNameEdit()
+                    }}
+                    className="min-w-0 flex-1 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-base font-bold text-white outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSaveTerminalName}
+                    disabled={isSavingTerminalName}
+                    className="rounded-lg p-2 text-emerald-400 transition-colors hover:bg-emerald-500/10 hover:text-emerald-300 disabled:opacity-50"
+                    aria-label="Save register name"
+                    title="Save register name"
+                  >
+                    <Check className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelTerminalNameEdit}
+                    disabled={isSavingTerminalName}
+                    className="rounded-lg p-2 text-gray-400 transition-colors hover:bg-white/5 hover:text-white disabled:opacity-50"
+                    aria-label="Cancel register name edit"
+                    title="Cancel"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <h2 className="truncate text-xl font-bold text-white">{terminalName}</h2>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditingTerminalName(true)}
+                    className="rounded-lg p-1.5 text-gray-400 transition-colors hover:bg-white/5 hover:text-white"
+                    aria-label="Edit register name"
+                    title="Edit register name"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
               <p className="text-gray-400 text-sm">Status: Opening Shift</p>
             </div>
           </div>
@@ -308,13 +395,15 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
               <label className="block text-sm font-medium text-gray-300 mb-2">
                 Opening Float (Register Balance)
               </label>
-              <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium">$</span>
+              <div className="flex overflow-hidden rounded-xl border border-gray-700 bg-gray-800 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500">
+                <span className="flex min-w-14 items-center justify-center border-r border-gray-700 px-3 text-sm font-semibold text-gray-300" aria-hidden="true">{currencyPrefix}</span>
                 <input 
                   type="number" 
+                  inputMode="decimal"
+                  aria-label={`Opening float in ${baseCurrency}`}
                   value={shiftAmount}
                   onChange={e => setShiftAmount(e.target.value)}
-                  className="w-full bg-gray-800 border border-gray-700 rounded-xl py-3 pl-8 pr-4 text-white font-medium focus:ring-1 focus:ring-emerald-500 outline-none"
+                  className="min-w-0 flex-1 bg-transparent px-4 py-3 text-white font-medium outline-none"
                 />
               </div>
             </div>
@@ -333,26 +422,26 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
   }
 
   return (
-    <div className="h-screen flex overflow-hidden bg-gray-950 pos-grid">
+    <div className="min-h-[calc(100dvh-5rem)] lg:h-screen flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden bg-gray-950 pos-grid">
       {/* Product Grid */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="min-h-[54vh] lg:min-h-0 flex-1 flex flex-col overflow-hidden">
         {/* POS Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-4 py-3 bg-gray-900 border-b border-gray-800">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center">
               <Monitor className="w-4 h-4 text-white" />
             </div>
             <div>
-              <p className="text-white text-sm font-semibold">{initialTerminal?.terminalName || 'Main Register'}</p>
+              <p className="text-white text-sm font-semibold">{terminalName}</p>
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
                 <span className="text-gray-400 text-xs">Session Active</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-4 text-gray-400 text-xs">
+          <div className="flex w-full sm:w-auto items-center justify-between gap-2 overflow-x-auto text-gray-400 text-xs">
             {/* Drawer Actions */}
-            <div className="flex bg-gray-800 rounded-lg overflow-hidden border border-gray-700 mr-2">
+            <div className="flex flex-shrink-0 bg-gray-800 rounded-lg overflow-hidden border border-gray-700">
               <button disabled={!activeSession} onClick={handleOpenCashDrawer} className="px-3 py-1.5 hover:bg-gray-700 disabled:opacity-50 border-r border-gray-700" title="Open Drawer">
                 <Monitor className="w-3.5 h-3.5 text-emerald-400" />
               </button>
@@ -367,12 +456,12 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
               </button>
             </div>
             
-            <button onClick={handlePrepareCloseShift} className="text-emerald-400 hover:text-emerald-300 underline font-medium mr-2 border-r border-gray-800 pr-4">Close Shift</button>
-            <div className="flex items-center gap-1.5">
+            <button onClick={handlePrepareCloseShift} className="flex-shrink-0 text-emerald-400 hover:text-emerald-300 underline font-medium sm:mr-2 sm:border-r sm:border-gray-800 sm:pr-4">Close Shift</button>
+            <div className="hidden sm:flex items-center gap-1.5">
               <Wifi className="w-3.5 h-3.5 text-emerald-400" />
               <span>Online</span>
             </div>
-            <div className="flex items-center gap-1.5">
+            <div className="hidden md:flex items-center gap-1.5">
               <Clock className="w-3.5 h-3.5" />
               <span className="font-mono">{time.toLocaleTimeString()}</span>
             </div>
@@ -429,7 +518,7 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
       </div>
 
       {/* Cart Panel */}
-      <div className="w-80 flex flex-col bg-gray-900 border-l border-gray-800">
+      <div className="w-full lg:w-80 lg:max-h-none flex flex-col bg-gray-900 border-t lg:border-t-0 lg:border-l border-gray-800">
         <div className="px-4 py-3 border-b border-gray-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ShoppingCart className="w-4 h-4 text-gray-400" />
@@ -619,9 +708,16 @@ export function PosClient({ initialTerminal, initialCatalogItems, initialSession
               
               <div className="mt-4 pt-4 border-t border-gray-800">
                 <label className="block text-xs font-medium text-gray-400 mb-2">Counted Closing Balance</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                  <input type="number" value={shiftAmount} onChange={e => setShiftAmount(e.target.value)} className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 pl-7 text-white" />
+                <div className="flex overflow-hidden rounded-lg border border-gray-700 bg-gray-800 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500">
+                  <span className="flex min-w-14 items-center justify-center border-r border-gray-700 px-3 text-sm font-semibold text-gray-300" aria-hidden="true">{currencyPrefix}</span>
+                  <input
+                    type="number"
+                    inputMode="decimal"
+                    aria-label={`Counted closing balance in ${baseCurrency}`}
+                    value={shiftAmount}
+                    onChange={e => setShiftAmount(e.target.value)}
+                    className="min-w-0 flex-1 bg-transparent px-3 py-2 text-white outline-none"
+                  />
                 </div>
                 {parseFloat(shiftAmount || '0') !== shiftSummary.expectedDrawer && (
                   <p className="text-xs text-amber-500 mt-2">

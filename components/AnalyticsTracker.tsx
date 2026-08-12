@@ -28,15 +28,32 @@ export function AnalyticsTracker({ tenantId }: AnalyticsTrackerProps) {
     if (lastTrackedPath.current === pathname) return
     lastTrackedPath.current = pathname
 
+    const sessionStorageKey = 'dagangos-analytics-session'
+    let sessionId = ''
+    try {
+      sessionId = window.sessionStorage.getItem(sessionStorageKey) || ''
+      if (!sessionId) {
+        sessionId = `anon-${crypto.randomUUID()}`
+        window.sessionStorage.setItem(sessionStorageKey, sessionId)
+      }
+    } catch {
+      sessionId = `anon-${crypto.randomUUID()}`
+    }
+
+    const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : ''
+    const deviceType = /ipad|tablet/i.test(userAgent) ? 'tablet' : /mobi|android/i.test(userAgent) ? 'mobile' : 'desktop'
+
     const payload = {
       tenantId,
       eventName: 'pageview',
       pageUrl: pathname,
       metadata: {
         referrer: typeof document !== 'undefined' ? document.referrer : '',
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        userAgent,
+        deviceType,
         timestamp: new Date().toISOString()
-      }
+      },
+      sessionId,
     }
 
     // Fire-and-forget — don't block the UI

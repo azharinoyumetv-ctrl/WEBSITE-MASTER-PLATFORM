@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { ArrowLeft, Building2, Globe, Calendar, CheckCircle2, XCircle, CreditCard, Box, Settings, Users, Star, Activity, AlertTriangle } from 'lucide-react'
 import Link from 'next/link'
 import { formatDate, getStatusBadgeClass } from '@/lib/utils'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 import { TenantDetailsClient } from './tenant-details-client'
 
 export default async function TenantDetailsPage({ params }: { params: { tenantId: string } }) {
@@ -35,7 +36,7 @@ export default async function TenantDetailsPage({ params }: { params: { tenantId
           </h1>
           <p className="text-sm text-slate-500 mt-1 flex items-center gap-2">
             <Globe className="w-3.5 h-3.5" />
-            {tenant.customDomain || `${tenant.subdomain}.${process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com'}`}
+            {getTenantPublicUrl(tenant).replace(/^https:\/\//, '')}
           </p>
         </div>
       </div>

@@ -2,38 +2,69 @@
 
 import prisma from "@/lib/prisma"
 import { Resend } from "resend"
-import { sendWhatsAppTemplate } from "@/lib/whatsapp"
+import { getTenantWhatsAppConfig, sendWhatsAppTemplate } from "@/lib/whatsapp"
 import crypto from 'crypto'
+import { headers } from 'next/headers'
+import { z } from 'zod'
+import { resolvePublicTenantFromHost } from '@/lib/tenant-context'
+import { getWebhookSigningSecret } from '@/lib/webhook-signing'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
+const contactFormSchema = z.object({
+  name: z.string().trim().min(1).max(255),
+  email: z.string().trim().email().max(255),
+  subject: z.string().trim().max(255).refine(value => !/[\r\n]/.test(value), 'Subject must be a single line.'),
+  message: z.string().trim().min(1).max(5000),
+  turnstileToken: z.string().trim().max(4096).nullable().optional(),
+})
+
+function escapeHtml(value: string) {
+  return value.replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#039;',
+  })[character] || character)
+}
+
 export async function submitContactForm(tenantId: string, data: { name: string, email: string, subject: string, message: string, turnstileToken?: string | null }) {
   try {
-    if (process.env.TURNSTILE_SECRET_KEY && data.turnstileToken) {
+    const parsed = contactFormSchema.safeParse(data)
+    if (!parsed.success) return { success: false, error: 'Please provide a valid name, email, and message.' }
+    data = parsed.data
+
+    const requestHeaders = headers()
+    const publicTenant = await resolvePublicTenantFromHost(
+      requestHeaders.get('host') || '',
+      requestHeaders.get('x-tenant-id'),
+    )
+    if (!publicTenant || publicTenant.id !== tenantId) {
+      return { success: false, error: 'This storefront is not available.' }
+    }
+
+    if (process.env.TURNSTILE_SECRET_KEY) {
+      if (!data.turnstileToken) {
+        return { success: false, error: 'Security check is required.' }
+      }
+
       const verifyRes = await fetch('https://challenges.cloudflare.com/turnstile/v0/siteverify', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: `secret=${process.env.TURNSTILE_SECRET_KEY}&response=${data.turnstileToken}`
+        body: new URLSearchParams({
+          secret: process.env.TURNSTILE_SECRET_KEY,
+          response: data.turnstileToken,
+        }),
       })
-      const verifyData = await verifyRes.json()
-      if (!verifyData.success) {
+      const verifyData = await verifyRes.json().catch(() => ({ success: false }))
+      if (!verifyRes.ok || !verifyData.success) {
         return { success: false, error: 'Security check failed. Please try again.' }
       }
     }
-    let resolvedTenantId = tenantId
-    if (tenantId === 'default') {
-      const defaultTenant = await prisma.systemTenant.findFirst({
-        where: { subdomain: 'default' }
-      })
-      if (defaultTenant) {
-        resolvedTenantId = defaultTenant.id
-      } else {
-        console.log('Contact submission received for default tenant, but default tenant is not seeded:', data)
-        return { success: true }
-      }
-    }
+    const resolvedTenantId = publicTenant.id
 
     // 1. Create or Update CRM Contact
     const [firstName, ...lastNames] = data.name.split(' ')
@@ -99,14 +130,10 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
     }
 
     const payloadString = JSON.stringify(payload)
-    const webhookSecret = process.env.WEBHOOK_API_KEY
-    
     webhooksToTrigger.forEach(w => {
       const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (webhookSecret) {
-        const signature = crypto.createHmac('sha256', webhookSecret).update(payloadString).digest('hex')
-        headers['X-Webhook-Signature'] = signature
-      }
+      const signature = crypto.createHmac('sha256', getWebhookSigningSecret(w.secretSigningToken)).update(payloadString).digest('hex')
+      headers['X-Webhook-Signature'] = signature
 
       fetch(w.targetUrl, {
         method: 'POST',
@@ -117,18 +144,20 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
 
     // 4. Send Confirmation Email via Resend
     if (process.env.RESEND_API_KEY) {
+      const safeFirstName = escapeHtml(firstName || 'there')
+      const safeMessage = escapeHtml(data.message).replace(/\n/g, '<br/>')
       await resend.emails.send({
         from: 'contact@dagangos.com',
         to: [data.email],
         subject: `Re: ${data.subject || 'Thank you for contacting us'}`,
         html: `
           <div>
-            <p>Hi ${firstName || 'there'},</p>
+            <p>Hi ${safeFirstName},</p>
             <p>Thank you for reaching out! We've received your message and will get back to you shortly.</p>
             <br/>
             <p><strong>Your message:</strong></p>
             <blockquote style="border-left: 3px solid #ccc; padding-left: 10px; color: #555;">
-              ${data.message.replace(/\n/g, '<br/>')}
+              ${safeMessage}
             </blockquote>
             <br/>
             <p>Best regards,<br/>The Team</p>
@@ -138,26 +167,19 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
     }
 
     // 5. Trigger WhatsApp PA Alert (if configured)
-    const website = await prisma.tenantWebsite.findUnique({
-      where: { tenantId: resolvedTenantId }
-    })
-    const themeConfig = website?.themeConfig as any || {}
-    const { whatsappPaNumber, whatsappPhoneId, whatsappToken, whatsappTemplate } = themeConfig
-
-    if (whatsappPaNumber && whatsappPhoneId && whatsappToken && whatsappTemplate) {
+    const whatsAppConfig = await getTenantWhatsAppConfig(resolvedTenantId)
+    if (whatsAppConfig?.recipientNumber && whatsAppConfig.templateName) {
       await sendWhatsAppTemplate({
-        to: whatsappPaNumber,
-        templateName: whatsappTemplate,
+        to: whatsAppConfig.recipientNumber,
+        templateName: whatsAppConfig.templateName,
         parameters: [data.name, data.email],
-        credentials: {
-          token: whatsappToken,
-          phoneNumberId: whatsappPhoneId
-        }
+        credentials: whatsAppConfig,
       })
     }
 
     return { success: true }
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (error) {
+    console.error('Contact form submission failed', { name: error instanceof Error ? error.name : 'unknown' })
+    return { success: false, error: 'Unable to send your message right now.' }
   }
 }

@@ -1,9 +1,9 @@
 # Refund Policy
 
 **Last Updated:** July 2026
-**Company:** PT DagangOS Digital Indonesia
+**Company:** DagangOS Digital Indonesia
 
-At PT DagangOS Digital Indonesia, we strive to ensure absolute satisfaction with our B2B SaaS and custom development services. This policy outlines the conditions under which refunds may be issued.
+At DagangOS Digital Indonesia, we strive to ensure absolute satisfaction with our B2B SaaS and custom development services. This policy outlines the conditions under which refunds may be issued.
 
 ## Eligible Refunds
 Refunds are strictly evaluated on a case-by-case basis and are generally only eligible if DagangOS fails to deliver the agreed-upon Services as defined in the Statement of Work (SOW).

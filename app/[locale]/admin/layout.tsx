@@ -34,24 +34,35 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   // Create map of enabled modules
   const enabledModules = new Set<string>()
-  PLATFORM_MODULES.forEach(mockMod => {
-    // If DB fetch failed, default all modules to enabled (graceful nav degradation)
-    const dbMod = (dbModules || []).find((m: any) => m.moduleKey === mockMod.key)
-    const isEnabled = res.success ? (dbMod ? dbMod.isEnabled : mockMod.isEnabled) : true
+  PLATFORM_MODULES.forEach(moduleDefinition => {
+    const dbMod = (dbModules || []).find((m: any) => m.moduleKey === moduleDefinition.key)
+    // Core capabilities remain available for older tenants that predate module
+    // records; optional capabilities still require an explicit enabled record.
+    const isEnabled = res.success
+      ? (dbMod ? Boolean(dbMod.isEnabled) : moduleDefinition.isCore)
+      : moduleDefinition.isCore
     if (isEnabled) {
-      enabledModules.add(mockMod.key)
+      enabledModules.add(moduleDefinition.key)
     }
   })
 
   const enabledModulesList = Array.from(enabledModules)
+  const roles = ((session.user as any).roles || []) as string[]
+  const normalizedRoles = roles.map(role => role.toLowerCase())
+  const roleLabel = normalizedRoles.includes('platform_owner') || normalizedRoles.includes('platform owner')
+    ? 'Platform Owner'
+    : normalizedRoles.includes('super-admin')
+      ? 'Super Admin'
+      : roles[0] || 'Tenant Admin'
 
   return (
     <AdminLayoutClient 
       enabledModules={enabledModulesList}
+      canManageTenants={normalizedRoles.includes('super-admin')}
       tenant={tenant}
       user={{
         name: session.user.name || session.user.email?.split('@')[0] || 'Admin User',
-        role: (session.user as any).role || 'Tenant Admin'
+        role: roleLabel
       }}
     >
       {children}

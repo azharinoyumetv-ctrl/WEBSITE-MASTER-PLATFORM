@@ -23,7 +23,7 @@ export default async function POSPage() {
     return <div className="p-8 text-red-500">Error loading POS: {res.error}</div>
   }
 
-  let baseCurrency = 'USD'
+  let baseCurrency = 'IDR'
   try {
     const prisma = (await import('@/lib/prisma')).default
     const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })

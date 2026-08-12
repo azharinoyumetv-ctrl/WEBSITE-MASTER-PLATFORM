@@ -1,8 +1,10 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import { validateV1Request } from '@/lib/v1-auth'
+import { withTenantApiTelemetry } from '@/lib/api-telemetry'
 
 export async function GET(req: Request) {
+  const startedAt = Date.now()
   const authError = await validateV1Request(req)
   if (authError) return authError
 
@@ -23,10 +25,15 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: false, error: 'Domain not found or not verified' }, { status: 404 })
     }
 
-    return NextResponse.json({
+    return withTenantApiTelemetry({
+      tenantId: domainRecord.tenantId,
+      request: req,
+      startedAt,
+      response: NextResponse.json({
       tenantId: domainRecord.tenantId,
       instanceId: domainRecord.instance?.instanceId || null,
       isVerified: true
+      })
     })
   } catch (error: any) {
     console.error('[v1/tenants/resolve-domain] Internal error:', error)

@@ -1,16 +1,20 @@
 'use server'
 
-import { PrismaClient, TenantStatus } from '@prisma/client'
+import { TenantStatus } from '@prisma/client'
 import { revalidatePath } from 'next/cache'
 import prisma from "@/lib/prisma"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { requireSuperAdmin } from "@/lib/rbac"
+import { dispatchNotification } from '@/lib/actions/notifications'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
+import bcrypt from 'bcryptjs'
+import crypto from 'crypto'
+import { addonModuleMap, addonsList, getBillableAddonKeys, packageModuleMap, packages } from '@/lib/constants/packages'
 
 export async function getTenants() {
   try {
     const user = await requireSuperAdmin()
     const tenants = await prisma.systemTenant.findMany({
+      where: { id: { not: user.tenantId } },
       orderBy: { createdAt: 'desc' },
       include: {
         _count: {
@@ -24,51 +28,67 @@ export async function getTenants() {
   }
 }
 
-export async function createTenant(data: { companyName: string, subdomain: string, packageKey?: string, addons?: string[] }) {
+export async function createTenant(data: { companyName: string, subdomain: string, adminEmail: string, packageKey?: string, addons?: string[], logoUrl?: string }) {
   try {
     const user = await requireSuperAdmin()
 
+    const companyName = data.companyName.trim()
+    const subdomain = data.subdomain.trim().toLowerCase()
+    const adminEmail = data.adminEmail.trim().toLowerCase()
+    const logoUrl = data.logoUrl?.trim() || ''
+    if (!companyName || companyName.length > 255 || !/^[a-z0-9-]{2,63}$/.test(subdomain)) {
+      return { success: false, error: 'Provide a company name and a valid subdomain (lowercase letters, numbers, and hyphens).' }
+    }
+    if (adminEmail.length > 255 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(adminEmail)) {
+      return { success: false, error: 'Provide a valid workspace administrator email.' }
+    }
+    if (logoUrl && (!/^data:image\/(png|jpeg);base64,/i.test(logoUrl) || logoUrl.length > 700_000)) {
+      return { success: false, error: 'Use a PNG or JPG logo smaller than 500 KB.' }
+    }
+
     // Check if subdomain exists
     const existing = await prisma.systemTenant.findUnique({
-      where: { subdomain: data.subdomain }
+      where: { subdomain }
     })
 
     if (existing) {
       return { success: false, error: 'Subdomain already in use' }
     }
 
+    const existingAdmin = await prisma.user.findFirst({ where: { email: adminEmail } })
+    if (existingAdmin) {
+      return { success: false, error: 'This administrator email already belongs to an existing workspace.' }
+    }
+
     const packageKey = data.packageKey || 'landing_page'
+    if (!packages[packageKey]) {
+      return { success: false, error: 'The selected package is invalid.' }
+    }
     const plan = (packageKey === 'custom' || packageKey === 'retail_pos' || packageKey === 'ecommerce') ? 'enterprise' : 'core'
 
     const tenant = await prisma.systemTenant.create({
       data: {
-        companyName: data.companyName,
-        subdomain: data.subdomain,
-        plan: plan as any
+        companyName,
+        subdomain,
+        plan: plan as any,
+        logoUrl: logoUrl || null,
       }
     })
 
-    // Determine modules to enable based on package
-    const packageModuleMap: Record<string, string[]> = {
-      landing_page: ['website_module', 'admin_module', 'user_management', 'rbac_module'],
-      company_profile: ['website_module', 'admin_module', 'user_management', 'rbac_module'],
-      business_website: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'notification_module', 'analytics_module'],
-      ecommerce: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'ecommerce_module', 'payment_module', 'inventory_module', 'notification_module', 'analytics_module'],
-      restaurant: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'booking_module', 'notification_module', 'analytics_module'],
-      retail_pos: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'ecommerce_module', 'payment_module', 'pos_module', 'inventory_module', 'notification_module', 'analytics_module'],
-      custom: ['website_module', 'admin_module', 'user_management', 'rbac_module', 'catalog_module', 'ecommerce_module', 'payment_module', 'pos_module', 'inventory_module', 'crm_module', 'booking_module', 'ai_module', 'notification_module', 'analytics_module', 'api_module']
-    }
-
-    const enabledModules = new Set(packageModuleMap[packageKey] || packageModuleMap.landing_page)
+    // Determine modules to enable based on package.
+    const enabledModules = new Set(packageModuleMap[packageKey])
     
-    // Add custom addons
-    if (data.addons) {
-      data.addons.forEach(addon => {
-        if (addon === 'ai') enabledModules.add('ai_module')
-        if (addon === 'booking') enabledModules.add('booking_module')
-        if (addon === 'crm') enabledModules.add('crm_module')
-        if (addon === 'api') enabledModules.add('api_module')
-      })
+    const submittedAddons = Array.from(new Set(data.addons || []))
+    const hasInvalidAddon = submittedAddons.some(key => !addonsList.some(addon => addon.key === key))
+    if (hasInvalidAddon) {
+      await prisma.systemTenant.delete({ where: { id: tenant.id } })
+      return { success: false, error: 'One or more selected add-ons are invalid.' }
+    }
+    const selectedAddons = getBillableAddonKeys(packageKey, submittedAddons)
+
+    for (const addonKey of selectedAddons) {
+      const moduleKey = addonModuleMap[addonKey]
+      if (moduleKey) enabledModules.add(moduleKey)
     }
 
     // Enable modules in database
@@ -76,7 +96,7 @@ export async function createTenant(data: { companyName: string, subdomain: strin
       'website_module', 'admin_module', 'user_management', 'rbac_module',
       'catalog_module', 'ecommerce_module', 'payment_module', 'pos_module',
       'inventory_module', 'crm_module', 'booking_module', 'ai_module',
-      'notification_module', 'analytics_module', 'api_module'
+      'notification_module', 'whatsapp_module', 'analytics_module', 'api_module'
     ]
 
     await prisma.tenantModule.createMany({
@@ -92,7 +112,7 @@ export async function createTenant(data: { companyName: string, subdomain: strin
     await prisma.tenantWebsite.create({
       data: {
         tenantId: tenant.id,
-        siteTitle: data.companyName,
+        siteTitle: companyName,
         themeConfig: {
           colors: {
             primary: '#4f46e5',
@@ -104,12 +124,12 @@ export async function createTenant(data: { companyName: string, subdomain: strin
             headings: 'Geist',
             base_font: 'Inter'
           },
+          baseCurrency: 'IDR',
           paymentGateway: 'unset',
           xenditEnabled: false,
           midtransEnabled: false,
           whatsappPaNumber: '',
           whatsappPhoneId: '',
-          whatsappToken: '',
           whatsappTemplate: 'order_confirmation'
         }
       }
@@ -128,7 +148,7 @@ export async function createTenant(data: { companyName: string, subdomain: strin
               type: 'hero',
               sortOrder: 1,
               config: {
-                title: `Welcome to ${data.companyName}`,
+                title: `Welcome to ${companyName}`,
                 subtitle: 'Your modern conversion-focused landing page template setup.',
                 ctaText: 'Get Started Today',
                 ctaUrl: '/contact'
@@ -162,7 +182,7 @@ export async function createTenant(data: { companyName: string, subdomain: strin
                 type: 'hero',
                 sortOrder: 1,
                 config: {
-                  title: `Discover ${data.companyName} store`,
+                  title: `Discover ${companyName} store`,
                   subtitle: 'Explore our catalog and order premium products online.',
                   ctaText: 'Shop Catalog Now',
                   ctaUrl: '/shop'
@@ -182,8 +202,58 @@ export async function createTenant(data: { companyName: string, subdomain: strin
       })
     }
 
+    // Issue access only after an administrator provisions the workspace. The
+    // user receives a one-time set-password link rather than a shared password.
+    const invitationToken = crypto.randomBytes(32).toString('hex')
+    const provisionalHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12)
+    const invitationExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+    const adminRole = await prisma.role.create({
+      data: {
+        tenantId: tenant.id,
+        name: 'Admin',
+        description: 'Workspace administrator',
+        permissions: {
+          system: ['read', 'write'], catalog: ['read', 'write', 'delete'], orders: ['read', 'write'],
+          payments: ['read'], inventory: ['read', 'write'], pos: ['read', 'write'], crm: ['read', 'write'], booking: ['read', 'write'],
+        },
+      },
+    })
+
+    const owner = await prisma.user.create({
+      data: {
+        tenantId: tenant.id,
+        email: adminEmail,
+        passwordHash: provisionalHash,
+        firstName: companyName,
+        status: 'pending_verification',
+        emailVerified: false,
+      },
+    })
+    await prisma.$transaction([
+      prisma.tenantAuthCredential.create({
+        data: {
+          tenantId: tenant.id,
+          userId: owner.id,
+          passwordHash: provisionalHash,
+          passwordResetToken: invitationToken,
+          passwordResetExpires: invitationExpiresAt,
+        },
+      }),
+      prisma.tenantUserRole.create({ data: { tenantId: tenant.id, userId: owner.id, roleId: adminRole.id } }),
+      prisma.tenantUserProfile.create({ data: { tenantId: tenant.id, userId: owner.id, preferences: { locale: 'id', timezone: 'Asia/Jakarta' } } }),
+    ])
+
+    const workspaceUrl = getTenantPublicUrl({ subdomain })
+    const accessUrl = `${workspaceUrl}/auth/reset-password?token=${invitationToken}`
+    const notification = await dispatchNotification(user.tenantId, adminEmail, 'email', 'workspace_invitation', {
+      company_name: companyName,
+      workspace_url: workspaceUrl,
+      access_url: accessUrl,
+      expires_at: invitationExpiresAt.toLocaleDateString('id-ID'),
+    })
+
     revalidatePath('/admin/tenants')
-    return { success: true, tenant }
+    return { success: true, tenant, workspaceUrl, accessUrl, invitationQueued: notification.success }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -206,6 +276,8 @@ export async function updateTenantStatus(id: string, status: TenantStatus) {
 
 export async function getTenantById(tenantId: string) {
   try {
+    await requireSuperAdmin()
+
     const tenant = await prisma.systemTenant.findUnique({
       where: { id: tenantId },
       include: {

@@ -1,51 +1,11 @@
 'use client'
 
-import { cn } from '@/lib/utils'
-import { Clock } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowUpRight, Clock3, ScrollText } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
 
-type AuditLog = {
-  id: string
-  userName?: string
-  actionPerformed?: string
-  targetResource?: string
-  createdAt?: string
-}
+type AuditLog = { id: string; userName?: string; actionPerformed?: string; targetResource?: string; createdAt?: string }
 
-type AuditLogCardProps = {
-  logs: AuditLog[]
-}
-
-export function AuditLogCard({ logs }: AuditLogCardProps) {
-  return (
-    <div className="card p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h3 className="text-sm font-semibold text-slate-900">Recent Activity</h3>
-        <span className="text-xs text-slate-400">Audit trail</span>
-      </div>
-      <div className="space-y-3">
-        {logs.length === 0 && <div className="text-xs text-slate-500 py-4 text-center">No recent activity.</div>}
-        {logs.slice(0, 5).map((log) => (
-          <div key={log.id} className="flex items-start gap-3">
-            <div className="w-7 h-7 rounded-full bg-indigo-50 border border-indigo-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-              <span className="text-indigo-700 text-[10px] font-bold">
-                {log.userName?.split(' ').map((n) => n[0]).join('') || '?'}
-              </span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-slate-700">
-                <span className="font-semibold">{log.userName || 'System'}</span>{' '}
-                <span className="text-slate-400">{log.actionPerformed?.replace(/_/g, ' ') || 'action'}</span>{' '}
-                <span className="font-medium text-slate-600 truncate">{log.targetResource || '—'}</span>
-              </p>
-              <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                <Clock className="w-2.5 h-2.5" />
-                {log.createdAt ? formatDate(log.createdAt, 'relative') : ''}
-              </p>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
+export function AuditLogCard({ logs }: { logs: AuditLog[] }) {
+  return <section className="relative overflow-hidden rounded-2xl border border-white bg-white/90 p-5 shadow-[0_10px_30px_rgba(15,23,42,.07)] backdrop-blur"><div className="absolute right-0 top-0 h-20 w-20 rounded-bl-[3rem] bg-violet-50" /><div className="relative mb-5 flex items-start justify-between"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-violet-500 text-white shadow-lg shadow-violet-500/20"><ScrollText className="h-5 w-5" /></span><div><h3 className="text-sm font-black text-slate-950">Workspace activity</h3><p className="text-xs text-slate-500">Audited administrative actions</p></div></div><Link href="/admin/audit" className="text-xs font-bold text-violet-700"><ArrowUpRight className="h-4 w-4" /></Link></div>{logs.length === 0 ? <p className="rounded-xl border border-dashed border-slate-200 py-7 text-center text-xs text-slate-500">Activity will be recorded here as the workspace is configured.</p> : <div className="space-y-3">{logs.slice(0, 4).map(log => <div key={log.id} className="flex items-start gap-3"><span className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-violet-100 bg-violet-50 text-[10px] font-black text-violet-700">{log.userName?.split(' ').map(name => name[0]).join('').slice(0, 2) || 'SY'}</span><div className="min-w-0 flex-1"><p className="truncate text-xs text-slate-700"><strong>{log.userName || 'System'}</strong> <span className="text-slate-500">{log.actionPerformed?.replace(/_/g, ' ') || 'performed an action'}</span></p><p className="mt-0.5 truncate text-[10px] font-medium text-slate-500">{log.targetResource || 'Workspace'}</p></div><span className="flex shrink-0 items-center gap-1 text-[10px] text-slate-400"><Clock3 className="h-3 w-3" />{log.createdAt ? formatDate(log.createdAt, 'relative') : ''}</span></div>)}</div>}</section>
 }

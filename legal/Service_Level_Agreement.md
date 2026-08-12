@@ -1,9 +1,9 @@
 # Service Level Agreement (SLA)
 
 **Last Updated:** July 2026
-**Company:** PT DagangOS Digital Indonesia
+**Company:** DagangOS Digital Indonesia
 
-This SLA outlines the support targets, response times, and availability commitments for clients subscribed to active Maintenance and Support packages with PT DagangOS Digital Indonesia.
+This SLA outlines the support targets, response times, and availability commitments for clients subscribed to active Maintenance and Support packages with DagangOS Digital Indonesia.
 
 ## Support Hours
 Standard Support Operations: **Monday – Friday, 09:00 WIB to 18:00 WIB**, excluding Indonesian national holidays.

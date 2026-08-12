@@ -2,11 +2,15 @@
 
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
+import { requirePermission, requireTenantUser } from '@/lib/rbac'
 
-
+const RESERVED_ROLE_NAMES = new Set(['admin', 'platform_owner', 'platform owner', 'super-admin'])
 
 export async function getRoles(tenantId: string) {
   try {
+    const user = await requireTenantUser(tenantId)
+    await requirePermission(user.id, tenantId, 'rbac', 'read')
+
     const roles = await prisma.role.findMany({
       where: { tenantId },
       include: {
@@ -24,14 +28,22 @@ export async function getRoles(tenantId: string) {
 
 export async function createRole(tenantId: string, data: { name: string, description: string, baseRoleId?: string }) {
   try {
-    if (data.name.toLowerCase() === 'platform_owner') {
+    const user = await requireTenantUser(tenantId)
+    await requirePermission(user.id, tenantId, 'rbac', 'write')
+
+    const roleName = data.name.trim()
+    const description = data.description.trim()
+    if (!roleName || roleName.length > 64 || description.length > 500) {
+      return { success: false, error: 'Provide a role name up to 64 characters and a description up to 500 characters.' }
+    }
+    if (RESERVED_ROLE_NAMES.has(roleName.toLowerCase())) {
       return { success: false, error: 'Cannot create system-reserved roles' }
     }
 
     let initialPermissions = {}
     
     if (data.baseRoleId) {
-      const baseRole = await prisma.role.findUnique({ where: { id: data.baseRoleId } })
+      const baseRole = await prisma.role.findFirst({ where: { id: data.baseRoleId, tenantId } })
       if (baseRole) {
         initialPermissions = baseRole.permissions as Record<string, string[]>
       }
@@ -40,8 +52,8 @@ export async function createRole(tenantId: string, data: { name: string, descrip
     const role = await prisma.role.create({
       data: {
         tenantId,
-        name: data.name,
-        description: data.description,
+        name: roleName,
+        description,
         permissions: initialPermissions
       }
     })
@@ -59,6 +71,13 @@ export async function createRole(tenantId: string, data: { name: string, descrip
 
 export async function updateRolePermissions(tenantId: string, roleId: string, permissions: any) {
   try {
+    const user = await requireTenantUser(tenantId)
+    await requirePermission(user.id, tenantId, 'rbac', 'write')
+
+    if (!permissions || typeof permissions !== 'object' || Array.isArray(permissions)) {
+      return { success: false, error: 'Invalid role permission configuration' }
+    }
+
     const role = await prisma.role.update({
       where: { id: roleId, tenantId },
       data: { permissions }

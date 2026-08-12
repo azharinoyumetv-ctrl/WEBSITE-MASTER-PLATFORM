@@ -2,17 +2,38 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import crypto from 'crypto'
 import { decrypt } from '@/lib/crypto'
-import { sendWhatsAppTemplate } from '@/lib/whatsapp'
+import { getTenantWhatsAppConfig, sendWhatsAppTemplate } from '@/lib/whatsapp'
 import { sendOrderConfirmationEmail } from '@/lib/actions/notifications'
 
 const RATE_LIMIT_WINDOW = 60000 // 1 minute
 const MAX_REQUESTS_PER_WINDOW = 50 // 50 requests per minute per IP
 
+function secureEqual(left: string | null | undefined, right: string | null | undefined) {
+  if (!left || !right) return false
+  const leftBuffer = Buffer.from(left)
+  const rightBuffer = Buffer.from(right)
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer)
+}
+
+function decryptStoredSecret(encryptedValue: string | null | undefined, legacyIv?: string | null) {
+  if (!encryptedValue) return ''
+
+  const candidates = [encryptedValue]
+  if (legacyIv) candidates.push(`${legacyIv}:${encryptedValue}`)
+
+  for (const candidate of candidates) {
+    const decrypted = decrypt(candidate)
+    if (decrypted) return decrypted
+  }
+
+  return ''
+}
+
 async function checkRateLimit(req: NextRequest, provider: string) {
   // Use Cloudflare true client IP if available, fallback to x-forwarded-for
   const ip = req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || 'unknown'
   const now = new Date()
-  
+
   try {
     const record = await prisma.systemApiRateLimit.findUnique({
       where: {
@@ -24,7 +45,6 @@ async function checkRateLimit(req: NextRequest, provider: string) {
     })
 
     if (!record || now > record.resetTime) {
-      // Create new record or reset window
       await prisma.systemApiRateLimit.upsert({
         where: { provider_ipAddress: { provider, ipAddress: ip } },
         update: { count: 1, resetTime: new Date(now.getTime() + RATE_LIMIT_WINDOW) },
@@ -37,22 +57,20 @@ async function checkRateLimit(req: NextRequest, provider: string) {
       return false
     }
 
-    // Increment count
     await prisma.systemApiRateLimit.update({
       where: { provider_ipAddress: { provider, ipAddress: ip } },
       data: { count: { increment: 1 } }
     })
-    
+
     return true
   } catch (error) {
-    // Fail open if database is down or table missing (e.g. before migration)
+    // Rate limiting is defensive only; webhook authentication below still fails closed.
     console.error('Rate limit error:', error)
     return true
   }
 }
 
-// Simple in-memory cache to prevent repeatedly scanning & decrypting the entire tenant DB on every webhook
-// Format: cache[provider] = { timestamp, data: [{ tenantId, decryptedValue }] }
+// Cache decrypted tenant webhook credentials to avoid scanning the tenant table on every callback.
 const tenantTokenCache: Record<string, { timestamp: number, data: { tenantId: string, decryptedValue: string }[] }> = {}
 const CACHE_TTL = 1000 * 60 * 15 // 15 minutes
 
@@ -65,99 +83,91 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
   try {
     const provider = params.provider
     const body = await req.json()
-    
 
     let orderId = ''
     let status = ''
 
     if (provider === 'xendit') {
-      let xenditToken = process.env.XENDIT_WEBHOOK_TOKEN
       const callbackToken = req.headers.get('x-callback-token')
+      let matched = secureEqual(callbackToken, process.env.XENDIT_WEBHOOK_TOKEN)
 
-      // Check tenant-specific webhook tokens if env doesn't match or doesn't exist
-      if (!xenditToken || callbackToken !== xenditToken) {
-        let cached = tenantTokenCache['xendit']
+      if (!matched) {
+        let cached = tenantTokenCache.xendit
         if (!cached || Date.now() - cached.timestamp > CACHE_TTL) {
           const websites = await prisma.tenantWebsite.findMany({
             where: { xenditEnabled: true, xenditEncryptedWebhookToken: { not: null } }
           })
-          const data = []
+          const data: { tenantId: string, decryptedValue: string }[] = []
           for (const site of websites) {
-            if (site.xenditEncryptedWebhookToken && site.xenditEncryptedWebhookTokenIv) {
-              const decrypted = decrypt(`${site.xenditEncryptedWebhookTokenIv}:${site.xenditEncryptedWebhookToken}`)
-              if (decrypted) data.push({ tenantId: site.tenantId, decryptedValue: decrypted })
-            }
+            const decrypted = decryptStoredSecret(
+              site.xenditEncryptedWebhookToken,
+              site.xenditEncryptedWebhookTokenIv,
+            )
+            if (decrypted) data.push({ tenantId: site.tenantId, decryptedValue: decrypted })
           }
-          tenantTokenCache['xendit'] = { timestamp: Date.now(), data }
-          cached = tenantTokenCache['xendit']
+          tenantTokenCache.xendit = { timestamp: Date.now(), data }
+          cached = tenantTokenCache.xendit
         }
-        
+
+        matched = cached.data.some(site => secureEqual(callbackToken, site.decryptedValue))
+      }
+
+      if (!matched) {
+        return NextResponse.json({ error: 'Unauthorized webhook signature' }, { status: 401 })
+      }
+
+      // Legacy Xendit invoice webhook format. Payment Requests v3 migration is handled separately.
+      orderId = String(body.external_id || '')
+      status = body.status === 'PAID' ? 'succeeded' : 'failed'
+    } else if (provider === 'midtrans') {
+      const signatureKey = typeof body.signature_key === 'string' ? body.signature_key : ''
+      if (!signatureKey) {
+        return NextResponse.json({ error: 'Unauthorized webhook signature' }, { status: 401 })
+      }
+
+      let matched = false
+      const platformKey = process.env.MIDTRANS_SERVER_KEY
+      if (platformKey) {
+        const envHash = crypto.createHash('sha512')
+          .update(`${body.order_id}${body.status_code}${body.gross_amount}${platformKey}`)
+          .digest('hex')
+        matched = secureEqual(envHash, signatureKey)
+      }
+
+      if (!matched) {
+        let cached = tenantTokenCache.midtrans
+        if (!cached || Date.now() - cached.timestamp > CACHE_TTL) {
+          const websites = await prisma.tenantWebsite.findMany({
+            where: { midtransEnabled: true, midtransEncryptedServerKey: { not: null } }
+          })
+          const data: { tenantId: string, decryptedValue: string }[] = []
+          for (const site of websites) {
+            const decrypted = decryptStoredSecret(
+              site.midtransEncryptedServerKey,
+              site.midtransEncryptedServerKeyIv,
+            )
+            if (decrypted) data.push({ tenantId: site.tenantId, decryptedValue: decrypted })
+          }
+          tenantTokenCache.midtrans = { timestamp: Date.now(), data }
+          cached = tenantTokenCache.midtrans
+        }
+
         for (const site of cached.data) {
-          if (site.decryptedValue === callbackToken) {
-            xenditToken = site.decryptedValue
+          const hash = crypto.createHash('sha512')
+            .update(`${body.order_id}${body.status_code}${body.gross_amount}${site.decryptedValue}`)
+            .digest('hex')
+          if (secureEqual(hash, signatureKey)) {
+            matched = true
             break
           }
         }
       }
 
-      if (xenditToken && callbackToken !== xenditToken) {
+      if (!matched) {
         return NextResponse.json({ error: 'Unauthorized webhook signature' }, { status: 401 })
       }
 
-      // Xendit invoice webhook format
-      orderId = body.external_id
-      status = body.status === 'PAID' ? 'succeeded' : 'failed'
-    } else if (provider === 'midtrans') {
-      let midtransKey = process.env.MIDTRANS_SERVER_KEY
-
-      // Try tenant keys if env key doesn't work
-      if (body.signature_key) {
-        let matched = false
-        if (midtransKey) {
-          const envHash = crypto.createHash('sha512')
-            .update(`${body.order_id}${body.status_code}${body.gross_amount}${midtransKey}`)
-            .digest('hex')
-          if (envHash === body.signature_key) {
-            matched = true
-          }
-        }
-
-        if (!matched) {
-          let cached = tenantTokenCache['midtrans']
-          if (!cached || Date.now() - cached.timestamp > CACHE_TTL) {
-            const websites = await prisma.tenantWebsite.findMany({
-              where: { midtransEnabled: true, midtransEncryptedServerKey: { not: null } }
-            })
-            const data = []
-            for (const site of websites) {
-              if (site.midtransEncryptedServerKey && site.midtransEncryptedServerKeyIv) {
-                const decrypted = decrypt(`${site.midtransEncryptedServerKeyIv}:${site.midtransEncryptedServerKey}`)
-                if (decrypted) data.push({ tenantId: site.tenantId, decryptedValue: decrypted })
-              }
-            }
-            tenantTokenCache['midtrans'] = { timestamp: Date.now(), data }
-            cached = tenantTokenCache['midtrans']
-          }
-
-          for (const site of cached.data) {
-            const hash = crypto.createHash('sha512')
-              .update(`${body.order_id}${body.status_code}${body.gross_amount}${site.decryptedValue}`)
-              .digest('hex')
-            if (hash === body.signature_key) {
-              midtransKey = site.decryptedValue
-              matched = true
-              break
-            }
-          }
-        }
-
-        if (!matched) {
-          return NextResponse.json({ error: 'Unauthorized webhook signature' }, { status: 401 })
-        }
-      }
-
-      // Midtrans notification webhook format
-      orderId = body.order_id
+      orderId = String(body.order_id || '')
       if (body.transaction_status === 'capture' || body.transaction_status === 'settlement') {
         status = 'succeeded'
       } else if (body.transaction_status === 'chargeback') {
@@ -171,29 +181,28 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
       return NextResponse.json({ error: 'Unknown provider' }, { status: 400 })
     }
 
-    // Resolve orderId / bookingId and idempotency
-    const idempotencyKey = body.id || body.transaction_id || body.uuid || body.invoice_id || body.order_id;
+    const idempotencyKey = body.id || body.transaction_id || body.uuid || body.invoice_id || body.order_id
     if (idempotencyKey) {
       const existingKey = await prisma.paymentIdempotencyKey.findUnique({
         where: { idempotencyKey }
-      });
+      })
       if (existingKey) {
-        return NextResponse.json({ success: true, message: 'Already processed' });
+        return NextResponse.json({ success: true, message: 'Already processed' })
       }
     }
 
-    let tenantId: string | null = null;
-    let isBooking = false;
+    let tenantId: string | null = null
+    let isBooking = false
 
     if (orderId) {
-      const order = await prisma.tenantOrder.findUnique({ where: { id: orderId } });
+      const order = await prisma.tenantOrder.findUnique({ where: { id: orderId } })
       if (order) {
-        tenantId = order.tenantId;
+        tenantId = order.tenantId
       } else {
-        const booking = await prisma.tenantBooking.findUnique({ where: { id: orderId } });
+        const booking = await prisma.tenantBooking.findUnique({ where: { id: orderId } })
         if (booking) {
-          tenantId = booking.tenantId;
-          isBooking = true;
+          tenantId = booking.tenantId
+          isBooking = true
         }
       }
     }
@@ -207,65 +216,46 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
       }
     }
 
-    if (idempotencyKey && tenantId) {
-      await prisma.paymentIdempotencyKey.create({
-        data: {
-          tenantId,
-          idempotencyKey,
-          responsePayload: body,
-          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        }
-      }).catch(err => console.error("Idempotency log failed", err));
-    }
-
     if (orderId && status === 'succeeded') {
       if (isBooking) {
         await prisma.tenantBooking.update({
           where: { id: orderId },
           data: { bookingStatus: 'confirmed', paymentIntentId: idempotencyKey }
-        });
+        })
         await prisma.tenantPayment.updateMany({
-          where: { orderId: orderId },
+          where: { orderId },
           data: { paymentStatus: 'succeeded' }
-        });
+        })
       } else {
-        // Update payment and order in database
         await prisma.tenantPayment.updateMany({
-          where: { orderId: orderId },
+          where: { orderId },
           data: { paymentStatus: 'succeeded' }
         })
         await prisma.tenantOrder.updateMany({
           where: { id: orderId },
-          data: { 
+          data: {
             orderStatus: 'pending_fulfillment',
             receiptUrl: `/orders/${orderId}/receipt`
           }
         })
-        
+
         const order = await prisma.tenantOrder.findFirst({
           where: { id: orderId }
         })
 
         if (order?.tenantId) {
-          // Send confirmation email asynchronously
-          const customerEmail = order.guestEmail || body.payer_email || 'customer@example.com';
+          const customerEmail = order.guestEmail || body.payer_email || 'customer@example.com'
           sendOrderConfirmationEmail(order.tenantId, order.id, customerEmail)
-            .catch(err => console.error("Failed to send async generic order confirmation email", err));
+            .catch(err => console.error('Failed to send async generic order confirmation email', err))
 
-          const website = await prisma.tenantWebsite.findUnique({
-            where: { tenantId: order.tenantId }
-          })
-          const themeConfig = website?.themeConfig as { whatsappPaNumber?: string, whatsappPhoneId?: string, whatsappToken?: string, whatsappTemplate?: string } | null
-          if (themeConfig) {
-            const { whatsappPaNumber, whatsappPhoneId, whatsappToken, whatsappTemplate } = themeConfig
-            if (whatsappPaNumber && whatsappPhoneId && whatsappToken && whatsappTemplate) {
-              await sendWhatsAppTemplate({
-                to: whatsappPaNumber,
-                templateName: whatsappTemplate,
-                parameters: [order.id, String(order.totalAmount)],
-                credentials: { token: whatsappToken, phoneNumberId: whatsappPhoneId }
-              }).catch(e => console.error("Failed to send WhatsApp notification on webhook", e))
-            }
+          const whatsAppConfig = await getTenantWhatsAppConfig(order.tenantId)
+          if (whatsAppConfig?.recipientNumber && whatsAppConfig.templateName) {
+            await sendWhatsAppTemplate({
+              to: whatsAppConfig.recipientNumber,
+              templateName: whatsAppConfig.templateName,
+              parameters: [order.id, String(order.totalAmount)],
+              credentials: whatsAppConfig,
+            }).catch(e => console.error('Failed to send WhatsApp notification on webhook', e))
           }
         }
       }
@@ -299,11 +289,11 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
         await prisma.tenantBooking.update({
           where: { id: orderId },
           data: { bookingStatus: 'cancelled' }
-        });
+        })
         await prisma.tenantPayment.updateMany({
           where: { orderId },
           data: { paymentStatus: status }
-        });
+        })
       } else {
         await prisma.tenantPayment.updateMany({
           where: { orderId },
@@ -314,18 +304,19 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
           data: { orderStatus: 'cancelled' }
         })
 
-        const order = await prisma.tenantOrder.findFirst({
-          where: { id: orderId }
-        })
-        if (order?.tenantId) {
+        const [order, payment] = await Promise.all([
+          prisma.tenantOrder.findFirst({ where: { id: orderId } }),
+          prisma.tenantPayment.findFirst({ where: { orderId } }),
+        ])
+        if (order?.tenantId && payment) {
           await prisma.tenantPaymentLedger.create({
             data: {
               tenantId: order.tenantId,
-              paymentId: orderId,
+              paymentId: payment.id,
               orderId: order.id,
               type: 'reversal',
               amount: order.totalAmount,
-              currency: order.currency || 'USD',
+              currency: order.currency || 'IDR',
               gateway: provider,
               gatewayTxId: body.id || body.transaction_id || 'unknown',
               status: 'failed',
@@ -336,8 +327,20 @@ export async function POST(req: NextRequest, { params }: { params: { provider: s
       }
     }
 
+    // Record idempotency only after business-state processing completes. If processing throws,
+    // the provider retry remains eligible instead of being incorrectly treated as completed.
+    if (idempotencyKey && tenantId) {
+      await prisma.paymentIdempotencyKey.create({
+        data: {
+          tenantId,
+          idempotencyKey,
+          responsePayload: body,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        }
+      }).catch(err => console.error('Idempotency log failed', err))
+    }
+
     return NextResponse.json({ success: true })
-    
   } catch (error) {
     console.error('[webhook/provider] Internal error:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

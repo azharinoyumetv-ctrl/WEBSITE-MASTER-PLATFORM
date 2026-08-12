@@ -10,6 +10,14 @@ export async function getAuthenticatedUser() {
   return session.user as { id: string, email: string, tenantId: string, roles: string[] };
 }
 
+export async function requireTenantUser(tenantId: string) {
+  const user = await getAuthenticatedUser()
+  if (!tenantId || user.tenantId !== tenantId) {
+    throw new Error('Unauthorized tenant access')
+  }
+  return user
+}
+
 export async function requireSuperAdmin() {
   const user = await getAuthenticatedUser();
   const crossTenantAdmin = await prisma.user.findFirst({

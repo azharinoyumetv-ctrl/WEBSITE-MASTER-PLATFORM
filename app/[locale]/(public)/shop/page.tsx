@@ -1,9 +1,10 @@
-import SitePage, { generateMetadata as generateSiteMetadata } from '../../site/[...slug]/page'
+import { generateMetadata as generateSiteMetadata } from '../../site/[...slug]/page'
+import { redirect } from 'next/navigation'
 
 export async function generateMetadata({ params }: { params: { locale: string } }) {
   return generateSiteMetadata({ params: { slug: ['shop'], ...params } })
 }
 
 export default async function ShopPage({ params }: { params: { locale: string } }) {
-  return <SitePage params={{ slug: ['shop'], ...params }} />
+  redirect(`/${params.locale}/site/shop`)
 }

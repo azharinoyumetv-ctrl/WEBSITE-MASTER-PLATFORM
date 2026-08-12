@@ -87,15 +87,32 @@ export async function deleteCategory(tenantId: string, categoryId: string) {
 // Catalog Items
 export async function getCatalogItems(tenantId: string) {
   try {
-    const items = await prisma.tenantCatalogItem.findMany({
-      where: { tenantId },
-      orderBy: { createdAt: 'desc' },
-      include: { category: true, variants: true, media: true }
-    })
+    const items = await loadCatalogItems(tenantId)
     return { success: true, items }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
+}
+
+export async function getAdminCatalogItems(tenantId: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
+    await requirePermission(user.id, tenantId, 'catalog', 'read')
+
+    const items = await loadCatalogItems(tenantId)
+    return { success: true, items }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+async function loadCatalogItems(tenantId: string) {
+  return prisma.tenantCatalogItem.findMany({
+    where: { tenantId },
+    orderBy: { createdAt: 'desc' },
+    include: { category: true, variants: true, media: true }
+  })
 }
 
 export async function createCatalogItem(tenantId: string, data: any) {

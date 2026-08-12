@@ -22,7 +22,7 @@ const API_SCOPES = [
   { id: 'inventory:write', label: 'Write Inventory' }
 ]
 
-export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { initialKeys: any[], initialWebhooks: any[], tenantId: string }) {
+export function ApiPortalClient({ initialKeys, initialWebhooks, telemetry, tenantId }: { initialKeys: any[], initialWebhooks: any[], telemetry: any, tenantId: string }) {
   const [keys, setKeys] = useState(initialKeys)
   const [webhooks, setWebhooks] = useState(initialWebhooks)
   const [showKey, setShowKey] = useState<string | null>(null)
@@ -38,18 +38,12 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
   const [showCreateKeyModal, setShowCreateKeyModal] = useState(false)
   const [newKeyForm, setNewKeyForm] = useState({ keyName: '', scopes: ['catalog:read'], expiresInDays: 30 })
   const [generatedKey, setGeneratedKey] = useState<any | null>(null)
+  const [generatedWebhookSecret, setGeneratedWebhookSecret] = useState<string | null>(null)
 
-  const [selectedMetric, setSelectedMetric] = useState<'requests' | 'latency' | 'errors'>('requests')
-  
-  const chartData = [
-    { day: 'Mon', requests: 12450, latency: 120, errorRate: 0.2 },
-    { day: 'Tue', requests: 18900, latency: 145, errorRate: 0.5 },
-    { day: 'Wed', requests: 22100, latency: 110, errorRate: 0.1 },
-    { day: 'Thu', requests: 15400, latency: 240, errorRate: 1.2 },
-    { day: 'Fri', requests: 19800, latency: 135, errorRate: 0.3 },
-    { day: 'Sat', requests: 8400, latency: 95, errorRate: 0.0 },
-    { day: 'Sun', requests: 11200, latency: 105, errorRate: 0.1 }
-  ]
+  const activeKeys = keys.filter(key => key.isActive && (!key.expiresAt || new Date(key.expiresAt) > new Date())).length
+  const activeWebhooks = webhooks.filter(webhook => webhook.isActive).length
+  const deliveryFailures = webhooks.reduce((total, webhook) => total + Number(webhook.failureCount || 0), 0)
+  const errorRate = telemetry?.requestCount ? Math.round((telemetry.errorCount / telemetry.requestCount) * 1000) / 10 : null
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -112,6 +106,7 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
       const res = await createWebhook(tenantId, editingWebhook.targetUrl, editingWebhook.subscribedEvents)
       if (res.success) {
         setWebhooks([res.webhook, ...webhooks])
+        setGeneratedWebhookSecret(res.signingSecret || null)
         toast.success('Webhook endpoint added')
         setEditingWebhook(null)
       } else {
@@ -330,12 +325,7 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
                 <div className="mt-3 space-y-1">
                   <p className="text-xs font-semibold text-slate-500 uppercase">Signing Secret</p>
                   <div className="flex items-center gap-2 bg-slate-50 p-2 rounded border border-slate-100">
-                    <code className="text-[10px] font-mono text-slate-600 truncate flex-1">{w.secretSigningToken || 'Hidden'}</code>
-                    {w.secretSigningToken && (
-                      <button onClick={() => copyToClipboard(w.secretSigningToken)} className="text-slate-400 hover:text-indigo-500">
-                        <Copy className="w-3 h-3" />
-                      </button>
-                    )}
+                    <code className="text-[10px] font-mono text-slate-600 truncate flex-1">Hidden after creation</code>
                   </div>
                 </div>
 
@@ -356,92 +346,31 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
         </div>
       </div>
 
-      {/* API Usage & Performance Charts */}
       <div className="card p-6 mb-6">
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b border-slate-100 pb-4 mb-6 gap-4">
-          <div>
-            <h3 className="text-base font-semibold text-slate-900">API Portal Usage & Performance</h3>
-            <p className="text-xs text-slate-500 mt-1">Real-time metrics for developer keys and webhook deliveries</p>
-          </div>
-          
-          <div className="flex bg-slate-100 p-1 rounded-lg">
-            <button 
-              onClick={() => setSelectedMetric('requests')}
-              className={cn("px-3 py-1.5 text-xs font-semibold rounded-md transition-all", selectedMetric === 'requests' ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900")}
-            >
-              Requests
-            </button>
-            <button 
-              onClick={() => setSelectedMetric('latency')}
-              className={cn("px-3 py-1.5 text-xs font-semibold rounded-md transition-all", selectedMetric === 'latency' ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900")}
-            >
-              Latency (ms)
-            </button>
-            <button 
-              onClick={() => setSelectedMetric('errors')}
-              className={cn("px-3 py-1.5 text-xs font-semibold rounded-md transition-all", selectedMetric === 'errors' ? "bg-white text-slate-900 shadow-sm" : "text-slate-600 hover:text-slate-900")}
-            >
-              Error Rate (%)
-            </button>
-          </div>
+        <div className="border-b border-slate-100 pb-4 mb-6">
+          <h3 className="text-base font-semibold text-slate-900">Developer activity</h3>
+          <p className="text-xs text-slate-500 mt-1">Configuration health and recorded tenant API activity from the last 30 days.</p>
         </div>
-
-        {/* 7 Days Performance Chart Visualizer */}
-        <div className="h-64 flex items-end justify-between gap-2 pt-6 px-4 border-b border-slate-100 pb-2 relative">
-          <div className="absolute top-0 left-0 text-[10px] text-slate-400 font-mono">
-            {selectedMetric === 'requests' ? '25,000 reqs' : selectedMetric === 'latency' ? '500 ms' : '10 %'}
-          </div>
-          <div className="absolute top-1/2 left-0 right-0 border-t border-slate-100 pointer-events-none" />
-          <div className="absolute top-1/4 left-0 right-0 border-t border-slate-50 pointer-events-none" />
-          <div className="absolute top-3/4 left-0 right-0 border-t border-slate-50 pointer-events-none" />
-
-          {chartData.map((d, index) => {
-            const val = selectedMetric === 'requests' ? d.requests : selectedMetric === 'latency' ? d.latency : d.errorRate
-            const max = selectedMetric === 'requests' ? 25000 : selectedMetric === 'latency' ? 500 : 10
-            const heightPercent = Math.max(5, Math.min(95, (val / max) * 100))
-            
-            return (
-              <div key={index} className="flex-1 flex flex-col items-center group relative cursor-pointer">
-                {/* Tooltip */}
-                <div className="absolute bottom-full mb-2 bg-slate-900 text-white text-[10px] px-2 py-1 rounded shadow-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10 whitespace-nowrap">
-                  {selectedMetric === 'requests' ? `${val.toLocaleString()} requests` : selectedMetric === 'latency' ? `${val} ms latency` : `${val}% error rate`}
-                </div>
-                
-                {/* Bar */}
-                <div className="w-full max-w-[40px] bg-slate-100 rounded-t-md overflow-hidden flex items-end h-48">
-                  <div 
-                    className={cn(
-                      "w-full rounded-t-md transition-all duration-700",
-                      selectedMetric === 'requests' ? "bg-gradient-to-t from-indigo-500 to-indigo-600" :
-                      selectedMetric === 'latency' ? "bg-gradient-to-t from-amber-500 to-amber-600" :
-                      "bg-gradient-to-t from-red-500 to-red-600"
-                    )}
-                    style={{ height: `${heightPercent}%` }}
-                  />
-                </div>
-                
-                {/* Day label */}
-                <span className="text-[10px] text-slate-500 font-mono mt-2">{d.day}</span>
-              </div>
-            )
-          })}
+        <div className="grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-indigo-100 bg-indigo-50 p-4"><p className="text-xs font-semibold text-indigo-700">Active API keys</p><p className="mt-1 text-2xl font-black text-indigo-950">{activeKeys}</p></div>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4"><p className="text-xs font-semibold text-emerald-700">Active webhook endpoints</p><p className="mt-1 text-2xl font-black text-emerald-950">{activeWebhooks}</p></div>
+          <div className="rounded-xl border border-rose-100 bg-rose-50 p-4"><p className="text-xs font-semibold text-rose-700">Recorded delivery failures</p><p className="mt-1 text-2xl font-black text-rose-950">{deliveryFailures}</p></div>
         </div>
-
-        {/* Legend */}
-        <div className="flex justify-center gap-6 mt-6 text-xs">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-indigo-500" />
-            <span className="text-slate-600 font-medium">Production Keys Traffic</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-amber-500" />
-            <span className="text-slate-600 font-medium">Avg response latency</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 rounded bg-red-500" />
-            <span className="text-slate-600 font-medium">Failed delivery logs</span>
-          </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-xl border border-sky-100 bg-sky-50 p-4"><p className="text-xs font-semibold text-sky-700">Recorded API requests</p><p className="mt-1 text-2xl font-black text-sky-950">{telemetry?.requestCount ?? 0}</p></div>
+          <div className="rounded-xl border border-violet-100 bg-violet-50 p-4"><p className="text-xs font-semibold text-violet-700">P95 latency</p><p className="mt-1 text-2xl font-black text-violet-950">{telemetry?.p95LatencyMs == null ? '—' : `${telemetry.p95LatencyMs} ms`}</p></div>
+          <div className="rounded-xl border border-amber-100 bg-amber-50 p-4"><p className="text-xs font-semibold text-amber-700">API error rate</p><p className="mt-1 text-2xl font-black text-amber-950">{errorRate == null ? '—' : `${errorRate}%`}</p></div>
         </div>
+        {telemetry?.requestCount ? (
+          <div className="mt-5 overflow-x-auto rounded-xl border border-slate-100">
+            <table className="min-w-full text-left text-xs">
+              <thead className="bg-slate-50 text-slate-500"><tr><th className="px-3 py-2 font-semibold">Route</th><th className="px-3 py-2 font-semibold">Status</th><th className="px-3 py-2 font-semibold">Latency</th><th className="px-3 py-2 font-semibold">Recorded</th></tr></thead>
+              <tbody className="divide-y divide-slate-100">
+                {telemetry.recentRequests.map((request: any, index: number) => <tr key={`${request.route}-${request.createdAt}-${index}`} className="text-slate-700"><td className="px-3 py-2 font-mono">{request.method} {request.route}</td><td className={cn('px-3 py-2 font-semibold', request.statusCode >= 400 ? 'text-rose-600' : 'text-emerald-600')}>{request.statusCode}</td><td className="px-3 py-2">{request.latencyMs} ms</td><td className="px-3 py-2">{formatDate(request.createdAt, 'relative')}</td></tr>)}
+              </tbody>
+            </table>
+          </div>
+        ) : <p className="mt-4 text-xs leading-5 text-slate-500">No recorded tenant API requests yet. Metrics appear only after an attributable request reaches the control plane; DagangOS does not display synthetic traffic.</p>}
       </div>
 
       {/* Edit Webhook Modal */}
@@ -640,6 +569,24 @@ export function ApiPortalClient({ initialKeys, initialWebhooks, tenantId }: { in
                 Close & I have copied it
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {generatedWebhookSecret && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 animate-slide-up">
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-emerald-600">
+              <CheckCircle2 className="w-6 h-6" /> Webhook Secret Created
+            </h3>
+            <p className="text-sm text-slate-600 mb-4">Copy this signing secret now. It will not be shown again after this dialog is closed.</p>
+            <div className="bg-slate-900 rounded-lg p-3 flex items-center justify-between mb-6">
+              <code className="text-xs text-emerald-400 font-mono break-all select-all">{generatedWebhookSecret}</code>
+              <button onClick={() => copyToClipboard(generatedWebhookSecret)} className="p-1 text-slate-400 hover:text-white transition-colors">
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+            <button onClick={() => setGeneratedWebhookSecret(null)} className="w-full btn-primary">I have saved it</button>
           </div>
         </div>
       )}

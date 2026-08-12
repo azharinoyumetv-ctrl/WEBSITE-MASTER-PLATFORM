@@ -262,6 +262,10 @@ export async function resetPassword(token: string, newPassword: string) {
     where: { id: authCred.id },
     data: { passwordHash, passwordResetToken: null, passwordResetExpires: null }
   })
+  await prisma.user.update({
+    where: { id: authCred.userId },
+    data: { passwordHash, status: 'active', emailVerified: true, verificationToken: null }
+  })
   return { success: true }
 }
 

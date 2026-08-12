@@ -6,7 +6,7 @@ import { submitContactForm } from '@/lib/actions/site'
 import { useTranslations } from 'next-intl'
 import { Turnstile } from '@marsidev/react-turnstile'
 
-export function ContactClient({ tenantId, primaryColor }: { tenantId: string, primaryColor: string }) {
+export function ContactClient({ tenantId }: { tenantId: string }) {
   const t = useTranslations('Storefront')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({ name: '', email: '', subject: '', message: '' })
@@ -16,10 +16,10 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
     e.preventDefault()
     
     if (!formData.name || !formData.email || !formData.message) {
-      return toast.error('Please fill in all required fields.')
+      return toast.error(t('form_required_error'))
     }
     if (!turnstileToken && process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY) {
-      return toast.error('Please complete the security check.')
+      return toast.error(t('security_check_error'))
     }
 
     setIsSubmitting(true)
@@ -27,21 +27,27 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
     setIsSubmitting(false)
 
     if (res.success) {
-      toast.success('Your message has been sent successfully!')
+      toast.success(t('message_sent'))
       setFormData({ name: '', email: '', subject: '', message: '' })
+      setTurnstileToken(null)
     } else {
-      toast.error('Failed to send message. Please try again.')
+      toast.error(t('message_failed'))
     }
   }
 
   return (
-    <div className="bg-white rounded-3xl p-8 shadow-sm border border-slate-100">
-      <h2 className="text-2xl font-bold text-slate-900 mb-6">{t('send_message')}</h2>
-      <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="relative overflow-hidden bg-white rounded-[1.75rem] p-8 shadow-[0_16px_45px_rgba(15,23,42,.08)] border border-slate-200">
+      <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500" />
+      <p className="text-xs font-black uppercase tracking-[0.16em] text-sky-700">{t('project_brief')}</p>
+      <h2 className="mt-2 text-2xl font-black text-slate-950 mb-6">{t('send_message')}</h2>
+      <form onSubmit={handleSubmit} className="space-y-4" aria-busy={isSubmitting}>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('full_name')} <span className="text-red-500">*</span></label>
+          <label htmlFor="contact-name" className="block text-sm font-medium text-slate-700 mb-1.5">{t('full_name')} <span aria-hidden className="text-red-500">*</span></label>
           <input 
+            id="contact-name"
+            name="name"
             type="text" 
+            autoComplete="name"
             placeholder={t('name_placeholder')} 
             required
             value={formData.name}
@@ -50,9 +56,12 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('email')} <span className="text-red-500">*</span></label>
+          <label htmlFor="contact-email" className="block text-sm font-medium text-slate-700 mb-1.5">{t('email')} <span aria-hidden className="text-red-500">*</span></label>
           <input 
+            id="contact-email"
+            name="email"
             type="email" 
+            autoComplete="email"
             placeholder={t('email_placeholder')} 
             required
             value={formData.email}
@@ -61,9 +70,12 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('subject')}</label>
+          <label htmlFor="contact-subject" className="block text-sm font-medium text-slate-700 mb-1.5">{t('subject')}</label>
           <input 
+            id="contact-subject"
+            name="subject"
             type="text" 
+            autoComplete="off"
             placeholder={t('subject_placeholder')} 
             value={formData.subject}
             onChange={e => setFormData({ ...formData, subject: e.target.value })}
@@ -71,8 +83,10 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">{t('message')} <span className="text-red-500">*</span></label>
+          <label htmlFor="contact-message" className="block text-sm font-medium text-slate-700 mb-1.5">{t('message')} <span aria-hidden className="text-red-500">*</span></label>
           <textarea 
+            id="contact-message"
+            name="message"
             rows={5} 
             placeholder={t('message_placeholder')}  
             required
@@ -87,6 +101,8 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
             <Turnstile 
               siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY} 
               onSuccess={(token) => setTurnstileToken(token)}
+              onExpire={() => setTurnstileToken(null)}
+              onError={() => setTurnstileToken(null)}
             />
           </div>
         )}
@@ -94,8 +110,7 @@ export function ContactClient({ tenantId, primaryColor }: { tenantId: string, pr
         <button 
           type="submit" 
           disabled={isSubmitting}
-          className="w-full py-3 rounded-xl font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
-          style={{ backgroundColor: primaryColor }}
+          className="w-full py-3 rounded-xl font-black text-slate-950 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-r from-emerald-300 to-sky-400"
         >
           {isSubmitting ? t('btn_sending') : t('btn_send')}
         </button>

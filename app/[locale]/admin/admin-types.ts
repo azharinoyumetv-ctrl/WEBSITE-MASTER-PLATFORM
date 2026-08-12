@@ -21,12 +21,13 @@ export type Analytics = {
 
 export type MonitoringStatus = {
   systemStatus?: string
-  nodes?: Array<{ service: string; status: string; latency: string; uptime: string }>
+  nodes?: Array<{ service: string; status: string; latency: string; uptime?: string; connections?: number }>
   alertHistory: Array<{
     id: string
-    userName?: string
-    actionPerformed?: string
-    targetResource?: string
-    createdAt?: string
+    severity?: string
+    message?: string
+    service?: string
+    timestamp?: string
+    resolved?: boolean
   }>
 }

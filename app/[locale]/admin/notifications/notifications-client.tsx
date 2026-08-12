@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Bell, Mail, MessageSquare, Settings2, Plus, Edit2, Trash2, Eye, CheckCircle2, Search, Loader2, X, Download } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { updateNotificationTemplate, saveNotificationGateway, createNotificationTemplate, dispatchTestNotification, toggleNotificationGateway, deleteNotificationTemplate, retryNotificationLog } from '@/lib/actions/notifications'
+import { updateNotificationTemplate, saveNotificationGateway, createNotificationTemplate, dispatchTestNotification, toggleNotificationGateway, deleteNotificationTemplate, retryNotificationLog, sendSmtpTestEmail } from '@/lib/actions/notifications'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 export function NotificationsClient({ initialTemplates, initialLogs = [], initialGateway, tenantId }: { initialTemplates: any[], initialLogs?: any[], initialGateway?: any, tenantId: string }) {
@@ -30,9 +30,12 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
     port: initialGateway?.providerConfig?.port || '587',
     encryption: initialGateway?.providerConfig?.encryption || 'TLS',
     username: initialGateway?.providerConfig?.username || '',
-    password: initialGateway?.providerConfig?.password || ''
+    password: initialGateway?.providerConfig?.password || '',
+    fromEmail: initialGateway?.providerConfig?.fromEmail || '',
+    fromName: initialGateway?.providerConfig?.fromName || ''
   })
   const [isSavingSmtp, setIsSavingSmtp] = useState(false)
+  const [isTestingSmtp, setIsTestingSmtp] = useState(false)
   
   const [isGatewayActive, setIsGatewayActive] = useState(initialGateway?.isActive ?? false)
   const [isTogglingGateway, setIsTogglingGateway] = useState(false)
@@ -150,6 +153,17 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
       toast.success(`Gateway ${newState ? 'enabled' : 'disabled'}`)
     } else {
       toast.error(res.error || 'Failed to toggle gateway')
+    }
+  }
+
+  const handleTestSmtp = async () => {
+    setIsTestingSmtp(true)
+    const result = await sendSmtpTestEmail(tenantId)
+    setIsTestingSmtp(false)
+    if (result.success) {
+      toast.success('Test email sent to your signed-in address')
+    } else {
+      toast.error(result.error || 'SMTP test failed')
     }
   }
 
@@ -381,13 +395,29 @@ export function NotificationsClient({ initialTemplates, initialLogs = [], initia
               <label className="form-label">Username</label>
               <input type="text" className="form-input" placeholder="apikey" value={smtpConfig.username} onChange={e => setSmtpConfig({...smtpConfig, username: e.target.value})} />
             </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div>
+                <label className="form-label">Sender Email</label>
+                <input type="email" className="form-input" placeholder="notifications@yourdomain.com" value={smtpConfig.fromEmail} onChange={e => setSmtpConfig({...smtpConfig, fromEmail: e.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">Sender Name</label>
+                <input type="text" className="form-input" placeholder="DagangOS" value={smtpConfig.fromName} onChange={e => setSmtpConfig({...smtpConfig, fromName: e.target.value})} />
+              </div>
+            </div>
             <div>
               <label className="form-label">Password</label>
               <input type="password" className="form-input" placeholder="••••••••••••••••" value={smtpConfig.password} onChange={e => setSmtpConfig({...smtpConfig, password: e.target.value})} />
             </div>
-            <button className="btn btn-primary" onClick={handleSaveSmtp} disabled={isSavingSmtp}>
-              {isSavingSmtp ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Save Configuration
-            </button>
+            <div className="flex flex-wrap gap-3">
+              <button className="btn btn-primary" onClick={handleSaveSmtp} disabled={isSavingSmtp}>
+                {isSavingSmtp ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null} Save Configuration
+              </button>
+              <button className="btn btn-secondary" onClick={handleTestSmtp} disabled={!gateway || !isGatewayActive || isTestingSmtp}>
+                {isTestingSmtp ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Mail className="w-4 h-4 mr-2" />} Send Test to Me
+              </button>
+            </div>
+            <p className="text-xs text-slate-500">The test verifies the SMTP connection and sends a message to your signed-in email address.</p>
           </div>
         </div>
       )}

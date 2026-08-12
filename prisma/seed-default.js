@@ -31,7 +31,7 @@ async function main() {
   // Create default tenant
   const tenant = await prisma.systemTenant.create({
     data: {
-      companyName: 'Master Platform Default',
+      companyName: 'DagangOS Digital Indonesia',
       subdomain: 'default',
       status: 'active',
       plan: 'enterprise'
@@ -42,7 +42,7 @@ async function main() {
     await prisma.tenantWebsite.create({
       data: {
         tenantId: tenant.id,
-        siteTitle: 'Website Master Platform',
+        siteTitle: 'DagangOS Digital Indonesia',
         themeConfig: dagangos.website.themeConfig,
         globalSeoMetadata: dagangos.website.globalSeoMetadata,
         isActive: true

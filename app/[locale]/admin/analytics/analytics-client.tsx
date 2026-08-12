@@ -1,14 +1,14 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { BarChart3, TrendingUp, Users, Eye, ShoppingCart, DollarSign, Globe, Smartphone, Monitor, Tablet, RefreshCw, Database, Mail, X, Trash2, Play, Download, Clock, FileText } from 'lucide-react'
+import { BarChart3, TrendingUp, Users, Eye, ShoppingCart, DollarSign, Globe, Smartphone, Monitor, Tablet, RefreshCw, Mail, X, Trash2, Play, Download, Clock, FileText } from 'lucide-react'
 import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis,
   CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts'
 import { formatCurrency, formatDate, cn } from '@/lib/utils'
-import { backfillAnalyticsSummaries, createReportSchedule, updateReportSchedule, deleteReportSchedule, triggerGenerateReport } from '@/lib/actions/analytics'
+import { createReportSchedule, updateReportSchedule, deleteReportSchedule, triggerGenerateReport } from '@/lib/actions/analytics'
 import toast from 'react-hot-toast'
 
 const COLORS = ['#4F46E5', '#10B981', '#F59E0B', '#8B5CF6', '#EC4899', '#06B6D4']
@@ -18,8 +18,6 @@ export function AnalyticsClient({ initialData, initialSchedules = [], initialRep
   const searchParams = useSearchParams()
   const currentDays = searchParams.get('days') || '7'
   const dateRange = currentDays + 'd'
-  const [backfillMsg, setBackfillMsg] = useState<string | null>(null)
-  const [isPending, startTransition] = useTransition()
 
   const [schedules, setSchedules] = useState<any[]>(initialSchedules)
   const [reports, setReports] = useState<any[]>(initialReports)
@@ -31,19 +29,6 @@ export function AnalyticsClient({ initialData, initialSchedules = [], initialRep
   const deviceData = initialData.deviceBreakdown.map((d: any) => ({
     name: d.device, value: d.sessions, percentage: d.percentage,
   }))
-
-  const handleBackfill = () => {
-    if (!tenantId) return
-    startTransition(async () => {
-      const res = await backfillAnalyticsSummaries(tenantId, 7)
-      if (res.success) {
-        setBackfillMsg(`Seeded ${res.upserted} summary entries. Charts have been updated.`)
-        router.refresh()
-      } else {
-        setBackfillMsg(`Backfill failed: ${(res as any).error}`)
-      }
-    })
-  }
 
   const handleExportCSV = () => {
     if (!initialData.dailyData || initialData.dailyData.length === 0) {
@@ -141,17 +126,6 @@ export function AnalyticsClient({ initialData, initialSchedules = [], initialRep
               {r}
             </button>
           ))}
-          {tenantId && (
-            <button
-              onClick={handleBackfill}
-              disabled={isPending}
-              title="Seed 7 days of test analytics summaries based on real order + pageview data"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-lg bg-amber-50 border border-amber-200 text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50"
-            >
-              <Database className="w-3.5 h-3.5" />
-              {isPending ? 'Seeding...' : 'Seed Test'}
-            </button>
-          )}
           <button onClick={() => setShowScheduleModal(true)} className="btn btn-secondary px-3 py-1.5 text-sm">
             <Mail className="w-4 h-4 mr-1.5 inline" /> Report Schedules
           </button>
@@ -160,12 +134,6 @@ export function AnalyticsClient({ initialData, initialSchedules = [], initialRep
           </button>
         </div>
       </div>
-
-      {backfillMsg && (
-        <div className="mb-6 p-4 rounded-lg bg-blue-50 border border-blue-100 text-sm text-blue-700">
-          {backfillMsg}
-        </div>
-      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[

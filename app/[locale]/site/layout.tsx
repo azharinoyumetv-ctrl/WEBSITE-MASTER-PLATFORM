@@ -1,12 +1,14 @@
-import '@/app/globals.css'
 import { generateThemeCssVars } from '@/lib/utils'
 import Link from 'next/link'
 import Image from 'next/image'
+import { DagangOSBrand } from '@/components/DagangOSBrand'
+import { COMPANY } from '@/lib/company'
+import { getTenantPublicUrl } from '@/lib/tenant-url'
 import { headers } from 'next/headers'
 import { getPublicWebsiteConfig } from '@/lib/actions/website'
 import { getTranslations } from 'next-intl/server'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
-import { WhatsAppWidget } from './whatsapp-widget'
+import { SupportChatWidget } from './support-chat-widget'
 import { AnalyticsTracker } from '@/components/AnalyticsTracker'
 
 export default async function SiteLayout({
@@ -26,30 +28,31 @@ export default async function SiteLayout({
   let website: any = null
   let tenant: any = null
 
-  if (tenantDomain === 'default') {
+  if (res.success && res.website && res.tenant) {
+    website = res.website
+    tenant = res.tenant
+  } else if (tenantDomain === 'default') {
+    // Keep the platform marketing site available if the database is briefly
+    // unavailable, but prefer the resolved active tenant whenever possible.
     website = {
-      siteTitle: 'Website Master Platform',
+      siteTitle: COMPANY.legalName,
       themeConfig: { colors: { primary: '#4F46E5', secondary: '#10B981', background: '#FFFFFF', text: '#0F172A', accent: '#F59E0B' } }
     }
     tenant = {
       id: 'default',
-      companyName: 'Master Platform Default',
+      companyName: COMPANY.legalName,
       subdomain: 'store',
       customDomain: null
     }
   } else {
-    if (!res.success || !res.website || !res.tenant) {
-      return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50">
-          <div className="text-center">
-            <h1 className="text-3xl font-bold text-slate-800 mb-2">Site Not Found</h1>
-            <p className="text-slate-500">This website is currently inactive or does not exist.</p>
-          </div>
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-slate-800 mb-2">Site Not Found</h1>
+          <p className="text-slate-500">This website is currently inactive or does not exist.</p>
         </div>
-      )
-    }
-    website = res.website
-    tenant = res.tenant
+      </div>
+    )
   }
   
   // Parse theme configuration
@@ -69,12 +72,32 @@ export default async function SiteLayout({
   // Generate CSS variables for theme injection
   const cssVars = generateThemeCssVars(themeConfig)
   const primaryColor = themeConfig.colors.primary
+  const logoUrl = tenant.logoUrl || null
+  const isCompanyStorefront = tenantDomain === 'default'
+  const nonce = headersList.get('x-nonce') || undefined
+  const configuredDomain = typeof website.domain === 'string' ? website.domain.trim() : ''
+  const requestHost = headersList.get('x-forwarded-host') || headersList.get('host')
+  const requestProtocol = headersList.get('x-forwarded-proto') || (requestHost?.includes('localhost') ? 'http' : 'https')
+  const siteUrl = requestHost
+    ? `${requestProtocol}://${requestHost}`
+    : configuredDomain
+      ? (/^https?:\/\//i.test(configuredDomain) ? configuredDomain : `https://${configuredDomain}`)
+      : getTenantPublicUrl(tenant)
+  let structuredLogoUrl: string | undefined
+  if (logoUrl || isCompanyStorefront) {
+    try {
+      structuredLogoUrl = new URL(logoUrl || '/dagangos-web-wordmark-cropped.png', siteUrl).toString()
+    } catch {
+      structuredLogoUrl = undefined
+    }
+  }
 
   const navigationTree = [
-    { label: t('home'), target: '/' },
-    { label: t('about'), target: '/about' },
-    { label: t('shop'), target: '/shop' },
-    { label: t('contact'), target: '/contact' },
+    { label: t('home'), target: `/${locale}` },
+    { label: t('about'), target: `/${locale}/site/about` },
+    { label: t('catalog'), target: `/${locale}/site/catalog` },
+    { label: t('shop'), target: `/${locale}/site/shop` },
+    { label: t('contact'), target: `/${locale}/site/contact` },
   ]
 
   return (
@@ -84,71 +107,86 @@ export default async function SiteLayout({
     >
       <script
         type="application/ld+json"
+        nonce={nonce}
         dangerouslySetInnerHTML={{
           __html: JSON.stringify({
             "@context": "https://schema.org",
             "@type": "Organization",
-            "name": tenant.companyName,
-            "url": `https://${website.domain || tenant.subdomain + '.' + (process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com')}`,
-            "logo": tenant.logoUrl || '',
+            "@id": `${siteUrl.replace(/\/+$/, '')}/#organization`,
+            "name": isCompanyStorefront ? COMPANY.legalName : tenant.companyName,
+            "url": siteUrl,
+            ...(structuredLogoUrl ? { "logo": structuredLogoUrl } : {}),
             "description": website.globalSeoMetadata?.description || ''
-          })
+          }).replace(/</g, '\\u003c')
         }}
       />
-      <header className="sticky top-0 z-50 bg-white border-b border-slate-100 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            {tenant.logoUrl ? (
-              <Image src={tenant.logoUrl} alt={website.siteTitle} className="h-8 max-w-[150px] object-contain" width={150} height={32} unoptimized />
+      <header className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/95 text-white shadow-[0_12px_36px_rgba(2,6,23,.28)] backdrop-blur-xl">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-[4.5rem] flex items-center justify-between gap-4">
+          <Link href={`/${locale}`} aria-label={tStore('back_home')} title={tStore('back_home')} className="flex items-center gap-2 rounded-xl outline-none transition hover:opacity-90 focus-visible:ring-2 focus-visible:ring-emerald-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-950">
+            {logoUrl ? (
+              <Image src={logoUrl} alt={website.siteTitle} className="h-10 w-10 rounded-lg object-cover" width={40} height={40} unoptimized />
+            ) : isCompanyStorefront ? (
+              <DagangOSBrand compact dark />
             ) : (
               <span className="font-bold text-xl tracking-tight" style={{ color: primaryColor }}>
                 {website.siteTitle}
               </span>
             )}
           </Link>
-          <nav className="hidden md:flex gap-8">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <LanguageSwitcher variant="dark" />
+            
+            <Link 
+              href={`/${locale}/project-setup?package=landing_page&v=v2`}
+              className="dagangos-cta-gradient hidden md:inline-flex items-center rounded-xl px-4 py-2.5 text-sm font-black"
+            >
+              {tStore('shop_now')}
+            </Link>
+          </div>
+        </div>
+        <nav aria-label="Storefront navigation" className="absolute left-1/2 top-0 hidden h-[4.5rem] -translate-x-1/2 items-center lg:flex">
+          <div className="flex items-center gap-1">
             {navigationTree.map((nav) => (
-              <Link 
-                key={nav.target} 
-                href={nav.target} 
-                className="text-sm font-medium text-slate-700 hover:opacity-80 transition-opacity"
+              <Link
+                key={nav.target}
+                href={nav.target}
+                className="whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/[.08] hover:text-white focus-visible:bg-white/[.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
               >
                 {nav.label}
               </Link>
             ))}
-          </nav>
-          <div className="flex items-center gap-4">
-            <LanguageSwitcher />
-            
-            <Link 
-              href="/shop" 
-              className="hidden md:inline-flex items-center px-4 py-2 rounded-lg text-sm font-semibold text-white transition-opacity hover:opacity-90"
-              style={{ backgroundColor: primaryColor }}
-            >
-              {tStore('shop_now')}
-            </Link>
-            <Link 
-              href="/auth/login" 
-              className="text-sm font-medium text-slate-600 hover:text-slate-900 transition-colors"
-            >
-              {tStore('login')}
-            </Link>
           </div>
-        </div>
+        </nav>
+        <nav aria-label="Storefront navigation" className="border-t border-white/10 bg-slate-950/80 lg:hidden">
+          <div className="max-w-7xl mx-auto flex justify-start gap-1 overflow-x-auto px-3 py-2 sm:justify-center sm:px-6 [scrollbar-width:none]">
+            {navigationTree.map((nav) => (
+              <Link
+                key={nav.target}
+                href={nav.target}
+                className="shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/[.08] hover:text-white focus-visible:bg-white/[.08] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              >
+                {nav.label}
+              </Link>
+            ))}
+          </div>
+        </nav>
       </header>
 
-      <main className="flex-1 bg-white">
+      <main className="flex-1 bg-[#f7fafc]">
         {children}
       </main>
 
-      <footer className="bg-slate-900 text-slate-400 py-12">
+      <footer className="relative overflow-hidden bg-slate-950 py-14 text-slate-400">
+        <div className="absolute inset-0 dagangos-aurora opacity-35" />
+        <div className="absolute inset-0 dagangos-grid opacity-20" />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 mb-8">
+          <div className="relative grid gap-10 md:grid-cols-4 mb-10">
             <div className="md:col-span-2">
-              <h3 className="text-white font-bold text-lg mb-3">{tenant.companyName}</h3>
-              <p className="text-slate-500 text-sm leading-relaxed">
+              {isCompanyStorefront ? <DagangOSBrand dark /> : <h3 className="text-white font-bold text-lg mb-3">{tenant.companyName}</h3>}
+              <p className="text-slate-400 text-sm leading-relaxed">
                 {tStore('footer_desc')}
               </p>
+              <Link href={`/${locale}/site/support`} className="dagangos-cta-gradient mt-5 inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold">{tStore('support_chat_cta')} <span aria-hidden>↗</span></Link>
             </div>
             <div>
               <h4 className="text-white font-semibold mb-3 text-sm">{tStore('quick_links')}</h4>
@@ -165,26 +203,25 @@ export default async function SiteLayout({
             <div>
               <h4 className="text-white font-semibold mb-3 text-sm">{tStore('platform')}</h4>
               <ul className="space-y-2">
-                <li><Link href="/auth/login" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('admin_login')}</Link></li>
-                <li><Link href="/shop" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('shop_now')}</Link></li>
-                <li><Link href="/contact" className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('support')}</Link></li>
+                <li><Link href={`/${locale}/project-setup?package=landing_page&v=v2`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('shop_now')}</Link></li>
+                <li><Link href={`/${locale}/site/support`} className="text-slate-500 hover:text-slate-300 text-sm transition-colors">{tStore('support')}</Link></li>
               </ul>
             </div>
           </div>
-          <div className="border-t border-slate-800 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="relative border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex flex-col md:flex-row items-center gap-4">
-              <p className="text-sm">&copy; {new Date().getFullYear()} {tenant.companyName}. {tStore('all_rights')}</p>
+              <p className="text-sm">&copy; {new Date().getFullYear()} {isCompanyStorefront ? COMPANY.legalName : tenant.companyName}. {tStore('all_rights')}</p>
               <div className="flex items-center gap-3">
-                <Link href="/terms" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('terms')}</Link>
+                <Link href={`/${locale}/site/terms`} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('terms')}</Link>
                 <span className="text-slate-700 text-xs">&bull;</span>
-                <Link href="/privacy" className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('privacy')}</Link>
+                <Link href={`/${locale}/site/privacy`} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('privacy')}</Link>
               </div>
             </div>
             <p className="text-xs opacity-50">{tStore('powered_by')}</p>
           </div>
         </div>
       </footer>
-      {tenantDomain === 'default' && <WhatsAppWidget />}
+      {tenantDomain === 'default' && <SupportChatWidget />}
       <AnalyticsTracker tenantId={tenant.id} />
     </div>
   )

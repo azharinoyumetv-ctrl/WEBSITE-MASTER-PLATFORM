@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import crypto from 'crypto'
+import { resolvePublicTenant } from '@/lib/tenant-context'
 
 /**
  * POST /api/analytics/event
@@ -23,6 +24,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'eventName is required' }, { status: 400 })
     }
 
+    if (eventName !== 'pageview') {
+      return NextResponse.json({ success: false, error: 'Unsupported public event' }, { status: 400 })
+    }
+
+    const publicTenant = await resolvePublicTenant(req)
+    if (!publicTenant || publicTenant.id !== tenantId) {
+      return NextResponse.json({ success: false, error: 'Invalid storefront tenant' }, { status: 403 })
+    }
+
     // Verify tenant exists and is active before recording event
     const tenant = await prisma.systemTenant.findUnique({
       where: { id: tenantId },
@@ -39,7 +49,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Generate session ID for anonymous visitors if not provided by the client
-    const sid = (typeof sessionId === 'string' && sessionId)
+    const sid = (typeof sessionId === 'string' && sessionId.length <= 128 && sessionId)
       ? sessionId
       : `anon-${crypto.randomUUID()}`
 
@@ -50,12 +60,13 @@ export async function POST(req: NextRequest) {
       data: {
         tenantId,
         eventName,
-        pageUrl: typeof pageUrl === 'string' ? pageUrl : '/',
+        pageUrl: typeof pageUrl === 'string' ? pageUrl.slice(0, 2048) : '/',
         sessionId: sid,
         eventPayload: Object.keys(restMeta).length > 0 ? restMeta : {},
         deviceProperties: {
-          userAgent: userAgent || '',
-          referrer: referrer || '',
+          userAgent: typeof userAgent === 'string' ? userAgent.slice(0, 1024) : '',
+          referrer: typeof referrer === 'string' ? referrer.slice(0, 2048) : '',
+          deviceType: typeof (metadata as any)?.deviceType === 'string' ? (metadata as any).deviceType.slice(0, 32) : 'desktop',
           timestamp: timestamp || new Date().toISOString()
         }
       }

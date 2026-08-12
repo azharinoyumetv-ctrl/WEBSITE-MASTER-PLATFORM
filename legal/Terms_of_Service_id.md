@@ -1,62 +1,48 @@
-# Syarat & Ketentuan
+# Syarat dan Ketentuan Layanan
 
-**Terakhir Diperbarui:** Juli 2026  
-**Perusahaan:** PT DagangOS Digital Indonesia
+**Berlaku sejak: 16 Juli 2026**
 
----
+Syarat dan Ketentuan ini mengatur situs web dan layanan DagangOS Web yang dioperasikan oleh **DagangOS Digital Indonesia** ("DagangOS", "kami", atau "milik kami"). Dengan meminta proposal, membuat pesanan, atau menggunakan layanan kami, Anda menyetujui ketentuan ini.
 
-## 1. Pendahuluan
+## 1. Layanan dan ruang lingkup proyek
 
-Selamat datang di PT DagangOS Digital Indonesia ("DagangOS", "kami"). Syarat & Ketentuan ("Syarat") ini mengatur akses dan penggunaan Anda terhadap pengembangan situs web, perangkat lunak khusus, sistem POS, modul AI, layanan otomatisasi, dan produk terkait kami (secara kolektif disebut "Layanan"). Dengan menggunakan Layanan kami, Anda ("Klien", "Anda") setuju untuk terikat oleh Syarat ini.
+Setiap proposal, pesanan, atau ruang lingkup kerja yang disetujui menjelaskan hasil kerja, jadwal, biaya, dan cakupan dukungan. Permintaan di luar ruang lingkup tersebut merupakan perubahan dan dapat membutuhkan persetujuan tertulis, jadwal, serta biaya terpisah.
 
-## 2. Definisi
+## 2. Tanggung jawab Anda
 
-- **"Infrastruktur Klien"**: Nama domain, Virtual Private Server (VPS), basis data, dan akun pihak ketiga yang dimiliki dan dikelola oleh Klien.
-- **"Platform"**: Kerangka kerja modular DagangOS dan arsitektur perangkat lunak yang dapat digunakan kembali untuk memberikan Layanan.
-- **"Hasil Kerja (Deliverables)"**: Kode, konfigurasi, dan aset yang telah dikompilasi akhir dan dikirimkan ke Infrastruktur Klien.
+Anda wajib memberikan informasi yang akurat serta memiliki hak, izin, dan lisensi atas konten, akun, domain, data, dan materi yang Anda berikan. Untuk VPS, domain, payment gateway, penyedia AI, atau akun pihak ketiga yang Anda kelola, Anda bertanggung jawab atas kredensial, biaya, kebijakan, dan penggunaannya yang sah.
 
-## 3. Layanan yang Diberikan
+## 3. Biaya dan pembayaran
 
-DagangOS menyediakan solusi perdagangan digital modular. Ruang lingkup Layanan yang tepat, termasuk jadwal dan hasil kerja spesifik, akan dirinci dalam SOW masing-masing atau paket langganan yang dipilih.
-- **Pengembangan Situs Web**: Penerapan CMS modular dan templat etalase toko kami.
-- **Pengembangan Perangkat Lunak**: Modul perangkat lunak khusus yang dikembangkan khusus untuk Klien.
-- **Sistem POS**: Modul perangkat lunak Point of Sale (perangkat keras tidak disediakan kecuali dinyatakan secara eksplisit).
-- **Layanan AI**: Fitur yang memanfaatkan kecerdasan buatan. Output disediakan "sebagaimana adanya" dan harus ditinjau oleh Klien sebelum digunakan.
+Nilai, tahap pembayaran, pajak, mata uang, dan ketentuan pengembalian dana tercantum dalam proposal atau invoice terkait. Kami dapat menjeda pekerjaan setelah pemberitahuan yang wajar apabila pembayaran yang tidak disengketakan masih terlambat. Biaya implementasi satu kali tidak termasuk biaya berulang pihak ketiga atau layanan pemeliharaan opsional kecuali disebutkan secara tegas dalam proposal.
 
-## 4. Hosting & Penempatan
+## 4. Data, infrastruktur, dan hak perangkat lunak
 
-> **Model Infrastruktur Milik Klien:**
-> DagangOS menerapkan Hasil Kerja ke Infrastruktur Klien. **Klien sepenuhnya memiliki dan bertanggung jawab atas** pendaftaran domain, biaya VPS, biaya Basis Data, akun gerbang pembayaran, dan semua biaya berlangganan pihak ketiga. DagangOS tidak bertanggung jawab atas gangguan layanan yang disebabkan oleh penyedia hosting Klien, domain yang kedaluwarsa, atau tagihan infrastruktur yang belum dibayar.
+Anda memiliki data bisnis, domain, dan infrastruktur yang Anda kendalikan. Setelah pembayaran penuh, DagangOS memberikan lisensi yang bersifat permanen dan dapat dialihkan untuk menggunakan platform yang telah dideploy sesuai proposal yang disetujui. DagangOS tetap memiliki kode sumber yang dapat digunakan kembali, template, metode, dan kekayaan intelektualnya, kecuali ada perjanjian tertulis terpisah untuk pengalihan kode sumber atau IP.
 
-## 5. Pembayaran & Pajak
+## 5. Layanan pihak ketiga dan bring-your-own-key
 
-- **Deposit Proyek**: Deposit yang tidak dapat dikembalikan (biasanya 50%) diperlukan sebelum pekerjaan dimulai.
-- **Pembayaran Pencapaian**: Ditagihkan saat fase proyek selesai dan disetujui.
-- **Pembayaran Akhir**: Jatuh tempo secara penuh sebelum penerapan produksi.
-- **Keterlambatan Pembayaran**: Pembayaran yang tertunda melebihi 14 hari dikenakan biaya keterlambatan 5% setiap bulannya. Layanan dapat ditangguhkan hingga akun diselesaikan.
-- **Pajak**: Semua biaya belum termasuk pajak yang berlaku (misalnya, PPN) kecuali ditentukan lain.
+Integrasi dengan penyedia pembayaran, hosting, pesan, atau AI bergantung pada pihak tersebut. Anda bertanggung jawab atas ketentuan, biaya, API key, keamanan akun, dan ketersediaan mereka. DagangOS tidak bertanggung jawab apabila pihak ketiga mengubah, membatasi, atau menghentikan layanannya.
 
-## 6. Kekayaan Intelektual & Kepemilikan
+## 6. Ketersediaan dan keamanan
 
-- **Lisensi Platform**: Klien menerima lisensi abadi, non-eksklusif, dan tidak dapat dialihkan untuk menggunakan Platform yang diterapkan untuk operasi bisnis mereka sendiri.
-- **Kerangka Kerja Inti**: PT DagangOS Digital Indonesia memegang kepemilikan penuh atas kerangka kerja yang dapat digunakan kembali dan modul inti. Klien *tidak* menerima kepemilikan atas kode sumber dasar kecuali "Pembelian Kode Sumber Penuh" dibeli secara eksplisit.
-- **Data Klien**: Klien memegang kepemilikan penuh atas semua data bisnis, data pelanggan, dan konten yang diunggah.
+Kami menggunakan langkah yang wajar untuk memberikan layanan secara aman dan andal. Namun, tidak ada layanan online yang selalu tanpa gangguan atau tanpa risiko. Kecuali ada perjanjian dukungan tertulis yang menyatakan lain, Anda bertanggung jawab atas pencadangan yang memadai dan akses ke sistem yang Anda kelola.
 
-## 7. Pengiriman & Penerimaan
+## 7. Kerahasiaan
 
-Setelah Layanan dikirimkan ke lingkungan pementasan (staging), Klien memiliki 7 hari untuk meninjau dan melaporkan cacat. Jika tidak ada cacat yang dilaporkan, Layanan dianggap diterima, memicu penagihan akhir dan penerapan produksi.
+Masing-masing pihak akan melindungi informasi bisnis nonpublik pihak lain dengan kehati-hatian yang wajar dan hanya menggunakannya untuk menjalankan layanan yang disepakati, kecuali pengungkapan diwajibkan oleh hukum.
 
-## 8. Garansi & Tanggung Jawab
+## 8. Batasan tanggung jawab
 
-LAYANAN DISEDIAKAN "SEBAGAIMANA ADANYA" TANPA JAMINAN DALAM BENTUK APA PUN. DALAM KEADAAN APA PUN PT DAGANGOS DIGITAL INDONESIA TIDAK BERTANGGUNG JAWAB ATAS KERUGIAN TIDAK LANGSUNG, INSIDENTAL, KHUSUS, KONSEKUENSIAL, ATAU HUKUMAN, TERMASUK HILANGNYA KEUNTUNGAN, DATA, ATAU GANGGUAN BISNIS, YANG TIMBUL DARI ATAU SEHUBUNGAN DENGAN LAYANAN ATAU KEGAGALAN INFRASTRUKTUR.
+Sejauh diizinkan oleh hukum yang berlaku, DagangOS tidak bertanggung jawab atas kerugian tidak langsung, insidental, khusus, konsekuensial, atau kehilangan keuntungan yang timbul dari layanan, sistem pihak ketiga, atau penggunaan Anda atas layanan tersebut.
 
-## 9. Pengakhiran
+## 9. Penangguhan dan penghentian
 
-Masing-masing pihak dapat mengakhiri perjanjian dengan pemberitahuan tertulis 30 hari sebelumnya. Setelah pengakhiran, Klien mempertahankan lisensi mereka untuk menggunakan perangkat lunak yang diterapkan (asalkan semua biaya telah dibayar), tetapi DagangOS akan menghentikan semua aktivitas pemeliharaan dan dukungan.
+Masing-masing pihak dapat mengakhiri kerja sama sesuai proposal yang disetujui. Kami dapat menangguhkan akses atau pekerjaan bila diperlukan untuk melindungi keamanan, mematuhi hukum, atau menangani pelanggaran material maupun pembayaran yang tidak disengketakan dan telah terlambat. Ketentuan mengenai pembayaran, kerahasiaan, kepemilikan, dan batasan tanggung jawab tetap berlaku setelah penghentian.
 
-## 10. Informasi Kontak
+## 10. Perubahan dan kontak
 
-Untuk pertanyaan hukum, silakan hubungi:  
-**PT DagangOS Digital Indonesia**  
-Email: legal@dagangos.com  
-Alamat: Jakarta, Indonesia
+Kami dapat memperbarui ketentuan ini untuk penggunaan situs atau layanan di masa mendatang. Ketentuan proyek yang material tetap diatur oleh proposal yang diterima untuk proyek tersebut. Pertanyaan mengenai ketentuan ini dapat dikirim ke **contact@dagangos.com**.
+
+**DagangOS Digital Indonesia**
+Subang, Jawa Barat, Indonesia

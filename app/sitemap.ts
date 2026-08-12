@@ -5,17 +5,22 @@ export default function sitemap(): MetadataRoute.Sitemap {
     ? `https://${process.env.NEXT_PUBLIC_BASE_DOMAIN}` 
     : 'https://store.dagangos.com'
 
-  // Standard public routes across all locales
-  const routes = ['', '/about', '/shop', '/contact', '/terms', '/privacy']
+  const routes = ['', '/site/about', '/site/catalog', '/site/shop', '/site/contact', '/site/support', '/site/terms', '/site/privacy']
+  const locales = ['en', 'id'] as const
 
-  const sitemapEntries = routes.map((route) => ({
-    url: `${baseUrl}/en${route}`,
-    lastModified: new Date(),
-    changeFrequency: 'weekly' as const,
-    priority: route === '' ? 1 : 0.8,
+  return locales.flatMap((locale) => routes.map((route) => {
+    const alternateRoute = (alternateLocale: typeof locales[number]) => `${baseUrl}/${alternateLocale}${route}`
+    return {
+      url: alternateRoute(locale),
+      changeFrequency: route === '' ? 'weekly' as const : 'monthly' as const,
+      priority: route === '' ? 1 : (route.includes('catalog') || route.includes('shop') ? 0.9 : 0.7),
+      alternates: {
+        languages: {
+          en: alternateRoute('en'),
+          id: alternateRoute('id'),
+          'x-default': alternateRoute('en'),
+        },
+      },
+    }
   }))
-
-  // You can also add Indonesian (/id) routes or dynamic product routes here
-
-  return sitemapEntries
 }

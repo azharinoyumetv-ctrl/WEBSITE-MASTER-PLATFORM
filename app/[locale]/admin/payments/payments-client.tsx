@@ -132,7 +132,7 @@ export function PaymentsClient({ initialPayments, initialDisputes = [], tenantId
       const headers = ['Transaction ID', 'External ID', 'Order ID', 'Gateway', 'Amount', 'Currency', 'Status', 'Date']
       let csvContent = headers.join(',') + '\n'
       payments.forEach(p => {
-        csvContent += `"${p.id}","${p.externalTransactionId || ''}","${p.orderId || ''}","${p.paymentGateway || ''}",${p.amount},"${p.currency || 'USD'}","${p.paymentStatus}","${new Date(p.createdAt).toLocaleDateString()}"\n`
+        csvContent += `"${p.id}","${p.externalTransactionId || ''}","${p.orderId || ''}","${p.paymentGateway || ''}",${p.amount},"${p.currency || 'IDR'}","${p.paymentStatus}","${new Date(p.createdAt).toLocaleDateString()}"\n`
       })
       const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
       const url = URL.createObjectURL(blob)

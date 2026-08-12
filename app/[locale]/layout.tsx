@@ -1,43 +1,92 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
+import localFont from 'next/font/local'
+import { headers } from 'next/headers'
 import '../globals.css'
 import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from '@/components/providers'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
+import { COMPANY } from '@/lib/company'
+import { DeploymentRecovery } from '@/components/deployment-recovery'
 
-const inter = Inter({ 
-  subsets: ['latin'],
-  variable: '--font-inter',
+const geistSans = localFont({
+  src: '../fonts/GeistVF.woff',
+  variable: '--font-geist-sans',
   display: 'swap',
 })
 
-export const metadata: Metadata = {
-  title: {
-    default: 'Website Master Platform',
-    template: '%s | Website Master Platform',
-  },
-  description: 'Enterprise-grade multi-tenant SaaS platform — built for agencies and their clients',
-  keywords: ['saas', 'multi-tenant', 'platform', 'cms', 'ecommerce', 'crm'],
-  openGraph: {
-    type: 'website',
-    title: 'Website Master Platform',
-    description: 'Enterprise-grade multi-tenant SaaS platform',
-    siteName: 'Website Master Platform',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Website Master Platform',
-    description: 'Enterprise-grade multi-tenant SaaS platform',
-  },
-  alternates: {
-    canonical: 'https://store.dagangos.com',
-  },
-  icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
-  },
-  manifest: '/site.webmanifest',
+const geistMono = localFont({
+  src: '../fonts/GeistMonoVF.woff',
+  variable: '--font-geist-mono',
+  display: 'swap',
+})
+
+function getMetadataBase() {
+  const headersList = headers()
+  const host = headersList.get('x-forwarded-host') || headersList.get('host')
+  const protocol = headersList.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
+  const fallback = process.env.NEXT_PUBLIC_SITE_URL
+    || (process.env.NEXT_PUBLIC_BASE_DOMAIN ? `https://${process.env.NEXT_PUBLIC_BASE_DOMAIN}` : 'https://store.dagangos.com')
+
+  try {
+    return new URL(host ? `${protocol}://${host}` : fallback)
+  } catch {
+    return new URL('https://store.dagangos.com')
+  }
+}
+
+export function generateMetadata({ params: { locale } }: { params: { locale: string } }): Metadata {
+  const isIndonesian = locale === 'id'
+  const title = `${COMPANY.legalName} | ${COMPANY.productName}`
+  const description = isIndonesian
+    ? 'Platform bisnis digital self-hosted sekali bayar untuk website, perdagangan, dan operasional bisnis Indonesia.'
+    : 'One-time, self-hosted digital business platforms for Indonesian websites, commerce, and operations.'
+  const canonical = `/${isIndonesian ? 'id' : 'en'}`
+
+  return {
+    metadataBase: getMetadataBase(),
+    title: {
+      default: title,
+      template: `%s | ${COMPANY.legalName}`,
+    },
+    description,
+    keywords: ['DagangOS', 'self-hosted', 'platform', 'website', 'ecommerce', 'POS', 'Indonesia'],
+    alternates: {
+      canonical,
+      languages: {
+        en: '/en',
+        id: '/id',
+        'x-default': '/en',
+      },
+    },
+    openGraph: {
+      type: 'website',
+      url: canonical,
+      locale: isIndonesian ? 'id_ID' : 'en_US',
+      alternateLocale: isIndonesian ? ['en_US'] : ['id_ID'],
+      title,
+      description,
+      siteName: COMPANY.legalName,
+      images: [{
+        url: '/og.png',
+        width: 1200,
+        height: 630,
+        alt: 'DagangOS Web — self-hosted digital business platforms',
+      }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: ['/og.png'],
+    },
+    icons: {
+      icon: [{ url: '/dagangos-tab-icon.png?v=2', type: 'image/png', sizes: '512x512' }],
+      shortcut: '/favicon.ico?v=2',
+      apple: [{ url: '/dagangos-tab-icon.png?v=2', type: 'image/png', sizes: '512x512' }],
+    },
+    manifest: '/site.webmanifest',
+  }
 }
 
 export default async function RootLayout({
@@ -51,17 +100,10 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
         <NextIntlClientProvider messages={messages} locale={locale}>
           <AuthProvider>
+            <DeploymentRecovery />
             {children}
           </AuthProvider>
           <Toaster

@@ -4,7 +4,7 @@ import { useState } from 'react'
 import {
   Users, Plus, Search, Filter, Mail, MoreHorizontal,
   UserCheck, UserX, Clock, Crown, Shield, Eye, Trash2,
-  RefreshCw, Send, Loader2, Download
+  RefreshCw, Send, Loader2, Download, Copy
 } from 'lucide-react'
 import { formatDate, getStatusBadgeClass, getInitials, stringToColor, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -12,7 +12,7 @@ import { inviteUser, toggleUserStatus } from '@/lib/actions/user'
 import Link from 'next/link'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
-export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser }: { initialUsers: any[], initialRoles: any[], tenantId: string, currentUser: any }) {
+export function UsersClient({ initialUsers, initialRoles, tenantId }: { initialUsers: any[], initialRoles: any[], tenantId: string }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
@@ -25,6 +25,7 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
   const [inviteRole, setInviteRole] = useState(initialRoles.length > 0 ? initialRoles[0].id : '')
   const [isInviting, setIsInviting] = useState(false)
   const [selectedProfile, setSelectedProfile] = useState<any | null>(null)
+  const [fallbackInvitationUrl, setFallbackInvitationUrl] = useState('')
 
   const updateFilters = (key: string, val: string | null) => {
     const params = new URLSearchParams(searchParams.toString())
@@ -78,16 +79,14 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
     if (!inviteEmail) { toast.error('Please enter an email'); return }
     setIsInviting(true)
     
-    // Fallback to system if currentUser id is missing for some reason
-    const invitedBy = currentUser?.id || 'system-user'
-
-    const res = await inviteUser(tenantId, inviteEmail, inviteRole, invitedBy)
+    const res = await inviteUser(tenantId, inviteEmail, inviteRole)
     setIsInviting(false)
     if (res.success) {
-      toast.success('Invitation sent successfully')
-      const invitedUser = (res as any).user
-      if (invitedUser) {
-        setUsers([invitedUser, ...users])
+      if ((res as any).delivery === 'copy_link') {
+        setFallbackInvitationUrl((res as any).accessUrl)
+        toast.success('Invitation created. Copy the secure link below.')
+      } else {
+        toast.success('Invitation email queued successfully')
       }
       setShowInviteModal(false)
       setInviteEmail('')
@@ -279,7 +278,7 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
           <div className="bg-white rounded-2xl shadow-modal w-full max-w-md animate-scale-in">
             <div className="p-6 border-b border-slate-100">
               <h3 className="text-lg font-semibold text-slate-900">Invite Team Member</h3>
-              <p className="text-sm text-slate-500 mt-0.5">Send a secure invitation link via email</p>
+              <p className="text-sm text-slate-500 mt-0.5">Create a secure invitation for a teammate</p>
             </div>
             <div className="p-6 space-y-4">
               <div>
@@ -310,8 +309,7 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
                 </select>
               </div>
               <p className="text-xs text-slate-400">
-                Invitation link expires in <strong>48 hours</strong>. The user will be directed to 
-                set their password upon first sign-in.
+                The one-time link expires in <strong>48 hours</strong>. It will be emailed when SMTP is configured; otherwise, you can copy it through an approved channel.
               </p>
             </div>
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
@@ -320,6 +318,20 @@ export function UsersClient({ initialUsers, initialRoles, tenantId, currentUser 
                 {isInviting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 {isInviting ? 'Sending...' : 'Send Invitation'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {fallbackInvitationUrl && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-modal animate-scale-in">
+            <h3 className="text-lg font-semibold text-slate-900">Copy secure invitation link</h3>
+            <p className="mt-2 text-sm leading-6 text-slate-500">Email delivery is not configured for this workspace yet. Send this one-time link through your approved channel. It expires in 48 hours.</p>
+            <input id="invite-access-url" readOnly value={fallbackInvitationUrl} className="form-input mt-5 font-mono text-xs" />
+            <div className="mt-5 flex justify-end gap-3">
+              <button onClick={() => setFallbackInvitationUrl('')} className="btn btn-secondary">Close</button>
+              <button onClick={() => { navigator.clipboard.writeText(fallbackInvitationUrl); toast.success('Invitation link copied') }} className="btn btn-primary"><Copy className="w-4 h-4" /> Copy link</button>
             </div>
           </div>
         </div>
