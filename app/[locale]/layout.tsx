@@ -8,6 +8,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { COMPANY } from '@/lib/company'
 import { DeploymentRecovery } from '@/components/deployment-recovery'
+import { getWmpBaseDomain, isLegacyWmpHostname } from '@/lib/wmp-domain'
 
 const geistSans = localFont({
   src: '../fonts/GeistVF.woff',
@@ -25,14 +26,17 @@ function getMetadataBase() {
   const headersList = headers()
   const host = headersList.get('x-forwarded-host') || headersList.get('host')
   const protocol = headersList.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
-  const fallback = process.env.NEXT_PUBLIC_SITE_URL
-    || (process.env.NEXT_PUBLIC_BASE_DOMAIN ? `https://${process.env.NEXT_PUBLIC_BASE_DOMAIN}` : 'https://store.dagangos.com')
+  const canonicalFallback = `https://${getWmpBaseDomain()}`
 
-  try {
-    return new URL(host ? `${protocol}://${host}` : fallback)
-  } catch {
-    return new URL('https://store.dagangos.com')
+  if (host && !isLegacyWmpHostname(host)) {
+    try {
+      return new URL(`${protocol}://${host}`)
+    } catch {
+      // Fall through to the canonical WMP origin.
+    }
   }
+
+  return new URL(canonicalFallback)
 }
 
 export function generateMetadata({ params: { locale } }: { params: { locale: string } }): Metadata {
