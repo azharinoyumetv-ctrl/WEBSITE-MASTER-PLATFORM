@@ -10,7 +10,15 @@ export function normalizeHostname(hostHeader: string) {
 }
 
 export function getWmpBaseDomain() {
-  return normalizeHostname(process.env.NEXT_PUBLIC_BASE_DOMAIN || DEFAULT_WMP_DOMAIN)
+  const configured = normalizeHostname(process.env.NEXT_PUBLIC_BASE_DOMAIN || DEFAULT_WMP_DOMAIN)
+
+  // Production WMP has exactly one platform hostname. A stale server env must
+  // not silently reactivate either retired hostname after deployment.
+  if (process.env.NODE_ENV === 'production' && LEGACY_WMP_DOMAINS.has(configured)) {
+    return DEFAULT_WMP_DOMAIN
+  }
+
+  return configured
 }
 
 export function isLegacyWmpHostname(hostHeader: string) {
