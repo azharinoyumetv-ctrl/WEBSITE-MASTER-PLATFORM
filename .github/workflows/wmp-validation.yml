@@ -84,8 +84,8 @@ jobs:
           cat /tmp/wmp.log
           exit 1
 
-      - name: Payment webhook regression tests
-        run: npx playwright test tests/payment-webhook-security.spec.ts tests/tenant-url.spec.ts --reporter=line
+      - name: Security and domain regression tests
+        run: npx playwright test tests/payment-webhook-security.spec.ts tests/tenant-url.spec.ts tests/domain-routing.spec.ts --reporter=line
 
       - name: Full WMP E2E suite
         run: |
