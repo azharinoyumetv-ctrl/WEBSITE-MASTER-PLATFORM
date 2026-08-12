@@ -12,7 +12,7 @@ on:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
 
     services:
       postgres:
@@ -84,6 +84,9 @@ jobs:
 
       - name: Payment webhook regression tests
         run: npx playwright test tests/payment-webhook-security.spec.ts tests/tenant-url.spec.ts --reporter=line
+
+      - name: Full WMP E2E suite
+        run: npx playwright test tests/e2e.spec.ts --reporter=line
 
       - name: Print server log on failure
         if: failure()
