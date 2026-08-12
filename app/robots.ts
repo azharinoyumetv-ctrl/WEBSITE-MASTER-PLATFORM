@@ -1,9 +1,8 @@
 import { MetadataRoute } from 'next'
+import { getWmpBaseDomain } from '@/lib/wmp-domain'
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_DOMAIN 
-    ? `https://${process.env.NEXT_PUBLIC_BASE_DOMAIN}` 
-    : 'https://store.dagangos.com'
+  const baseUrl = `https://${getWmpBaseDomain()}`
 
   return {
     rules: {
