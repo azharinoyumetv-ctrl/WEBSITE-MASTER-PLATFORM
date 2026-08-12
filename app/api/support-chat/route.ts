@@ -10,6 +10,7 @@ import {
 import { isTenantFeatureEnabled } from '@/lib/feature-flags'
 import { resolvePublicTenant } from '@/lib/tenant-context'
 import { addonsList, getIncludedAddonKeys, packages } from '@/lib/constants/packages'
+import { getWmpBaseDomain } from '@/lib/wmp-domain'
 
 export const runtime = 'nodejs'
 
@@ -53,6 +54,7 @@ function buildSafeHistory(input: unknown, currentMessage: string) {
 }
 
 function createSystemPolicyPrompt() {
+  const wmpOrigin = `https://${getWmpBaseDomain()}`
   const catalog = {
     packages: Object.values(packages).map(pkg => ({
       key: pkg.key,
@@ -65,8 +67,8 @@ function createSystemPolicyPrompt() {
         .map(addonKey => addonsList.find(addon => addon.key === addonKey)?.name)
         .filter(Boolean),
       projectSetupUrl: {
-        id: `https://store.dagangos.com/id/project-setup?package=${pkg.key}`,
-        en: `https://store.dagangos.com/en/project-setup?package=${pkg.key}`,
+        id: `${wmpOrigin}/id/project-setup?package=${pkg.key}`,
+        en: `${wmpOrigin}/en/project-setup?package=${pkg.key}`,
       },
     })),
     optionalAddons: addonsList.map(addon => ({
@@ -92,7 +94,7 @@ function createSystemPolicyPrompt() {
     'When a visitor asks which package suits their business, give one clear primary recommendation by its exact catalog name and price, explain the fit using exact included capabilities, and give at most one conditional lower- or higher-scope alternative.',
     'Recommendation rules: physical-product sellers who need direct online catalog, checkout, payments, orders, and inventory should be recommended E-Commerce Platform. Add Retail POS + Website only when they also need an in-store cashier/POS workflow. Restaurant System is for restaurant menus, bookings, staff, and restaurant operations—not packaged snack retail. Business Website + Admin is an alternative only when the visitor does not need online checkout.',
     'For sellers leaving marketplaces, explain that direct website sales avoid marketplace commissions, but do not claim all transaction costs disappear: payment-gateway, shipping, domain, VPS, and operational costs may still apply.',
-    'Whenever recommending a package, include its exact projectSetupUrl for the visitor language. Never link to dagangos.com; the current storefront host is store.dagangos.com.',
+    `Whenever recommending a package, include its exact projectSetupUrl for the visitor language. The only canonical WMP host is ${getWmpBaseDomain()}; never use store.dagangos.com or shop.dagangos.com.`,
     `Authoritative catalog JSON: ${JSON.stringify(catalog)}`,
     `For anything outside scope, reply exactly in the visitor language. Indonesian: ${OUT_OF_SCOPE_REPLY_ID} English: ${OUT_OF_SCOPE_REPLY}`,
   ].join('\n\n')
