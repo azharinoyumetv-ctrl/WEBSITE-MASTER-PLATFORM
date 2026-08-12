@@ -86,7 +86,21 @@ jobs:
         run: npx playwright test tests/payment-webhook-security.spec.ts tests/tenant-url.spec.ts --reporter=line
 
       - name: Full WMP E2E suite
-        run: npx playwright test tests/e2e.spec.ts --reporter=line
+        run: |
+          set +e
+          npx playwright test tests/e2e.spec.ts --reporter=json > /tmp/wmp-e2e.json 2>&1
+          code=$?
+          node -e "const fs=require('fs'); const r=JSON.parse(fs.readFileSync('/tmp/wmp-e2e.json','utf8')); const failures=[]; const walk=s=>{for(const sp of s.suites||[]) walk(sp); for(const spec of s.specs||[]) for(const t of spec.tests||[]) for(const result of t.results||[]) if(result.status==='failed'||result.status==='timedOut') failures.push({title:spec.title,file:spec.file,line:spec.line,status:result.status,error:result.error?.message});}; walk(r); console.log(JSON.stringify({stats:r.stats,failures},null,2));"
+          exit $code
+
+      - name: Upload full E2E diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wmp-e2e-diagnostics
+          path: /tmp/wmp-e2e.json
+          if-no-files-found: ignore
+          retention-days: 3
 
       - name: Print server log on failure
         if: failure()
