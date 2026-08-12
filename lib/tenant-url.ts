@@ -1,3 +1,5 @@
+import { getWmpBaseDomain } from '@/lib/wmp-domain'
+
 export type TenantPublicAddress = {
   subdomain: string
   customDomain?: string | null
@@ -5,11 +7,11 @@ export type TenantPublicAddress = {
 
 /**
  * Returns the browser-facing origin for a tenant. The platform/company tenant
- * intentionally uses the root storefront domain rather than `default.<domain>`.
+ * intentionally uses the root WMP domain rather than `default.<domain>`.
  */
 export function getTenantPublicUrl(
   tenant: TenantPublicAddress,
-  baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN || 'store.dagangos.com',
+  baseDomain = getWmpBaseDomain(),
 ) {
   const domain = tenant.customDomain || (
     tenant.subdomain === 'default' ? baseDomain : `${tenant.subdomain}.${baseDomain}`
