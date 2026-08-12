@@ -19,9 +19,11 @@ module.exports = {
         ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
         NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
         CONTROL_PLANE_SECRET: process.env.CONTROL_PLANE_SECRET,
-        NEXTAUTH_URL: process.env.NEXTAUTH_URL || 'https://wmp.dagangos.com',
-        NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL || 'https://wmp.dagangos.com',
-        NEXT_PUBLIC_BASE_DOMAIN: process.env.NEXT_PUBLIC_BASE_DOMAIN || 'wmp.dagangos.com'
+        // WMP has one canonical production origin. Do not inherit stale
+        // store/shop values from the VPS process environment.
+        NEXTAUTH_URL: 'https://wmp.dagangos.com',
+        NEXT_PUBLIC_APP_URL: 'https://wmp.dagangos.com',
+        NEXT_PUBLIC_BASE_DOMAIN: 'wmp.dagangos.com'
       }
     }
   ]
