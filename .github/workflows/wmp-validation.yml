@@ -32,11 +32,13 @@ jobs:
     env:
       CI: true
       DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/wmp_ci
-      NEXTAUTH_URL: http://127.0.0.1:4000
+      NEXTAUTH_URL: http://localhost:4000
       NEXTAUTH_SECRET: ci-nextauth-secret-not-for-production
       ENCRYPTION_KEY: ci-encryption-key-not-for-production
       XENDIT_WEBHOOK_TOKEN: ci-xendit-webhook-token
-      E2E_BASE_URL: http://127.0.0.1:4000
+      CONTROL_PLANE_SECRET: e2e-control-plane-secret
+      E2E_CONTROL_PLANE_SECRET: e2e-control-plane-secret
+      E2E_BASE_URL: http://localhost:4000
 
     steps:
       - name: Checkout
