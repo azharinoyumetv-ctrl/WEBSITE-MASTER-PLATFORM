@@ -12,9 +12,8 @@ export const config = {
 
 import { locales, defaultLocale } from './i18n'
 import {
-  getCanonicalWmpUrl,
   getWmpBaseDomain,
-  isLegacyWmpHostname,
+  isReservedNonWmpHostname,
   normalizeHostname,
 } from './lib/wmp-domain'
 
@@ -116,13 +115,11 @@ export default async function middleware(request: NextRequest) {
   const isSecure = process.env.NEXTAUTH_URL?.startsWith('https://') || request.headers.get('x-forwarded-proto') === 'https'
   const hostname = request.headers.get('host') || ''
 
-  // WMP has exactly one canonical platform hostname. Legacy storefront names
-  // must never render a second copy of WMP, including login/admin routes.
-  if (isLegacyWmpHostname(hostname)) {
-    return applySecurityHeaders(
-      NextResponse.redirect(getCanonicalWmpUrl(request.nextUrl.pathname, request.nextUrl.search), 308),
-      csp,
-    )
+  // store.dagangos.com and shop.dagangos.com are reserved for other DagangOS
+  // products. If DNS still reaches this origin during migration, WMP must not
+  // render or redirect them. The edge/DNS layer can later route them elsewhere.
+  if (isReservedNonWmpHostname(hostname)) {
+    return applySecurityHeaders(new NextResponse('Not Found', { status: 404 }), csp)
   }
 
   const hostTenantId = getTenantFromHost(hostname)
