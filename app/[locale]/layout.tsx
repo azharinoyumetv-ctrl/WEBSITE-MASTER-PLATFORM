@@ -8,7 +8,7 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { COMPANY } from '@/lib/company'
 import { DeploymentRecovery } from '@/components/deployment-recovery'
-import { getWmpBaseDomain, isLegacyWmpHostname } from '@/lib/wmp-domain'
+import { getWmpBaseDomain, isReservedNonWmpHostname } from '@/lib/wmp-domain'
 
 const geistSans = localFont({
   src: '../fonts/GeistVF.woff',
@@ -28,7 +28,7 @@ function getMetadataBase() {
   const protocol = headersList.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
   const canonicalFallback = `https://${getWmpBaseDomain()}`
 
-  if (host && !isLegacyWmpHostname(host)) {
+  if (host && !isReservedNonWmpHostname(host)) {
     try {
       return new URL(`${protocol}://${host}`)
     } catch {
