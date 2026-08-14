@@ -4,10 +4,11 @@ on:
   pull_request:
     branches:
       - main
-      - codex/fix-storefront-runtime
   push:
     branches:
-      - codex/wmp-payment-hardening
+      - main
+      - agent/**
+  workflow_dispatch:
 
 jobs:
   validate:
@@ -63,7 +64,7 @@ jobs:
         run: node prisma/seed-test.js
 
       - name: TypeScript check
-        run: npx tsc --noEmit
+        run: npm run typecheck
 
       - name: Production build
         run: npm run build
@@ -73,7 +74,7 @@ jobs:
 
       - name: Start WMP
         run: |
-          npm run dev > /tmp/wmp.log 2>&1 &
+          npm run start > /tmp/wmp.log 2>&1 &
           echo $! > /tmp/wmp.pid
           for i in {1..60}; do
             if curl --fail --silent http://127.0.0.1:4000/en > /dev/null; then
@@ -85,7 +86,7 @@ jobs:
           exit 1
 
       - name: Security and domain regression tests
-        run: npx playwright test tests/payment-webhook-security.spec.ts tests/tenant-url.spec.ts tests/domain-routing.spec.ts --reporter=line
+        run: npm run test:security -- --reporter=line
 
       - name: Full WMP E2E suite
         run: |
