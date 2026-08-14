@@ -32,6 +32,13 @@ test.describe('platform hardening', () => {
     expect(response.headers().location).toContain('/id')
   })
 
+  test('auth pages expose keyboard skip navigation', async ({ page }) => {
+    await page.goto('/id/auth/login')
+    const skipLink = page.getByRole('link', { name: 'Skip to main content' })
+    await expect(skipLink).toHaveAttribute('href', '#auth-main-content')
+    await expect(page.locator('#auth-main-content')).toHaveCount(1)
+  })
+
   test('DOKU webhook rejects unsupported content types before protocol handling', async ({ request }) => {
     const response = await request.post('/api/webhook/doku', {
       headers: {
