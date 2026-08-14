@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { validateV1Request } from '@/lib/v1-auth'
+import { hashLicenseKey, licenseKeysMatch, validateV1Request } from '@/lib/v1-auth'
 import { withTenantApiTelemetry } from '@/lib/api-telemetry'
 
 export async function POST(req: Request) {
@@ -15,6 +15,11 @@ export async function POST(req: Request) {
     if (!instanceId || !tenantId || !instanceUrl || !licenseKey) {
       return NextResponse.json({ success: false, error: 'Missing registration details' }, { status: 400 })
     }
+    const authenticatedLicenseKey = req.headers.get('x-license-key') || ''
+    if (!licenseKeysMatch(authenticatedLicenseKey, licenseKey)) {
+      return NextResponse.json({ success: false, error: 'License identity mismatch' }, { status: 401 })
+    }
+    const licenseKeyHash = hashLicenseKey(licenseKey)
     const respond = (response: NextResponse) => withTenantApiTelemetry({ tenantId, request: req, response, startedAt })
 
     // Ensure tenant exists to prevent Foreign Key constraint crash on fresh tenants
@@ -35,7 +40,7 @@ export async function POST(req: Request) {
       where: { instanceId },
       update: {
         instanceUrl,
-        licenseKeyHash: licenseKey,
+        licenseKeyHash,
         status: 'active',
         infraMetadata: infraMetadata || {},
         lastHeartbeat: new Date()
@@ -44,7 +49,7 @@ export async function POST(req: Request) {
         tenantId,
         instanceId,
         instanceUrl,
-        licenseKeyHash: licenseKey,
+        licenseKeyHash,
         status: 'active',
         infraMetadata: infraMetadata || {},
         lastHeartbeat: new Date()
