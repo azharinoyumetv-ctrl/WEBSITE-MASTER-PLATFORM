@@ -23,13 +23,23 @@ const loadDatabaseUrl = (): string => {
   return connectionString
 }
 
+const readPoolSetting = (name: string, fallback: number, minimum: number, maximum: number): number => {
+  const raw = process.env[name]
+  if (!raw) return fallback
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isInteger(parsed) || parsed < minimum || parsed > maximum) {
+    throw new Error(`${name} must be an integer between ${minimum} and ${maximum}.`)
+  }
+  return parsed
+}
+
 const prismaClientSingleton = () => {
   const connectionString = loadDatabaseUrl()
   const pool = new Pool({
     connectionString,
-    max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000
+    max: readPoolSetting('DATABASE_POOL_MAX', 20, 1, 100),
+    idleTimeoutMillis: readPoolSetting('DATABASE_POOL_IDLE_TIMEOUT_MS', 30000, 1000, 300000),
+    connectionTimeoutMillis: readPoolSetting('DATABASE_POOL_CONNECT_TIMEOUT_MS', 10000, 1000, 60000)
   })
   const adapter = new PrismaPg(pool)
   return new PrismaClient({ adapter })
