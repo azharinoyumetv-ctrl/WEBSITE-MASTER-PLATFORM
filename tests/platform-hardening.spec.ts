@@ -5,7 +5,7 @@ test.describe('platform hardening', () => {
     const health = await request.get('/api/health')
     expect(health.status()).toBe(200)
     expect(health.headers()['cache-control']).toContain('no-store')
-    await expect(health.json()).resolves.toMatchObject({
+    expect(await health.json()).toMatchObject({
       status: 'ok',
       service: 'website-master-wmp',
     })
@@ -13,7 +13,7 @@ test.describe('platform hardening', () => {
     const ready = await request.get('/api/ready')
     expect(ready.status()).toBe(200)
     expect(ready.headers()['cache-control']).toContain('no-store')
-    await expect(ready.json()).resolves.toMatchObject({
+    expect(await ready.json()).toMatchObject({
       status: 'ready',
       service: 'website-master-wmp',
     })
@@ -41,7 +41,7 @@ test.describe('platform hardening', () => {
     })
 
     expect(response.status()).toBe(415)
-    await expect(response.json()).resolves.toEqual({
+    expect(await response.json()).toEqual({
       error: 'Unsupported media type',
     })
   })
