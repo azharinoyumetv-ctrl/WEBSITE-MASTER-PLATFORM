@@ -11,7 +11,7 @@
     "typecheck": "tsc --noEmit",
     "test": "playwright test",
     "test:e2e": "playwright test tests/e2e.spec.ts",
-    "test:security": "playwright test tests/payment-webhook-security.spec.ts tests/tenant-url.spec.ts tests/domain-routing.spec.ts tests/wmp-payment-hostnames.spec.ts"
+    "test:security": "playwright test tests/payment-webhook-security.spec.ts tests/tenant-url.spec.ts tests/domain-routing.spec.ts tests/wmp-payment-hostnames.spec.ts tests/platform-hardening.spec.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.11.2",
