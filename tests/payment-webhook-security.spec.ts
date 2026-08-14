@@ -52,7 +52,7 @@ test.describe('payment webhook hardening', () => {
   })
 
   test('rejects a signed Xendit callback when the amount does not match', async ({ request }) => {
-    const tenant = await prisma.systemTenant.findFirst({ where: { subdomain: 'default' } })
+    const tenant = await prisma.systemTenant.findFirst({ where: { status: 'active' }, orderBy: { createdAt: 'asc' } })
     expect(tenant).not.toBeNull()
 
     const order = await prisma.tenantOrder.create({
@@ -103,7 +103,7 @@ test.describe('payment webhook hardening', () => {
   })
 
   test('records a failed Xendit payment against the real payment id', async ({ request }) => {
-    const tenant = await prisma.systemTenant.findFirst({ where: { subdomain: 'default' } })
+    const tenant = await prisma.systemTenant.findFirst({ where: { status: 'active' }, orderBy: { createdAt: 'asc' } })
     expect(tenant).not.toBeNull()
 
     const eventId = `xendit-failed-${crypto.randomUUID()}`
