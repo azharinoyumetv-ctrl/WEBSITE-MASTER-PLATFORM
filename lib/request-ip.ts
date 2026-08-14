@@ -22,7 +22,7 @@ export function getTrustedHeaderClientIp(request: Pick<Request, 'headers'>): str
     .split(',')
     .map(normalizeIp)
     .filter(candidate => isIP(candidate) !== 0)
-  const closestForwardedHop = forwardedChain.at(-1)
+  const closestForwardedHop = forwardedChain[forwardedChain.length - 1]
   if (closestForwardedHop) return closestForwardedHop
 
   const realIp = normalizeIp(request.headers.get('x-real-ip') || '')
