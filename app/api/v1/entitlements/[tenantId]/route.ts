@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import prisma from '@/lib/prisma'
-import { validateV1Request } from '@/lib/v1-auth'
+import { getAuthenticatedV1Instance, validateV1Request } from '@/lib/v1-auth'
 import { withTenantApiTelemetry } from '@/lib/api-telemetry'
 
 const tenantIdSchema = z.string().uuid()
@@ -18,6 +18,10 @@ export async function GET(req: Request, { params }: { params: { tenantId: string
     }
 
     const tenantId = parsedTenantId.data
+    const instance = await getAuthenticatedV1Instance(req)
+    if (!instance || instance.tenantId !== tenantId) {
+      return NextResponse.json({ success: false, error: 'License is not authorized for this tenant' }, { status: 403 })
+    }
     const respond = (response: NextResponse) => withTenantApiTelemetry({ tenantId, request: req, response, startedAt })
 
     const entitlement = await prisma.tenantEntitlement.findFirst({
