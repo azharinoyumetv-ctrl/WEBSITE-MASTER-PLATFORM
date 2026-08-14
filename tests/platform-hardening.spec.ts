@@ -5,6 +5,7 @@ test.describe('platform hardening', () => {
     const health = await request.get('/api/health')
     expect(health.status()).toBe(200)
     expect(health.headers()['cache-control']).toContain('no-store')
+    expect(health.headers()['strict-transport-security']).toContain('max-age=31536000')
     expect(await health.json()).toMatchObject({
       status: 'ok',
       service: 'website-master-wmp',
