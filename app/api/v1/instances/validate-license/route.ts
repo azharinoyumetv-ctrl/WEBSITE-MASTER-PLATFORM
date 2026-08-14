@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
-import { validateV1Request } from '@/lib/v1-auth'
+import { getAuthenticatedV1Instance, licenseKeysMatch, validateV1Request } from '@/lib/v1-auth'
 import { withTenantApiTelemetry } from '@/lib/api-telemetry'
 
 export async function POST(req: Request) {
@@ -16,20 +15,16 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: 'Missing license validation parameters' }, { status: 400 })
     }
 
-    const instance = await prisma.tenantInstance.findUnique({
-      where: { instanceId }
-    })
+    const authenticatedLicenseKey = req.headers.get('x-license-key') || ''
+    if (!licenseKeysMatch(authenticatedLicenseKey, licenseKey)) {
+      return NextResponse.json({ success: false, error: 'Invalid license identity' }, { status: 401 })
+    }
 
-    if (!instance) {
-      return NextResponse.json({ success: false, error: 'Instance not found' }, { status: 404 })
+    const instance = await getAuthenticatedV1Instance(req)
+    if (!instance || instance.instanceId !== instanceId) {
+      return NextResponse.json({ success: false, error: 'Invalid license or instance' }, { status: 401 })
     }
     const respond = (response: NextResponse) => withTenantApiTelemetry({ tenantId: instance.tenantId, request: req, response, startedAt })
-
-    const valid = instance.licenseKeyHash === licenseKey
-
-    if (!valid) {
-      return respond(NextResponse.json({ success: false, error: 'Invalid license key' }, { status: 401 }))
-    }
 
     return respond(NextResponse.json({
       valid: true,

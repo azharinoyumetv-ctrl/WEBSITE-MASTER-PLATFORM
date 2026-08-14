@@ -1,13 +1,54 @@
 import { NextResponse } from 'next/server'
 import * as crypto from 'crypto'
+import prisma from '@/lib/prisma'
 
 const REPLAY_WINDOW_MS = 5 * 60 * 1000 // 5 minutes
+
+function secureEqual(left: string, right: string): boolean {
+  const leftBuffer = Buffer.from(left)
+  const rightBuffer = Buffer.from(right)
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer)
+}
+
+export function hashLicenseKey(licenseKey: string): string {
+  return crypto.createHash('sha256').update(licenseKey).digest('hex')
+}
+
+export function licenseKeysMatch(left: string, right: string): boolean {
+  return Boolean(left && right) && secureEqual(left, right)
+}
+
+export async function getAuthenticatedV1Instance(req: Request) {
+  const licenseKey = req.headers.get('x-license-key') || ''
+  if (!licenseKey) return null
+
+  const licenseKeyHash = hashLicenseKey(licenseKey)
+  const instance = await prisma.tenantInstance.findFirst({
+    where: {
+      OR: [
+        { licenseKeyHash },
+        // Backward-compatible lookup for instances registered before license
+        // hashes were enforced. A successful lookup is migrated immediately.
+        { licenseKeyHash: licenseKey },
+      ],
+    },
+  })
+
+  if (instance?.licenseKeyHash === licenseKey) {
+    return prisma.tenantInstance.update({
+      where: { id: instance.id },
+      data: { licenseKeyHash },
+    })
+  }
+
+  return instance
+}
 
 /**
  * Validates HMAC-SHA256 signature for /api/v1 control-plane requests.
  *
  * Required headers:
- *   x-license-key       — the tenant's raw license key (used as context)
+ *   x-license-key       — the tenant's raw license key (identity context)
  *   x-request-timestamp — Unix timestamp in ms (string)
  *   x-signature         — HMAC-SHA256(timestamp + ":" + rawBody, CONTROL_PLANE_SECRET)
  *
@@ -23,10 +64,11 @@ export async function validateV1Request(req: Request): Promise<NextResponse | nu
     )
   }
 
+  const licenseKey = req.headers.get('x-license-key')
   const timestamp = req.headers.get('x-request-timestamp')
   const signature = req.headers.get('x-signature')
 
-  if (!timestamp || !signature) {
+  if (!licenseKey || !timestamp || !signature) {
     return NextResponse.json(
       { success: false, error: 'Missing authentication headers' },
       { status: 401 }
@@ -41,17 +83,14 @@ export async function validateV1Request(req: Request): Promise<NextResponse | nu
     )
   }
 
-  // Clone the request to read the body without consuming it
+  // Clone the request to read the body without consuming it.
   const rawBody = await req.clone().text()
   const expected = crypto
     .createHmac('sha256', secret)
     .update(`${timestamp}:${rawBody}`)
     .digest('hex')
 
-  const sigBuf = Buffer.from(signature)
-  const expBuf = Buffer.from(expected)
-
-  if (sigBuf.length !== expBuf.length || !crypto.timingSafeEqual(sigBuf, expBuf)) {
+  if (!secureEqual(signature, expected)) {
     return NextResponse.json(
       { success: false, error: 'Invalid request signature' },
       { status: 401 }

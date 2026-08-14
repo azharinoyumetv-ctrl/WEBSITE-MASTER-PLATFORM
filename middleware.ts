@@ -20,11 +20,31 @@ import {
 function parseAcceptLanguage(request: NextRequest): string | null {
   const raw = request.headers.get('accept-language')
   if (!raw) return null
-  const parsed = raw
+
+  const preferences = raw
     .split(',')
-    .map(part => part.trim().split(';')[0].toLowerCase())
-  const idMatch = parsed.find(part => part === 'id' || part.startsWith('id-'))
-  return idMatch ? 'id' : null
+    .map((part, index) => {
+      const [languageRange, ...parameters] = part.trim().toLowerCase().split(';')
+      const qualityParameter = parameters.find(parameter => parameter.trim().startsWith('q='))
+      const parsedQuality = qualityParameter
+        ? Number.parseFloat(qualityParameter.trim().slice(2))
+        : 1
+      return {
+        languageRange,
+        quality: Number.isFinite(parsedQuality) ? parsedQuality : 0,
+        index,
+      }
+    })
+    .filter(preference => preference.languageRange && preference.quality > 0)
+    .sort((left, right) => right.quality - left.quality || left.index - right.index)
+
+  for (const preference of preferences) {
+    if (preference.languageRange === '*') return defaultLocale
+    const language = preference.languageRange.split('-')[0]
+    if (locales.includes(language)) return language
+  }
+
+  return null
 }
 
 function getBaseUrl(request: NextRequest) {
@@ -89,6 +109,9 @@ function applySecurityHeaders(res: NextResponse, csp: string) {
   res.headers.set('X-Content-Type-Options', 'nosniff')
   res.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   res.headers.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()')
+  if (process.env.NODE_ENV === 'production') {
+    res.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
+  }
   return res
 }
 
@@ -133,7 +156,9 @@ export default async function middleware(request: NextRequest) {
     !pathname.includes('/auth/login')
   ) || isProtectedAction
 
-  const token = (hostTenantId !== 'default' || isProtected)
+  // Public pages do not need JWT parsing. Protected admin routes and Server
+  // Actions still validate the session before tenant routing continues.
+  const token = isProtected
     ? await getToken({
         req: request,
         secret: process.env.NEXTAUTH_SECRET,

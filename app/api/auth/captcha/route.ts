@@ -3,16 +3,21 @@ import prisma from '@/lib/prisma'
 import crypto from 'crypto'
 import { encrypt, decrypt } from '@/lib/crypto'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { getTrustedHeaderClientIp } from '@/lib/request-ip'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
+  const ip = getTrustedHeaderClientIp(req)
+  const rl = await checkRateLimit(ip, 'auth_captcha_issue', 20, 60 * 1000)
+  if (rl.limited) {
+    return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
+  }
+
   const svgCaptchaModule = await import('svg-captcha')
   const svgCaptcha = (svgCaptchaModule as unknown as Record<string, unknown>).default as {
     create(options: Record<string, unknown>): { text: string; data: string }
   } || svgCaptchaModule as unknown as { create(options: Record<string, unknown>): { text: string; data: string } }
-  const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || "unknown"
-  
   const captcha = svgCaptcha.create({
     size: 4,
     ignoreChars: '0o1i',
@@ -49,7 +54,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const ip = getTrustedHeaderClientIp(req)
     const rl = await checkRateLimit(ip, 'auth_captcha', 20, 60 * 1000)
     if (rl.limited) {
       return NextResponse.json({ success: false, error: 'Too many requests. Please try again later.' }, { status: 429 })

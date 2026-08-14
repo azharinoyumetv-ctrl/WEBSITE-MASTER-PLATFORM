@@ -2,10 +2,11 @@ import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { getTrustedHeaderClientIp } from '@/lib/request-ip'
 
 export async function POST(req: Request) {
   try {
-    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const ip = getTrustedHeaderClientIp(req)
     const rl = await checkRateLimit(ip, 'auth_reset_password', 5, 15 * 60 * 1000)
     
     if (rl.limited) {

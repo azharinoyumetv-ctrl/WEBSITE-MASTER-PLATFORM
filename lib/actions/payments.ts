@@ -8,6 +8,13 @@ import { decrypt } from '@/lib/crypto'
 import crypto from 'crypto'
 import { sendOrderConfirmationEmail } from './notifications'
 
+function secureEqual(left: string | null | undefined, right: string | null | undefined) {
+  if (!left || !right) return false
+  const leftBuffer = Buffer.from(left)
+  const rightBuffer = Buffer.from(right)
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer)
+}
+
 async function getXenditAuth(tenantId: string) {
   const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })
   if (!website?.xenditEnabled || !website.xenditEncryptedSecret) {
@@ -71,11 +78,20 @@ export async function refundPayment(tenantId: string, paymentId: string) {
 
     const payment = await prisma.tenantPayment.findUnique({ where: { id: paymentId, tenantId } })
     if (!payment) return { success: false, error: 'Payment not found' }
+    if (payment.processorKey.toLowerCase() !== 'xendit') {
+      return {
+        success: false,
+        error: `Refunds for ${payment.processorKey} require that provider's dedicated refund workflow`,
+      }
+    }
     if (payment.paymentStatus === 'refunded') return { success: false, error: 'Already refunded' }
+    if (payment.paymentStatus !== 'succeeded') {
+      return { success: false, error: 'Only succeeded payments can be refunded' }
+    }
     if (!payment.externalTransactionId) return { success: false, error: 'No external transaction ID to refund' }
     
-    // Call Xendit Refund API (for invoices/ewallet/etc depending on channel, usually Refunds API)
-    // Here we assume it's a generic charge that supports /refunds
+    // Preserve the existing Xendit refund protocol. Other providers fail safely
+    // above instead of accidentally receiving a Xendit API request.
     const authHeader = await getXenditAuth(tenantId);
     const res = await fetch(`https://api.xendit.co/refunds`, {
       method: 'POST',
@@ -128,7 +144,16 @@ export async function capturePayment(tenantId: string, paymentId: string) {
 
     const payment = await prisma.tenantPayment.findUnique({ where: { id: paymentId, tenantId } })
     if (!payment) return { success: false, error: 'Payment not found' }
+    if (payment.processorKey.toLowerCase() !== 'xendit') {
+      return {
+        success: false,
+        error: `Capture for ${payment.processorKey} requires that provider's dedicated capture workflow`,
+      }
+    }
     if (payment.paymentStatus === 'succeeded') return { success: false, error: 'Already captured' }
+    if (payment.paymentStatus !== 'initiated') {
+      return { success: false, error: `Cannot capture a ${payment.paymentStatus} payment` }
+    }
     if (!payment.externalTransactionId) return { success: false, error: 'No external transaction ID to capture' }
     
     const authHeader = await getXenditAuth(tenantId);
@@ -179,11 +204,23 @@ export async function manualAdjustPayment(tenantId: string, paymentId: string, a
     const user = await getAuthenticatedUser()
     await requirePermission(user.id, tenantId, 'payments', 'write')
 
+    if (!Number.isFinite(adjustAmount) || adjustAmount === 0) {
+      return { success: false, error: 'Adjustment amount must be a non-zero finite number' }
+    }
+    const normalizedReason = reason.trim()
+    if (normalizedReason.length < 3) {
+      return { success: false, error: 'Adjustment reason must contain at least 3 characters' }
+    }
+
     const payment = await prisma.tenantPayment.findUnique({ where: { id: paymentId, tenantId } })
     if (!payment) return { success: false, error: 'Payment not found' }
 
     const updated = await prisma.$transaction(async (tx) => {
-      const newAmount = Number(payment.amount) + adjustAmount
+      const originalAmount = Number(payment.amount)
+      const newAmount = originalAmount + adjustAmount
+      if (newAmount < 0) {
+        throw new Error('Adjustment cannot make the payment amount negative')
+      }
       const p = await tx.tenantPayment.update({
         where: { id: paymentId },
         data: { amount: newAmount }
@@ -198,13 +235,19 @@ export async function manualAdjustPayment(tenantId: string, paymentId: string, a
           currency: p.currency,
           gateway: p.processorKey,
           gatewayTxId: p.externalTransactionId,
-          status: 'success'
+          status: 'success',
+          metadata: {
+            reason: normalizedReason,
+            actorId: user.id,
+            originalAmount,
+            adjustedAmount: newAmount,
+          }
         }
       })
-      // optional log of reason
       return p
     })
     
+    revalidatePath('/admin/payments')
     return { success: true, payment: updated }
   } catch (error: any) {
     return { success: false, error: error.message }
@@ -541,7 +584,7 @@ export async function handleDokuNotification(req: Request) {
 
     const calculatedSignature = 'HMACSHA256=' + crypto.createHmac('sha256', auth.sharedKey).update(signatureString).digest('base64');
 
-    if (calculatedSignature !== incomingSignature) {
+    if (!secureEqual(calculatedSignature, incomingSignature)) {
       console.error('Doku webhook signature verification failed.');
       return { status: 401, body: { error: 'Unauthorized webhook signature' } };
     }
@@ -560,6 +603,13 @@ export async function handleDokuNotification(req: Request) {
     }
 
     const externalTransactionId = body.transaction?.token || body.transaction?.reference_id || rawInvoiceNumber;
+    const idempotencyKey = `doku:${clientId}:${requestId}`
+    const existingEvent = await prisma.paymentIdempotencyKey.findUnique({
+      where: { idempotencyKey }
+    })
+    if (existingEvent) {
+      return { status: 200, body: { success: true, message: 'Already processed' } }
+    }
 
     // Retrieve or create payment record
     const updated = await prisma.$transaction(async (tx) => {
@@ -598,6 +648,8 @@ export async function handleDokuNotification(req: Request) {
         });
       }
 
+      const becameSucceeded = oldStatus !== 'succeeded' && paymentStatus === 'succeeded'
+
       // Write ledger entry if status changed
       if (oldStatus !== paymentStatus) {
         await tx.tenantPaymentLedger.create({
@@ -632,17 +684,27 @@ export async function handleDokuNotification(req: Request) {
         });
       }
 
-      return payment;
-    });
+      await tx.paymentIdempotencyKey.create({
+        data: {
+          tenantId,
+          idempotencyKey,
+          responsePayload: body as any,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        }
+      })
 
-    // Send confirmation email asynchronously after transaction success
-    if (paymentStatus === 'succeeded') {
+      return { payment, becameSucceeded };
+    }, { isolationLevel: 'Serializable' });
+
+    // Send confirmation email only for the transition into succeeded. Provider
+    // retries and repeated success notifications must not send duplicates.
+    if (updated.becameSucceeded) {
       const emailRecipient = order?.guestEmail || body.customer?.email || 'customer@example.com';
       sendOrderConfirmationEmail(tenantId, orderId, emailRecipient)
         .catch(err => console.error("Failed to send async Doku order confirmation email", err));
     }
 
-    return { status: 200, body: { success: true, paymentId: updated.id } };
+    return { status: 200, body: { success: true, paymentId: updated.payment.id } };
   } catch (error: any) {
     console.error('Error handling DOKU notification:', error);
     return { status: 500, body: { error: error.message } };

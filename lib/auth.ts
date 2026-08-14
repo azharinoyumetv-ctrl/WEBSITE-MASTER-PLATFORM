@@ -4,6 +4,7 @@ import bcrypt from "bcryptjs"
 import { PrismaAdapter } from "@auth/prisma-adapter"
 import prisma from "@/lib/prisma"
 import crypto from "crypto"
+import { isIP } from "net"
 import * as OTPAuth from "otpauth"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { decrypt } from "@/lib/crypto"
@@ -19,6 +20,43 @@ const cookiePrefix = useSecureCookies ? "__Secure-" : ""
 const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN 
   ? (process.env.NEXT_PUBLIC_BASE_DOMAIN.startsWith('.') ? process.env.NEXT_PUBLIC_BASE_DOMAIN : `.${process.env.NEXT_PUBLIC_BASE_DOMAIN}`) 
   : undefined
+
+function normalizeIp(value: string): string {
+  const trimmed = value.trim()
+  return trimmed.startsWith('::ffff:') ? trimmed.slice(7) : trimmed
+}
+
+function isTrustedProxy(value: string): boolean {
+  const normalized = normalizeIp(value)
+  const configured = (process.env.TRUSTED_PROXY_IPS || '')
+    .split(',')
+    .map(entry => normalizeIp(entry))
+    .filter(Boolean)
+  return normalized === '127.0.0.1' || normalized === '::1' || configured.includes(normalized)
+}
+
+function getRateLimitIp(req: unknown): string {
+  const request = req as {
+    ip?: string
+    socket?: { remoteAddress?: string }
+    headers?: Record<string, string | string[] | undefined>
+  }
+  const directIp = normalizeIp(request?.ip || request?.socket?.remoteAddress || '')
+  const rawForwarded = request?.headers?.['x-forwarded-for']
+  const forwardedValue = Array.isArray(rawForwarded) ? rawForwarded.join(',') : rawForwarded || ''
+  const forwardedChain = forwardedValue
+    .split(',')
+    .map(normalizeIp)
+    .filter(candidate => isIP(candidate) !== 0)
+
+  if (!directIp || isIP(directIp) === 0) return 'unknown'
+
+  let clientIp = directIp
+  while (forwardedChain.length > 0 && isTrustedProxy(clientIp)) {
+    clientIp = forwardedChain.pop() as string
+  }
+  return clientIp
+}
 
 export const authOptions: NextAuthOptions = {
   cookies: {
@@ -58,18 +96,10 @@ export const authOptions: NextAuthOptions = {
           throw new Error("Missing credentials")
         }
 
-        const headers = (req as any)?.headers || {}
-        const directIp = (req as any)?.ip || (req as any)?.socket?.remoteAddress || ''
-        const forwarded = (headers['x-forwarded-for'] || headers['x-real-ip'] || '') as string
-        let ip = 'unknown'
-        const firstHop = (forwarded.split(',')[0] || '').trim()
-        if (/^(::1|127\.0\.0\.1|0\.0\.0\.0|localhost)$/.test(directIp) && firstHop) {
-          ip = firstHop
-        } else if (firstHop) {
-          ip = firstHop
-        } else {
-          ip = directIp || 'unknown'
-        }
+        // Forwarded addresses are accepted only when every traversed hop is a
+        // configured trusted proxy. This prevents clients from choosing their
+        // own rate-limit identity with a spoofed x-forwarded-for header.
+        const ip = getRateLimitIp(req)
         
         // 1. IP-based rate limiting
         const rl = await checkRateLimit(ip, 'auth', 20, 15 * 60 * 1000)
