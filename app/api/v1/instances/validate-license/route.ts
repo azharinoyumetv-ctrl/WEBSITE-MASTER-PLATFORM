@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import prisma from '@/lib/prisma'
 import { getAuthenticatedV1Instance, licenseKeysMatch, validateV1Request } from '@/lib/v1-auth'
 import { withTenantApiTelemetry } from '@/lib/api-telemetry'
 
