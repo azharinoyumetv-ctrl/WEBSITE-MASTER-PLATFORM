@@ -20,7 +20,9 @@ export async function GET() {
       },
     )
   } catch (error) {
-    logger.error('Readiness check failed', error)
+    logger.error('Readiness check failed', {
+      error: error instanceof Error ? error.message : String(error),
+    })
     return NextResponse.json(
       {
         status: 'unavailable',
