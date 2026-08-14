@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import prisma from '@/lib/prisma'
-import { validateV1Request } from '@/lib/v1-auth'
+import { getAuthenticatedV1Instance, validateV1Request } from '@/lib/v1-auth'
 import { withTenantApiTelemetry } from '@/lib/api-telemetry'
 
 export async function GET(req: Request) {
@@ -16,8 +16,13 @@ export async function GET(req: Request) {
       return NextResponse.json({ success: false, error: 'Missing host parameter' }, { status: 400 })
     }
 
+    const instance = await getAuthenticatedV1Instance(req)
+    if (!instance) {
+      return NextResponse.json({ success: false, error: 'Unknown license' }, { status: 403 })
+    }
+
     const domainRecord = await prisma.tenantDomain.findFirst({
-      where: { domain: host, isVerified: true },
+      where: { domain: host.toLowerCase(), tenantId: instance.tenantId, isVerified: true },
       include: { instance: true }
     })
 
