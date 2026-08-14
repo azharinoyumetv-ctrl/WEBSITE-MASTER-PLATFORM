@@ -8,6 +8,13 @@ import { decrypt } from '@/lib/crypto'
 import crypto from 'crypto'
 import { sendOrderConfirmationEmail } from './notifications'
 
+function secureEqual(left: string | null | undefined, right: string | null | undefined) {
+  if (!left || !right) return false
+  const leftBuffer = Buffer.from(left)
+  const rightBuffer = Buffer.from(right)
+  return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer)
+}
+
 async function getXenditAuth(tenantId: string) {
   const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })
   if (!website?.xenditEnabled || !website.xenditEncryptedSecret) {
@@ -577,7 +584,7 @@ export async function handleDokuNotification(req: Request) {
 
     const calculatedSignature = 'HMACSHA256=' + crypto.createHmac('sha256', auth.sharedKey).update(signatureString).digest('base64');
 
-    if (calculatedSignature !== incomingSignature) {
+    if (!secureEqual(calculatedSignature, incomingSignature)) {
       console.error('Doku webhook signature verification failed.');
       return { status: 401, body: { error: 'Unauthorized webhook signature' } };
     }
@@ -596,6 +603,13 @@ export async function handleDokuNotification(req: Request) {
     }
 
     const externalTransactionId = body.transaction?.token || body.transaction?.reference_id || rawInvoiceNumber;
+    const idempotencyKey = `doku:${clientId}:${requestId}`
+    const existingEvent = await prisma.paymentIdempotencyKey.findUnique({
+      where: { idempotencyKey }
+    })
+    if (existingEvent) {
+      return { status: 200, body: { success: true, message: 'Already processed' } }
+    }
 
     // Retrieve or create payment record
     const updated = await prisma.$transaction(async (tx) => {
@@ -634,6 +648,8 @@ export async function handleDokuNotification(req: Request) {
         });
       }
 
+      const becameSucceeded = oldStatus !== 'succeeded' && paymentStatus === 'succeeded'
+
       // Write ledger entry if status changed
       if (oldStatus !== paymentStatus) {
         await tx.tenantPaymentLedger.create({
@@ -668,17 +684,27 @@ export async function handleDokuNotification(req: Request) {
         });
       }
 
-      return payment;
-    });
+      await tx.paymentIdempotencyKey.create({
+        data: {
+          tenantId,
+          idempotencyKey,
+          responsePayload: body as any,
+          expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        }
+      })
 
-    // Send confirmation email asynchronously after transaction success
-    if (paymentStatus === 'succeeded') {
+      return { payment, becameSucceeded };
+    }, { isolationLevel: 'Serializable' });
+
+    // Send confirmation email only for the transition into succeeded. Provider
+    // retries and repeated success notifications must not send duplicates.
+    if (updated.becameSucceeded) {
       const emailRecipient = order?.guestEmail || body.customer?.email || 'customer@example.com';
       sendOrderConfirmationEmail(tenantId, orderId, emailRecipient)
         .catch(err => console.error("Failed to send async Doku order confirmation email", err));
     }
 
-    return { status: 200, body: { success: true, paymentId: updated.id } };
+    return { status: 200, body: { success: true, paymentId: updated.payment.id } };
   } catch (error: any) {
     console.error('Error handling DOKU notification:', error);
     return { status: 500, body: { error: error.message } };
