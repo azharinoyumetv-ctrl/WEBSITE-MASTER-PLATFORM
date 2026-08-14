@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server'
 import { logoutEverywhere } from '@/lib/actions/auth'
 import { checkRateLimit } from '@/lib/rate-limit'
+import { getTrustedHeaderClientIp } from '@/lib/request-ip'
 
 export async function POST(req: Request) {
   try {
-    const ip = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
+    const ip = getTrustedHeaderClientIp(req)
     const rl = await checkRateLimit(ip, 'auth_logout_everywhere', 10, 15 * 60 * 1000)
     if (rl.limited) {
       return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
