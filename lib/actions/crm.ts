@@ -16,16 +16,23 @@ export async function getCrmData(tenantId: string) {
       orderBy: { createdAt: 'desc' }
     })
 
-    const timeline = await prisma.tenantCrmTimeline.findMany({
-      where: { 
-        tenantId, 
-        eventType: { in: ['login', 'order_placed', 'form_submission', 'contact_created'] } 
-      },
-      orderBy: { occurredAt: 'desc' },
-      take: 50
-    })
+    const [timeline, expenses] = await Promise.all([
+      prisma.tenantCrmTimeline.findMany({
+        where: {
+          tenantId,
+          eventType: { in: ['login', 'order_placed', 'form_submission', 'contact_created', 'expense_recorded'] },
+        },
+        orderBy: { occurredAt: 'desc' },
+        take: 50,
+      }),
+      prisma.tenantCrmExpense.findMany({
+        where: { tenantId },
+        include: { contact: true },
+        orderBy: [{ expenseDate: 'desc' }, { createdAt: 'desc' }],
+      }),
+    ])
 
-    return { success: true, contacts, timeline }
+    return { success: true, contacts, timeline, expenses }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -214,6 +221,123 @@ export async function importCrmContacts(tenantId: string, contacts: any[]) {
     
     revalidatePath('/admin/crm')
     return { success: true, count: imported }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+
+export async function createCrmExpense(tenantId: string, data: {
+  contactId?: string
+  category: string
+  amount: number
+  currency?: string
+  description?: string
+  expenseDate: string
+  receiptUrl?: string
+}) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'crm', 'write')
+
+    const amount = Number(data.amount)
+    if (!Number.isFinite(amount) || amount <= 0) throw new Error('Expense amount must be greater than zero')
+    if (!data.category.trim()) throw new Error('Expense category is required')
+    const expenseDate = new Date(data.expenseDate)
+    if (Number.isNaN(expenseDate.getTime())) throw new Error('Expense date is invalid')
+
+    if (data.contactId) {
+      const contact = await prisma.tenantCrmContact.findFirst({ where: { id: data.contactId, tenantId } })
+      if (!contact) throw new Error('CRM contact not found')
+    }
+
+    const expense = await prisma.$transaction(async tx => {
+      const created = await tx.tenantCrmExpense.create({
+        data: {
+          tenantId,
+          contactId: data.contactId || null,
+          category: data.category.trim(),
+          amount,
+          currency: (data.currency || 'IDR').trim().toUpperCase().slice(0, 3),
+          description: data.description?.trim() || null,
+          expenseDate,
+          receiptUrl: data.receiptUrl?.trim() || null,
+          createdBy: user.id,
+        },
+        include: { contact: true },
+      })
+
+      if (data.contactId) {
+        await tx.tenantCrmTimeline.create({
+          data: {
+            tenantId,
+            contactId: data.contactId,
+            eventType: 'expense_recorded',
+            sourceModule: 'crm',
+            eventPayload: { expenseId: created.id, category: created.category, amount: Number(created.amount), currency: created.currency },
+            occurredAt: new Date(),
+          },
+        })
+      }
+      return created
+    })
+
+    revalidatePath('/admin/crm')
+    return { success: true, expense }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateCrmExpense(tenantId: string, expenseId: string, data: {
+  contactId?: string | null
+  category?: string
+  amount?: number
+  currency?: string
+  description?: string | null
+  expenseDate?: string
+  receiptUrl?: string | null
+}) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'crm', 'write')
+
+    const current = await prisma.tenantCrmExpense.findFirst({ where: { id: expenseId, tenantId } })
+    if (!current) throw new Error('Expense not found')
+    if (data.amount !== undefined && (!Number.isFinite(Number(data.amount)) || Number(data.amount) <= 0)) {
+      throw new Error('Expense amount must be greater than zero')
+    }
+
+    const expense = await prisma.tenantCrmExpense.update({
+      where: { id: expenseId },
+      data: {
+        contactId: data.contactId === undefined ? undefined : data.contactId || null,
+        category: data.category?.trim(),
+        amount: data.amount,
+        currency: data.currency?.trim().toUpperCase().slice(0, 3),
+        description: data.description === undefined ? undefined : data.description?.trim() || null,
+        expenseDate: data.expenseDate ? new Date(data.expenseDate) : undefined,
+        receiptUrl: data.receiptUrl === undefined ? undefined : data.receiptUrl?.trim() || null,
+      },
+      include: { contact: true },
+    })
+    revalidatePath('/admin/crm')
+    return { success: true, expense }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function deleteCrmExpense(tenantId: string, expenseId: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'crm', 'write')
+    await prisma.tenantCrmExpense.deleteMany({ where: { id: expenseId, tenantId } })
+    revalidatePath('/admin/crm')
+    return { success: true }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
