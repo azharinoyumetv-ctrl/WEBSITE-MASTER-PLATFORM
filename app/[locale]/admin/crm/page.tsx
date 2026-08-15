@@ -28,6 +28,7 @@ export default async function CrmPage() {
 
   const initialContacts = res.contacts!
   const initialTimeline = res.timeline!
+  const initialExpenses = res.expenses || []
 
-  return <CrmClient tenantId={tenantId} initialContacts={initialContacts} initialTimeline={initialTimeline} />
+  return <CrmClient tenantId={tenantId} initialContacts={initialContacts} initialTimeline={initialTimeline} initialExpenses={initialExpenses} />
 }
