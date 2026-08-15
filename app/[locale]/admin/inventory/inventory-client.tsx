@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { Warehouse, AlertTriangle, CheckCircle2, TrendingDown, MapPin, Package, RefreshCw, ArrowUpDown, Search, Loader2, Plus, Edit2, Trash2, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { adjustInventory, transferStock, addInventoryBalance, updateInventoryBalance, deleteInventoryBalance, createLocation, updateLocation, deleteLocation, bulkAdjustInventory, bulkDeleteInventoryBalances } from '@/lib/actions/inventory'
+import { adjustInventory, transferStock, addInventoryBalance, updateInventoryBalance, deleteInventoryBalance, createLocation, updateLocation, deleteLocation, bulkAdjustInventory, bulkDeleteInventoryBalances, createInventoryBatch, updateInventoryBatch, deleteInventoryBatch } from '@/lib/actions/inventory'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
 const STATUS_CONFIG = {
@@ -13,13 +13,23 @@ const STATUS_CONFIG = {
   critical: { label: 'Critical', color: 'badge-error', icon: TrendingDown },
 }
 
-export function InventoryClient({ initialLocations, initialBalances, catalogItems, tenantId }: { initialLocations: any[], initialBalances: any[], catalogItems: any[], tenantId: string }) {
+export function InventoryClient({ initialLocations, initialBalances, initialBatches = [], catalogItems, tenantId }: {
+  initialLocations: any[]
+  initialBalances: any[]
+  initialBatches?: any[]
+  catalogItems: any[]
+  tenantId: string
+}) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
 
   const [balances, setBalances] = useState(initialBalances)
   const [locations, setLocations] = useState(initialLocations)
+  const [batches, setBatches] = useState(initialBatches)
+  const [isBatchModalOpen, setIsBatchModalOpen] = useState(false)
+  const [batchForm, setBatchForm] = useState({ locationId: '', catalogItemId: '', lotNumber: '', quantityOnHand: '', receivedAt: '', expiresAt: '', supplier: '', notes: '' })
+  const [isSavingBatch, setIsSavingBatch] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState<string | null>(searchParams.get('location') || null)
   const [search, setSearch] = useState(searchParams.get('q') || '')
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all')
@@ -67,8 +77,9 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
   useEffect(() => { 
     setBalances(initialBalances)
     setLocations(initialLocations)
+    setBatches(initialBatches)
     setSelectedBalances([])
-  }, [initialBalances, initialLocations])
+  }, [initialBalances, initialLocations, initialBatches])
 
   const filteredBalances = balances.filter(b => {
     const matchSearch = b.catalogItem?.title?.toLowerCase().includes(search.toLowerCase()) || false
@@ -262,6 +273,33 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
     }
   }
 
+  const mergeBatchBalance = (balance: any) => {
+    setBalances(current => {
+      const exists = current.some(item => item.id === balance.id)
+      return exists
+        ? current.map(item => item.id === balance.id ? balance : item)
+        : [...current, balance]
+    })
+  }
+
+  const handleCreateBatch = async () => {
+    const quantityOnHand = Number(batchForm.quantityOnHand)
+    if (!batchForm.locationId || !batchForm.catalogItemId || !batchForm.lotNumber.trim() || !Number.isFinite(quantityOnHand)) {
+      toast.error('Location, item, lot number, and quantity are required')
+      return
+    }
+    setIsSavingBatch(true)
+    const res = await createInventoryBatch(tenantId, { ...batchForm, quantityOnHand })
+    setIsSavingBatch(false)
+    if (res.success) {
+      setBatches(current => [...current, res.batch])
+      mergeBatchBalance(res.balance)
+      setBatchForm({ locationId: '', catalogItemId: '', lotNumber: '', quantityOnHand: '', receivedAt: '', expiresAt: '', supplier: '', notes: '' })
+      setIsBatchModalOpen(false)
+      toast.success('Inventory batch created')
+    } else toast.error(res.error || 'Failed to create batch')
+  }
+
   const updateFilters = (key: string, val: string | null) => {
     const params = new URLSearchParams(searchParams.toString())
     if (val) {
@@ -280,6 +318,10 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
           <p className="section-desc">Multi-location stock tracking and low-stock alerts</p>
         </div>
         <div className="flex items-center gap-3">
+          <button onClick={() => setIsBatchModalOpen(true)} className="btn btn-secondary">
+            <Package className="w-4 h-4" />
+            Add Batch
+          </button>
           <button onClick={() => setIsTransferModalOpen(true)} className="btn btn-secondary">
             <ArrowUpDown className="w-4 h-4" />
             Transfer Stock
@@ -309,6 +351,65 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
             <p className="stat-value">{s.value}</p>
           </div>
         ))}
+      </div>
+
+      <div className="card p-5 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">Batches & Lots</h3>
+            <p className="text-xs text-slate-500 mt-1">Trace stock by lot, supplier, receipt date, and expiration</p>
+          </div>
+          <span className="badge badge-neutral">{batches.length} batches</span>
+        </div>
+        {batches.length === 0 ? (
+          <p className="text-sm text-slate-500 text-center py-5 border border-dashed rounded-lg">No inventory batches recorded.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="data-table">
+              <thead><tr><th>Lot</th><th>Item</th><th>Location</th><th>Quantity</th><th>Expiry</th><th>Actions</th></tr></thead>
+              <tbody>
+                {batches.map(batch => (
+                  <tr key={batch.id}>
+                    <td className="font-mono text-xs">{batch.lotNumber}</td>
+                    <td>{batch.catalogItem?.title}</td>
+                    <td>{batch.location?.locationName}</td>
+                    <td>{batch.quantityOnHand}</td>
+                    <td>{batch.expiresAt ? new Date(batch.expiresAt).toLocaleDateString() : 'No expiry'}</td>
+                    <td>
+                      <div className="flex gap-2">
+                        <button
+                          className="text-xs text-indigo-600"
+                          onClick={async () => {
+                            const value = prompt('New quantity on hand', String(batch.quantityOnHand))
+                            if (value === null) return
+                            const quantityOnHand = Number(value)
+                            if (!Number.isFinite(quantityOnHand) || quantityOnHand < 0) return toast.error('Invalid quantity')
+                            const res = await updateInventoryBatch(tenantId, batch.id, { quantityOnHand })
+                            if (res.success) {
+                              setBatches(current => current.map(item => item.id === batch.id ? res.batch : item))
+                              mergeBatchBalance(res.balance)
+                            } else toast.error(res.error || 'Failed to update batch')
+                          }}
+                        >Edit quantity</button>
+                        <button
+                          className="text-xs text-red-500"
+                          onClick={async () => {
+                            if (!confirm(`Delete lot ${batch.lotNumber}?`)) return
+                            const res = await deleteInventoryBatch(tenantId, batch.id)
+                            if (res.success) {
+                              setBatches(current => current.filter(item => item.id !== batch.id))
+                              mergeBatchBalance(res.balance)
+                            } else toast.error(res.error || 'Failed to delete batch')
+                          }}
+                        >Delete</button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Alerts */}
@@ -647,6 +748,30 @@ export function InventoryClient({ initialLocations, initialBalances, catalogItem
                 {isAdjusting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {isAdjusting ? 'Adjusting...' : 'Confirm'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isBatchModalOpen && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-modal w-full max-w-lg animate-scale-in">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-semibold">Add Inventory Batch</h3>
+            </div>
+            <div className="p-6 grid grid-cols-2 gap-4">
+              <div><label className="form-label">Location *</label><select className="form-select" value={batchForm.locationId} onChange={e => setBatchForm({...batchForm, locationId: e.target.value})}><option value="">Select...</option>{locations.map(location => <option key={location.id} value={location.id}>{location.locationName}</option>)}</select></div>
+              <div><label className="form-label">Catalog Item *</label><select className="form-select" value={batchForm.catalogItemId} onChange={e => setBatchForm({...batchForm, catalogItemId: e.target.value})}><option value="">Select...</option>{catalogItems.map(item => <option key={item.id} value={item.id}>{item.title}</option>)}</select></div>
+              <div><label className="form-label">Lot Number *</label><input className="form-input" value={batchForm.lotNumber} onChange={e => setBatchForm({...batchForm, lotNumber: e.target.value})} /></div>
+              <div><label className="form-label">Quantity *</label><input type="number" min="0" className="form-input" value={batchForm.quantityOnHand} onChange={e => setBatchForm({...batchForm, quantityOnHand: e.target.value})} /></div>
+              <div><label className="form-label">Received</label><input type="date" className="form-input" value={batchForm.receivedAt} onChange={e => setBatchForm({...batchForm, receivedAt: e.target.value})} /></div>
+              <div><label className="form-label">Expires</label><input type="date" className="form-input" value={batchForm.expiresAt} onChange={e => setBatchForm({...batchForm, expiresAt: e.target.value})} /></div>
+              <div className="col-span-2"><label className="form-label">Supplier</label><input className="form-input" value={batchForm.supplier} onChange={e => setBatchForm({...batchForm, supplier: e.target.value})} /></div>
+              <div className="col-span-2"><label className="form-label">Notes</label><textarea className="form-textarea" rows={2} value={batchForm.notes} onChange={e => setBatchForm({...batchForm, notes: e.target.value})} /></div>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+              <button className="btn btn-secondary" onClick={() => setIsBatchModalOpen(false)}>Cancel</button>
+              <button className="btn btn-primary" disabled={isSavingBatch} onClick={handleCreateBatch}>{isSavingBatch ? 'Saving...' : 'Create Batch'}</button>
             </div>
           </div>
         </div>
