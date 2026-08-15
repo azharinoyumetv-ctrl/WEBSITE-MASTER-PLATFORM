@@ -27,6 +27,9 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
   const [paymentVerifyStatus, setPaymentVerifyStatus] = useState<'idle' | 'checking' | 'success' | 'failed' | 'cancelled' | 'timeout'>('idle')
   const [attempts, setAttempts] = useState(0)
   const maxAttempts = 15
+  const hasPaymentGateway = Boolean(
+    website.dokuEnabled || website.xenditEnabled || website.midtransEnabled
+  )
 
   const searchParams = useSearchParams()
 
@@ -108,6 +111,9 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
     if (!phone.trim()) return toast.error('Please enter your phone number')
     if (!email.trim()) return toast.error('Please enter your email address')
     if (cart.length === 0) return toast.error('Cart is empty')
+    if (!hasPaymentGateway) {
+      return toast.error('Checkout is not available until this storefront configures a payment gateway')
+    }
 
     setIsProcessing(true)
     const res = await createOrder(tenantId, {
@@ -163,8 +169,7 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
           return
         }
 
-        // Show confirmation page if no payment gateways enabled
-        setStep(3)
+        throw new Error('No payment gateway is configured for this storefront')
       } catch (err: any) {
         toast.error(err.message || 'Payment redirection failed')
       } finally {
@@ -357,9 +362,14 @@ function CheckoutClientComponent({ tenantId, items, checkoutNonce, website }: {
                 </div>
               </div>
 
+              {!hasPaymentGateway && (
+                <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                  Online payment is not configured for this storefront. Please contact the merchant before placing an order.
+                </div>
+              )}
               <button 
                 onClick={handleCheckout} 
-                disabled={isProcessing}
+                disabled={isProcessing || !hasPaymentGateway}
                 className="btn btn-primary w-full"
               >
                 {isProcessing ? 'Processing...' : `Pay ${formatCurrency(total)}`}

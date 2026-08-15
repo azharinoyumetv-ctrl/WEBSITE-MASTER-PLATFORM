@@ -1,18 +1,31 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Users2, Search, Mail, Phone, Tag, Plus, ChevronRight, Clock, ShoppingCart, MessageSquare, TrendingUp, X, Loader2, Upload, Trash2, CheckSquare, Download } from 'lucide-react'
+import { Users2, Search, Mail, Phone, Plus, Clock, ShoppingCart, MessageSquare, X, Loader2, Upload, Trash2, Download, Receipt, Pencil } from 'lucide-react'
 import { formatCurrency, formatDate, getInitials, stringToColor, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { createCrmContact, updateCrmContact, deleteCrmContact, addTimelineEvent, sendTimelineWhatsApp, bulkDeleteCrmContacts, importCrmContacts } from '@/lib/actions/crm'
+import { createCrmContact, updateCrmContact, deleteCrmContact, addTimelineEvent, sendTimelineWhatsApp, bulkDeleteCrmContacts, importCrmContacts, createCrmExpense, updateCrmExpense, deleteCrmExpense } from '@/lib/actions/crm'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 
-export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tenantId: string, initialContacts: any[], initialTimeline: any[] }) {
+export function CrmClient({ tenantId, initialContacts, initialTimeline, initialExpenses = [] }: { tenantId: string, initialContacts: any[], initialTimeline: any[], initialExpenses?: any[] }) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const pathname = usePathname()
   const [contacts, setContacts] = useState(initialContacts)
+  const [expenses, setExpenses] = useState(initialExpenses)
   const [selected, setSelected] = useState<any | null>(initialContacts[0] || null)
+  const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false)
+  const [editingExpense, setEditingExpense] = useState<any | null>(null)
+  const [isSavingExpense, setIsSavingExpense] = useState(false)
+  const [expenseForm, setExpenseForm] = useState({
+    contactId: '',
+    category: '',
+    amount: '',
+    currency: 'IDR',
+    description: '',
+    expenseDate: new Date().toISOString().slice(0, 10),
+    receiptUrl: '',
+  })
   const [search, setSearch] = useState(searchParams.get('q') || '')
   
   // New Contact Modal State
@@ -177,14 +190,79 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
       if (res.success) {
         toast.success(`Imported ${res.count} contacts`)
         setTimeout(() => window.location.reload(), 1500)
-      } else {
-        toast.error('Import failed: ' + res.error)
+      } else {        toast.error('Import failed: ' + res.error)
       }
     } catch (err: any) {
       toast.error('Failed to parse CSV')
     }
     setIsImporting(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const resetExpenseForm = () => {
+    setEditingExpense(null)
+    setExpenseForm({
+      contactId: '',
+      category: '',
+      amount: '',
+      currency: 'IDR',
+      description: '',
+      expenseDate: new Date().toISOString().slice(0, 10),
+      receiptUrl: '',
+    })
+  }
+
+  const openExpenseModal = (expense?: any) => {
+    if (expense) {
+      setEditingExpense(expense)
+      setExpenseForm({
+        contactId: expense.contactId || '',
+        category: expense.category || '',
+        amount: String(Number(expense.amount) || ''),
+        currency: expense.currency || 'IDR',
+        description: expense.description || '',
+        expenseDate: new Date(expense.expenseDate).toISOString().slice(0, 10),
+        receiptUrl: expense.receiptUrl || '',
+      })
+    } else {
+      resetExpenseForm()
+    }
+    setIsExpenseModalOpen(true)
+  }
+
+  const handleSaveExpense = async () => {
+    const amount = Number(expenseForm.amount)
+    if (!expenseForm.category.trim() || !Number.isFinite(amount) || amount <= 0) {
+      toast.error('Category and a positive amount are required')
+      return
+    }
+    setIsSavingExpense(true)
+    const payload = { ...expenseForm, contactId: expenseForm.contactId || undefined, amount }
+    const res = editingExpense
+      ? await updateCrmExpense(tenantId, editingExpense.id, payload)
+      : await createCrmExpense(tenantId, payload)
+    setIsSavingExpense(false)
+    if (!res.success || !res.expense) {
+      toast.error(res.error || 'Failed to save expense')
+      return
+    }
+    setExpenses(current => editingExpense
+      ? current.map(expense => expense.id === editingExpense.id ? res.expense : expense)
+      : [res.expense, ...current])
+    toast.success(editingExpense ? 'Expense updated' : 'Expense recorded')
+    setIsExpenseModalOpen(false)
+    resetExpenseForm()
+  }
+
+  const handleDeleteExpense = async (expenseId: string) => {
+    if (!confirm('Delete this expense record?')) return
+    const res = await deleteCrmExpense(tenantId, expenseId)
+    if (res.success) {
+      setExpenses(current => current.filter(expense => expense.id !== expenseId))
+      toast.success('Expense deleted')
+    } else {
+      toast.error(res.error || 'Failed to delete expense')
+    }
   }
 
   const handleSearchChange = (val: string) => {
@@ -252,10 +330,69 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
             <button onClick={handleExportCSV} className="btn btn-secondary flex items-center gap-1.5 focus:ring-2 focus:ring-indigo-500">
               <Download className="w-4 h-4" /> Export CSV
             </button>
+            <button onClick={() => openExpenseModal()} className="btn btn-secondary flex items-center gap-2 focus:ring-2 focus:ring-indigo-500">
+              <Receipt className="w-4 h-4" /> Add Expense
+            </button>
             <button onClick={() => setIsModalOpen(true)} className="btn btn-primary flex items-center gap-2 focus:ring-2 focus:ring-indigo-500">
               <Plus className="w-4 h-4" /> New Contact
             </button>
           </div>
+      </div>
+
+      <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 className="font-semibold text-slate-900">CRM Expenses</h3>
+            <p className="text-xs text-slate-500 mt-1">Track customer-related acquisition, retention, and service costs.</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-slate-400 uppercase tracking-wide">Total recorded</p>
+            <p className="text-lg font-bold text-slate-900">
+              {formatCurrency(expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0))}
+            </p>
+          </div>
+        </div>
+        {expenses.length === 0 ? (
+          <div className="p-8 text-center text-sm text-slate-500">No CRM expenses recorded yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 text-left text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-5 py-3">Date</th>
+                  <th className="px-5 py-3">Category</th>
+                  <th className="px-5 py-3">Contact</th>
+                  <th className="px-5 py-3">Description</th>
+                  <th className="px-5 py-3 text-right">Amount</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {expenses.map(expense => (
+                  <tr key={expense.id} className="hover:bg-slate-50">
+                    <td className="px-5 py-3 whitespace-nowrap">{formatDate(expense.expenseDate)}</td>
+                    <td className="px-5 py-3 font-medium text-slate-800">{expense.category}</td>
+                    <td className="px-5 py-3 text-slate-600">
+                      {expense.contact ? `${expense.contact.firstName} ${expense.contact.lastName || ''}` : 'General'}
+                    </td>
+                    <td className="px-5 py-3 text-slate-500 max-w-xs truncate">{expense.description || '—'}</td>
+                    <td className="px-5 py-3 text-right font-semibold">{formatCurrency(Number(expense.amount || 0), expense.currency || 'IDR')}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex justify-end gap-1">
+                        <button onClick={() => openExpenseModal(expense)} className="p-2 text-slate-500 hover:text-indigo-600" aria-label="Edit expense">
+                          <Pencil className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDeleteExpense(expense.id)} className="p-2 text-slate-500 hover:text-red-600" aria-label="Delete expense">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -377,8 +514,7 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
                     <p className="text-xs text-slate-400">Member Since</p>
                     <p className="text-sm font-medium text-slate-700">{formatDate(selected.createdAt)}</p>
                   </div>
-                </div>
-              </div>
+                </div>              </div>
 
               {/* Timeline Composer */}
               <div className="card p-5">
@@ -450,6 +586,62 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline }: { tena
         </div>
       </div>
 
+      {isExpenseModalOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden animate-slide-up">
+            <div className="flex items-center justify-between p-4 border-b border-slate-100 bg-slate-50">
+              <h3 className="font-semibold text-slate-900">{editingExpense ? 'Edit Expense' : 'Record Expense'}</h3>
+              <button onClick={() => { setIsExpenseModalOpen(false); resetExpenseForm() }} className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-200/50">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="form-label">Category *</label>
+                  <input className="form-input" value={expenseForm.category} onChange={e => setExpenseForm({...expenseForm, category: e.target.value})} placeholder="Acquisition, support…" />
+                </div>
+                <div>
+                  <label className="form-label">Contact</label>
+                  <select className="form-input" value={expenseForm.contactId} onChange={e => setExpenseForm({...expenseForm, contactId: e.target.value})}>
+                    <option value="">General expense</option>
+                    {contacts.map(contact => <option key={contact.id} value={contact.id}>{contact.firstName} {contact.lastName}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="col-span-2">
+                  <label className="form-label">Amount *</label>
+                  <input type="number" min="0" step="0.01" className="form-input" value={expenseForm.amount} onChange={e => setExpenseForm({...expenseForm, amount: e.target.value})} />
+                </div>
+                <div>
+                  <label className="form-label">Currency</label>
+                  <input className="form-input uppercase" maxLength={3} value={expenseForm.currency} onChange={e => setExpenseForm({...expenseForm, currency: e.target.value.toUpperCase()})} />
+                </div>
+              </div>
+              <div>
+                <label className="form-label">Expense Date *</label>
+                <input type="date" className="form-input" value={expenseForm.expenseDate} onChange={e => setExpenseForm({...expenseForm, expenseDate: e.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">Description</label>
+                <textarea className="form-textarea w-full" rows={3} value={expenseForm.description} onChange={e => setExpenseForm({...expenseForm, description: e.target.value})} />
+              </div>
+              <div>
+                <label className="form-label">Receipt URL</label>
+                <input type="url" className="form-input" value={expenseForm.receiptUrl} onChange={e => setExpenseForm({...expenseForm, receiptUrl: e.target.value})} placeholder="https://…" />
+              </div>
+            </div>
+            <div className="p-4 border-t border-slate-100 flex justify-end gap-3 bg-slate-50">
+              <button onClick={() => { setIsExpenseModalOpen(false); resetExpenseForm() }} className="btn btn-secondary">Cancel</button>
+              <button onClick={handleSaveExpense} disabled={isSavingExpense} className="btn btn-primary">
+                {isSavingExpense ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                {editingExpense ? 'Save Expense' : 'Record Expense'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-900/50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-slide-up">

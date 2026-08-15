@@ -269,6 +269,8 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: `${user.firstName || ""} ${user.lastName || ""}`.trim(),
           tenantId: user.tenantId,
+          tenantSubdomain: user.tenant?.subdomain || null,
+          tenantCustomDomain: user.tenant?.customDomain || null,
           roles: user.userRoles.map(ur => ur.role.name),
           sessionId,
           tokenVersion: user.tokenVersion
@@ -281,6 +283,8 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id
         token.tenantId = (user as any).tenantId
+        token.tenantSubdomain = (user as any).tenantSubdomain
+        token.tenantCustomDomain = (user as any).tenantCustomDomain
         token.roles = (user as any).roles
         token.sessionId = (user as any).sessionId
         token.tokenVersion = (user as any).tokenVersion
@@ -289,12 +293,17 @@ export const authOptions: NextAuthOptions = {
       if (token.id) {
         const dbUser = await prisma.user.findUnique({
           where: { id: token.id as string },
-          select: { tokenVersion: true }
+          select: {
+            tokenVersion: true,
+            tenant: { select: { subdomain: true, customDomain: true } }
+          }
         })
         if (!dbUser || dbUser.tokenVersion !== token.tokenVersion) {
           // Token version mismatch or user deleted
           return {} as any
         }
+        token.tenantSubdomain = dbUser.tenant?.subdomain || null
+        token.tenantCustomDomain = dbUser.tenant?.customDomain || null
       }
 
       if (token.sessionId) {

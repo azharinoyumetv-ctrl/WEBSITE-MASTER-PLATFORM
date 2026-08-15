@@ -20,6 +20,7 @@ export default async function BookingPage() {
   const res = await getBookingData(tenantId)
   const initialResources = res.resources || []
   const initialBookings = res.bookings || []
+  const initialStaff = res.staff || []
 
-  return <BookingClient initialResources={initialResources} initialBookings={initialBookings} tenantId={tenantId} />
+  return <BookingClient initialResources={initialResources} initialBookings={initialBookings} initialStaff={initialStaff} tenantId={tenantId} />
 }

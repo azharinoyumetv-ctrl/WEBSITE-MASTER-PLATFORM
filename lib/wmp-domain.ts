@@ -26,3 +26,33 @@ export function getWmpBaseDomain() {
 export function isReservedNonWmpHostname(hostHeader: string) {
   return RESERVED_NON_WMP_DOMAINS.has(normalizeHostname(hostHeader))
 }
+
+
+export type TenantHostnameIdentity = {
+  id: string
+  subdomain?: string | null
+  customDomain?: string | null
+}
+
+/**
+ * Match an incoming hostname to a tenant without comparing a hostname slug to
+ * the tenant UUID. This helper is deliberately database-free so middleware can
+ * use the tenant identity already refreshed into the signed JWT.
+ */
+export function isHostnameForTenant(
+  hostHeader: string,
+  tenant: TenantHostnameIdentity,
+) {
+  const host = normalizeHostname(hostHeader)
+  const baseDomain = getWmpBaseDomain()
+  const subdomain = normalizeHostname(tenant.subdomain || '')
+  const customDomain = normalizeHostname(tenant.customDomain || '')
+  const tenantId = tenant.id.trim().toLowerCase()
+
+  if (!host || !tenantId) return false
+  if (customDomain && host === customDomain) return true
+  if (subdomain && (host === `${subdomain}.${baseDomain}` || host === `${subdomain}.localhost`)) return true
+
+  // Preserve UUID-based tenant hostnames for older self-hosted deployments.
+  return host === `${tenantId}.${baseDomain}` || host === `${tenantId}.localhost`
+}

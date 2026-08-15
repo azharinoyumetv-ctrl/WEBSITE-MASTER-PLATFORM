@@ -17,13 +17,13 @@ export async function generateMetadata(): Promise<Metadata> {
   }
 }
 
-export default async function CheckoutPage() {
+export default async function CheckoutPage({ params }: { params: { locale: string } }) {
   const headersList = await headers()
   const tenantDomain = headersList.get('x-tenant-id') || 'default'
   const websiteRes = await getPublicWebsiteConfig(tenantDomain)
 
   if (tenantDomain === 'default') {
-    redirect('/project-setup')
+    redirect(`/${params.locale}/project-setup`)
   }
 
   if (!websiteRes.success || !websiteRes.website) {

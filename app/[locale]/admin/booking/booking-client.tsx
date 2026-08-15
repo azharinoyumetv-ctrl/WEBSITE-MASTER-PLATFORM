@@ -4,16 +4,24 @@ import { useState } from 'react'
 import { CalendarCheck, Clock, User, CheckCircle2, XCircle, AlertCircle, Plus, ChevronLeft, ChevronRight, Loader2, Download } from 'lucide-react'
 import { formatDate, getStatusBadgeClass, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
-import { createBooking, updateBookingStatus, createBookingPaymentLink } from '@/lib/actions/booking'
+import { createBooking, updateBookingStatus, createBookingPaymentLink, createBookingStaff, updateBookingStaff, deleteBookingStaff, assignBookingStaff } from '@/lib/actions/booking'
 
 const HOURS = Array.from({ length: 10 }, (_, i) => `${i + 9}:00`)
 const DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
 
-export function BookingClient({ initialBookings, initialResources, tenantId }: { initialBookings: any[], initialResources: any[], tenantId: string }) {
+export function BookingClient({ initialBookings, initialResources, initialStaff = [], tenantId }: {
+  initialBookings: any[]
+  initialResources: any[]
+  initialStaff?: any[]
+  tenantId: string
+}) {
   const [bookings, setBookings] = useState(initialBookings)
+  const [staff, setStaff] = useState(initialStaff)
   const [selectedResource, setSelectedResource] = useState(initialResources[0] || null)
   const [showNewModal, setShowNewModal] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [showStaffModal, setShowStaffModal] = useState(false)
+  const [staffForm, setStaffForm] = useState({ displayName: '', email: '', phoneNumber: '', resourceId: '', skills: '' })
   
   // Payment link modal states
   const [paymentModalBooking, setPaymentModalBooking] = useState<any | null>(null)
@@ -45,7 +53,8 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
     resourceId: initialResources[0]?.id || '',
     date: '',
     time: '',
-    notes: ''
+    notes: '',
+    staffId: ''
   })
 
   const stats = {
@@ -70,8 +79,10 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
       customerName: newBooking.customerEmail || 'Walk-in',
       resourceId: resource?.id,
       resourceName: resource?.resourceName,
+      staffId: newBooking.staffId || undefined,
       startTime,
       endTime,
+      notes: newBooking.notes,
     })
     setIsSaving(false)
 
@@ -131,6 +142,10 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
           <button onClick={exportToICal} className="btn btn-secondary flex items-center gap-2">
             <Download className="w-4 h-4" /> iCal
           </button>
+          <button onClick={() => setShowStaffModal(true)} className="btn btn-secondary">
+            <User className="w-4 h-4" />
+            Add Staff
+          </button>
           <button onClick={() => setShowNewModal(true)} className="btn btn-primary" id="new-booking-btn">
             <Plus className="w-4 h-4" />
             New Booking
@@ -178,6 +193,46 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
                 </button>
               ))}
               {initialResources.length === 0 && <p className="text-sm text-slate-500">No resources defined.</p>}
+            </div>
+          </div>
+
+          <div className="card p-4 mt-4">
+            <h3 className="text-sm font-semibold text-slate-900 mb-3">Staff</h3>
+            <div className="space-y-2">
+              {staff.map(member => (
+                <div key={member.id} className="rounded-lg border border-slate-200 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-medium text-slate-800">{member.displayName}</p>
+                      <p className="text-xs text-slate-400">{member.resource?.resourceName || 'All resources'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="text-xs text-red-500 hover:text-red-700"
+                      onClick={async () => {
+                        if (!confirm(`Delete ${member.displayName}?`)) return
+                        const res = await deleteBookingStaff(tenantId, member.id)
+                        if (res.success) setStaff(current => current.filter(item => item.id !== member.id))
+                        else toast.error(res.error || 'Failed to delete staff')
+                      }}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    className="mt-2 text-xs text-indigo-600"
+                    onClick={async () => {
+                      const res = await updateBookingStaff(tenantId, member.id, { isActive: !member.isActive })
+                      if (res.success) setStaff(current => current.map(item => item.id === member.id ? res.staff : item))
+                      else toast.error(res.error || 'Failed to update staff')
+                    }}
+                  >
+                    {member.isActive ? 'Deactivate' : 'Activate'}
+                  </button>
+                </div>
+              ))}
+              {staff.length === 0 && <p className="text-xs text-slate-500">No staff configured.</p>}
             </div>
           </div>
         </div>
@@ -237,6 +292,7 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
                 <tr>
                   <th>Customer</th>
                   <th>Resource</th>
+                  <th>Staff</th>
                   <th>Time</th>
                   <th>Status</th>
                   <th>Actions</th>
@@ -269,6 +325,32 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
                       </div>
                     </td>
                     <td className="text-sm text-slate-600">{b.resourceName}</td>
+                    <td>
+                      <select
+                        aria-label={`Staff for ${b.customerName}`}
+                        className="form-select min-w-32 text-xs"
+                        value={b.staffId || ''}
+                        onChange={async event => {
+                          const staffId = event.target.value || null
+                          const res = await assignBookingStaff(tenantId, b.id, staffId)
+                          if (res.success) {
+                            setBookings(current => current.map(item => item.id === b.id ? {
+                              ...item,
+                              ...res.booking,
+                              staffName: res.booking?.staff?.displayName || 'Unassigned',
+                            } : item))
+                            toast.success('Staff assignment updated')
+                          } else {
+                            toast.error(res.error || 'Failed to assign staff')
+                          }
+                        }}
+                      >
+                        <option value="">Unassigned</option>
+                        {staff.filter(member => member.isActive && (!member.resourceId || member.resourceId === b.resourceId)).map(member => (
+                          <option key={member.id} value={member.id}>{member.displayName}</option>
+                        ))}
+                      </select>
+                    </td>
                     <td>
                       <p className="text-xs font-medium text-slate-700">{formatDate(b.startTime)}</p>
                       <p className="text-xs text-slate-400">{new Date(b.startTime).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })} — {new Date(b.endTime).toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' })}</p>
@@ -319,7 +401,7 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
                 ))}
                 {bookings.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center py-8 text-slate-500">No bookings found.</td>
+                    <td colSpan={6} className="text-center py-8 text-slate-500">No bookings found.</td>
                   </tr>
                 )}
               </tbody>
@@ -345,6 +427,15 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
                   {initialResources.filter(r => r.isActive).map(r => <option key={r.id} value={r.id}>{r.resourceName}</option>)}
                 </select>
               </div>
+              <div>
+                <label className="form-label">Staff</label>
+                <select value={newBooking.staffId} onChange={e => setNewBooking({...newBooking, staffId: e.target.value})} className="form-select">
+                  <option value="">Unassigned</option>
+                  {staff.filter(member => member.isActive && (!member.resourceId || member.resourceId === newBooking.resourceId)).map(member => (
+                    <option key={member.id} value={member.id}>{member.displayName}</option>
+                  ))}
+                </select>
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div><label className="form-label">Date</label><input type="date" value={newBooking.date} onChange={e => setNewBooking({...newBooking, date: e.target.value})} className="form-input" /></div>
                 <div><label className="form-label">Time</label><input type="time" value={newBooking.time} onChange={e => setNewBooking({...newBooking, time: e.target.value})} className="form-input" /></div>
@@ -356,6 +447,47 @@ export function BookingClient({ initialBookings, initialResources, tenantId }: {
               <button onClick={handleCreateBooking} disabled={isSaving} className="btn btn-primary" id="confirm-booking-btn">
                 {isSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {isSaving ? 'Creating...' : 'Create Booking'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showStaffModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-modal w-full max-w-md animate-scale-in">
+            <div className="p-6 border-b border-slate-100">
+              <h3 className="text-lg font-semibold">Add Booking Staff</h3>
+            </div>
+            <div className="p-6 space-y-4">
+              <div><label className="form-label">Name *</label><input className="form-input" value={staffForm.displayName} onChange={e => setStaffForm({...staffForm, displayName: e.target.value})} /></div>
+              <div><label className="form-label">Email</label><input type="email" className="form-input" value={staffForm.email} onChange={e => setStaffForm({...staffForm, email: e.target.value})} /></div>
+              <div><label className="form-label">Phone</label><input className="form-input" value={staffForm.phoneNumber} onChange={e => setStaffForm({...staffForm, phoneNumber: e.target.value})} /></div>
+              <div><label className="form-label">Primary Resource</label><select className="form-select" value={staffForm.resourceId} onChange={e => setStaffForm({...staffForm, resourceId: e.target.value})}><option value="">All resources</option>{initialResources.map(resource => <option key={resource.id} value={resource.id}>{resource.resourceName}</option>)}</select></div>
+              <div><label className="form-label">Skills</label><input className="form-input" placeholder="Consultation, installation" value={staffForm.skills} onChange={e => setStaffForm({...staffForm, skills: e.target.value})} /></div>
+            </div>
+            <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
+              <button className="btn btn-secondary" onClick={() => setShowStaffModal(false)}>Cancel</button>
+              <button
+                className="btn btn-primary"
+                disabled={isSaving || !staffForm.displayName.trim()}
+                onClick={async () => {
+                  setIsSaving(true)
+                  const res = await createBookingStaff(tenantId, {
+                    ...staffForm,
+                    resourceId: staffForm.resourceId || undefined,
+                    skills: staffForm.skills.split(',').map(skill => skill.trim()).filter(Boolean),
+                  })
+                  setIsSaving(false)
+                  if (res.success) {
+                    setStaff(current => [...current, res.staff])
+                    setStaffForm({ displayName: '', email: '', phoneNumber: '', resourceId: '', skills: '' })
+                    setShowStaffModal(false)
+                    toast.success('Staff member added')
+                  } else toast.error(res.error || 'Failed to add staff')
+                }}
+              >
+                {isSaving ? 'Saving...' : 'Add Staff'}
               </button>
             </div>
           </div>

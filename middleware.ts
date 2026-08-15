@@ -13,6 +13,7 @@ export const config = {
 import { locales, defaultLocale } from './i18n'
 import {
   getWmpBaseDomain,
+  isHostnameForTenant,
   isReservedNonWmpHostname,
   normalizeHostname,
 } from './lib/wmp-domain'
@@ -166,12 +167,22 @@ export default async function middleware(request: NextRequest) {
       })
     : null
 
-  // 1. Cross-tenant routing validation if user has active session
+  const tokenMatchesTenantHost = token
+    ? isHostnameForTenant(hostname, {
+        id: String(token.tenantId || ''),
+        subdomain: typeof token.tenantSubdomain === 'string' ? token.tenantSubdomain : null,
+        customDomain: typeof token.tenantCustomDomain === 'string' ? token.tenantCustomDomain : null,
+      })
+    : false
+
+  // 1. Cross-tenant routing validation if user has active session. Hostnames
+  // identify tenants by subdomain or custom domain, while the JWT stores the
+  // tenant UUID; compare like-for-like tenant identities before rejecting.
   if (token && hostTenantId !== 'default') {
     const userRoles = (token.roles as string[]) || []
     const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super-admin')
 
-    if (token.tenantId !== hostTenantId && !isSuperAdmin) {
+    if (!tokenMatchesTenantHost && !isSuperAdmin) {
       console.warn(`Rejecting cross-tenant access from tenant ${token.tenantId} to target ${hostTenantId}`)
       if (request.headers.has('next-action') || pathname.startsWith('/api')) {
         return applySecurityHeaders(NextResponse.json({ error: 'Unauthorized tenant access' }, { status: 403 }), csp)
@@ -192,7 +203,7 @@ export default async function middleware(request: NextRequest) {
       const isPlatformOwner = userRoles.some(r => r.toLowerCase() === 'platform_owner' || r.toLowerCase() === 'platform owner')
       const isSuperAdmin = userRoles.some(r => r.toLowerCase() === 'super-admin')
 
-      if (hasAnyRole && (hostTenantId === 'default' || token.tenantId === hostTenantId || isPlatformOwner || isSuperAdmin)) {
+      if (hasAnyRole && (hostTenantId === 'default' || tokenMatchesTenantHost || isPlatformOwner || isSuperAdmin)) {
         isAuthorized = true
       }
     }

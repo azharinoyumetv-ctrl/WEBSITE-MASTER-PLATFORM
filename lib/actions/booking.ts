@@ -3,20 +3,27 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { getAuthenticatedUser, requirePermission } from "@/lib/rbac"
+import { Prisma } from '@prisma/client'
 
 export async function getBookingData(tenantId: string) {
   try {
     const user = await getAuthenticatedUser()
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'bookings', 'read')
-    const resources = await prisma.tenantBookingResource.findMany({
-      where: { tenantId }
-    })
+    const [resources, staff] = await Promise.all([
+      prisma.tenantBookingResource.findMany({ where: { tenantId } }),
+      prisma.tenantBookingStaff.findMany({
+        where: { tenantId },
+        include: { resource: true },
+        orderBy: [{ isActive: 'desc' }, { displayName: 'asc' }],
+      }),
+    ])
 
     const bookings = await prisma.tenantBooking.findMany({
       where: { tenantId },
       include: {
-        resource: true
+        resource: true,
+        staff: true,
       },
       orderBy: { startTime: 'desc' }
     })
@@ -37,11 +44,12 @@ export async function getBookingData(tenantId: string) {
       return {
         ...b,
         customerName,
-        resourceName: b.resource?.resourceName || 'Unknown Resource'
+        resourceName: b.resource?.resourceName || 'Unknown Resource',
+        staffName: b.staff?.displayName || 'Unassigned',
       }
     })
 
-    return { success: true, resources, bookings: mappedBookings }
+    return { success: true, resources, staff, bookings: mappedBookings }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -64,11 +72,32 @@ export async function createBooking(tenantId: string, data: any) {
 
     const customerId = user ? user.id : (contact ? contact.id : '00000000-0000-0000-0000-000000000000')
 
+    const staffId: string | null = data.staffId || null
+    if (staffId) {
+      const staffMember = await prisma.tenantBookingStaff.findFirst({
+        where: { id: staffId, tenantId, isActive: true },
+      })
+      if (!staffMember) throw new Error('Selected staff member is unavailable')
+      if (staffMember.resourceId && staffMember.resourceId !== data.resourceId) {
+        throw new Error('Selected staff member is not assigned to this resource')
+      }
+      const conflict = await prisma.tenantBooking.findFirst({
+        where: {
+          tenantId,
+          staffId,
+          bookingStatus: { notIn: ['cancelled', 'completed'] },
+          startTime: { lt: data.endTime },
+          endTime: { gt: data.startTime },
+        },
+      })
+      if (conflict) throw new Error('Selected staff member already has a booking in this time slot')
+    }
 
     const booking = await prisma.tenantBooking.create({
       data: {
         tenantId,
         resourceId: data.resourceId,
+        staffId,
         customerId: customerId,
         bookingStatus: data.bookingStatus || 'confirmed',
         startTime: data.startTime,
@@ -76,14 +105,16 @@ export async function createBooking(tenantId: string, data: any) {
         notes: data.notes || ''
       },
       include: {
-        resource: true
+        resource: true,
+        staff: true,
       }
     })
 
     const mappedBooking = {
       ...booking,
       customerName: data.customerName || (booking.metadata && typeof booking.metadata === 'object' && 'customerName' in booking.metadata ? (booking.metadata as any).customerName : 'Unknown Customer'),
-      resourceName: booking.resource?.resourceName || 'Unknown Resource'
+      resourceName: booking.resource?.resourceName || 'Unknown Resource',
+      staffName: booking.staff?.displayName || 'Unassigned',
     }
     
     revalidatePath('/admin/booking')
@@ -267,6 +298,132 @@ export async function createBookingPaymentLink(tenantId: string, bookingId: stri
 
     revalidatePath('/admin/booking')
     return { success: true, paymentUrl }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+
+export async function createBookingStaff(tenantId: string, data: {
+  displayName: string
+  email?: string
+  phoneNumber?: string
+  resourceId?: string
+  skills?: string[]
+  availability?: Prisma.InputJsonValue
+}) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'bookings', 'write')
+    if (!data.displayName.trim()) throw new Error('Staff name is required')
+
+    if (data.resourceId) {
+      const resource = await prisma.tenantBookingResource.findFirst({ where: { id: data.resourceId, tenantId } })
+      if (!resource) throw new Error('Booking resource not found')
+    }
+
+    const staff = await prisma.tenantBookingStaff.create({
+      data: {
+        tenantId,
+        displayName: data.displayName.trim(),
+        email: data.email?.trim().toLowerCase() || null,
+        phoneNumber: data.phoneNumber?.trim() || null,
+        resourceId: data.resourceId || null,
+        skills: data.skills || [],
+        availability: data.availability || {},
+      },
+      include: { resource: true },
+    })
+    revalidatePath('/admin/booking')
+    return { success: true, staff }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateBookingStaff(tenantId: string, staffId: string, data: {
+  displayName?: string
+  email?: string | null
+  phoneNumber?: string | null
+  resourceId?: string | null
+  skills?: string[]
+  availability?: Prisma.InputJsonValue
+  isActive?: boolean
+}) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'bookings', 'write')
+
+    const staff = await prisma.tenantBookingStaff.update({
+      where: { id: staffId, tenantId },
+      data: {
+        displayName: data.displayName?.trim(),
+        email: data.email === undefined ? undefined : data.email?.trim().toLowerCase() || null,
+        phoneNumber: data.phoneNumber === undefined ? undefined : data.phoneNumber?.trim() || null,
+        resourceId: data.resourceId === undefined ? undefined : data.resourceId || null,
+        skills: data.skills,
+        availability: data.availability,
+        isActive: data.isActive,
+      },
+      include: { resource: true },
+    })
+    revalidatePath('/admin/booking')
+    return { success: true, staff }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function deleteBookingStaff(tenantId: string, staffId: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'bookings', 'write')
+    await prisma.tenantBookingStaff.deleteMany({ where: { id: staffId, tenantId } })
+    revalidatePath('/admin/booking')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function assignBookingStaff(tenantId: string, bookingId: string, staffId: string | null) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'bookings', 'write')
+
+    const booking = await prisma.tenantBooking.findFirst({ where: { id: bookingId, tenantId } })
+    if (!booking) throw new Error('Booking not found')
+
+    if (staffId) {
+      const staff = await prisma.tenantBookingStaff.findFirst({ where: { id: staffId, tenantId, isActive: true } })
+      if (!staff) throw new Error('Staff member not found or inactive')
+      if (staff.resourceId && staff.resourceId !== booking.resourceId) {
+        throw new Error('Staff member is not assigned to this booking resource')
+      }
+      const conflict = await prisma.tenantBooking.findFirst({
+        where: {
+          tenantId,
+          staffId,
+          id: { not: bookingId },
+          bookingStatus: { notIn: ['cancelled', 'completed'] },
+          startTime: { lt: booking.endTime },
+          endTime: { gt: booking.startTime },
+        },
+      })
+      if (conflict) throw new Error('Staff member already has a booking in this time slot')
+    }
+
+    const updated = await prisma.tenantBooking.update({
+      where: { id: bookingId },
+      data: { staffId, bookingStatus: staffId ? 'reassigned' : booking.bookingStatus },
+      include: { resource: true, staff: true },
+    })
+    revalidatePath('/admin/booking')
+    return { success: true, booking: updated }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
