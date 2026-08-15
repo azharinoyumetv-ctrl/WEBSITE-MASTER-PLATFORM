@@ -7,5 +7,5 @@ import { POST as handleProviderWebhook } from '../../../webhook/[provider]/route
  * idempotency, and settlement behavior lives in the canonical provider route.
  */
 export async function POST(req: NextRequest) {
-  return handleProviderWebhook(req, { params: { provider: 'midtrans' } })
+  return handleProviderWebhook(req, { params: Promise.resolve({ provider: 'midtrans' }) })
 }

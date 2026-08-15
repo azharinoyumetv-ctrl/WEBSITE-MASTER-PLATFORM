@@ -74,14 +74,15 @@ async function checkRateLimit(req: NextRequest, provider: string) {
 const tenantTokenCache: Record<string, { timestamp: number, data: { tenantId: string, decryptedValue: string }[] }> = {}
 const CACHE_TTL = 1000 * 60 * 15 // 15 minutes
 
-export async function POST(req: NextRequest, { params }: { params: { provider: string } }) {
-  const allowed = await checkRateLimit(req, params.provider)
+export async function POST(req: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
+  const { provider: requestedProvider } = await params
+  const allowed = await checkRateLimit(req, requestedProvider)
   if (!allowed) {
     return NextResponse.json({ error: 'Too Many Requests' }, { status: 429 })
   }
 
   try {
-    const provider = params.provider.toLowerCase()
+    const provider = requestedProvider.toLowerCase()
     const body = await req.json()
 
     let orderId = ''

@@ -13,11 +13,12 @@ import { AnalyticsTracker } from '@/components/AnalyticsTracker'
 
 export default async function SiteLayout({
   children,
-  params: { locale }
+  params,
 }: {
   children: React.ReactNode
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   const headersList = await headers()
   const tenantDomain = headersList.get('x-tenant-id') || 'default'
 

@@ -162,6 +162,37 @@ test.describe('Website Master Platform E2E Audit', () => {
 
     // Verify seeded inventory location is visible in locations panel
     await expect(page.locator('.card').filter({ hasText: 'Locations' })).toContainText('E2E Warehouse');
+
+    // Exercise the complete authenticated inventory CRUD path against the
+    // disposable CI tenant instead of mutating production inventory.
+    await page.getByRole('button', { name: 'Add Stock' }).click();
+    const addModal = page.locator('.fixed').filter({ has: page.getByRole('heading', { name: 'Add Stock' }) });
+    await addModal.locator('select').nth(0).selectOption({ label: 'E2E Warehouse' });
+    await addModal.locator('select').nth(1).selectOption({ label: 'Inventory CRUD Test Item' });
+    await addModal.locator('input[type="number"]').nth(0).fill('12');
+    await addModal.locator('input[type="number"]').nth(1).fill('3');
+    await addModal.getByRole('button', { name: 'Add Stock' }).click();
+
+    const inventoryRow = page.locator('tbody tr').filter({ hasText: 'Inventory CRUD Test Item' });
+    await expect(inventoryRow).toHaveCount(1);
+    await expect(inventoryRow.locator('td').nth(2)).toHaveText('12');
+    await expect(inventoryRow.locator('td').nth(5)).toHaveText('3');
+
+    await inventoryRow.getByTitle('Edit Record').click();
+    const editModal = page.locator('.fixed').filter({ has: page.getByRole('heading', { name: 'Edit Stock Record' }) });
+    await editModal.locator('input[type="number"]').nth(0).fill('20');
+    await editModal.locator('input[type="number"]').nth(1).fill('2');
+    await editModal.locator('input[type="number"]').nth(2).fill('4');
+    await editModal.getByRole('button', { name: 'Save Changes' }).click();
+
+    await expect(inventoryRow.locator('td').nth(2)).toHaveText('20');
+    await expect(inventoryRow.locator('td').nth(3)).toHaveText('2');
+    await expect(inventoryRow.locator('td').nth(4)).toHaveText('18');
+    await expect(inventoryRow.locator('td').nth(5)).toHaveText('4');
+
+    page.once('dialog', dialog => dialog.accept());
+    await inventoryRow.getByTitle('Delete Record').click();
+    await expect(inventoryRow).toHaveCount(0);
   });
 
   test('10. Booking & Scheduling', async ({ page }) => {
