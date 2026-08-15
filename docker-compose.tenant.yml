@@ -1,0 +1,31 @@
+services:
+  wmp:
+    build:
+      context: .
+      args:
+        DATABASE_URL: ${DATABASE_URL}
+    image: dagangos/wmp:${WMP_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      PORT: "4000"
+      HOSTNAME: 0.0.0.0
+    ports:
+      - "127.0.0.1:${WMP_PORT:-4000}:4000"
+    volumes:
+      - wmp_uploads:/app/public/uploads
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - fetch('http://127.0.0.1:4000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  wmp_uploads:
