@@ -391,7 +391,6 @@ export async function getPlatformInstanceRegistry() {
         instanceUrl: true,
         status: true,
         lastHeartbeat: true,
-        lastSyncAt: true,
         syncErrorCount: true,
         infraMetadata: true,
         createdAt: true,
@@ -447,7 +446,6 @@ export async function getPlatformInstanceRegistry() {
           ...instance,
           health,
           lastHeartbeat: instance.lastHeartbeat?.toISOString() || null,
-          lastSyncAt: instance.lastSyncAt?.toISOString() || null,
           createdAt: instance.createdAt.toISOString(),
           updatedAt: instance.updatedAt.toISOString(),
         }
