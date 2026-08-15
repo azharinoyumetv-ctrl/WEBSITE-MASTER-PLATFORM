@@ -3,6 +3,7 @@
 import prisma from "@/lib/prisma"
 import { revalidatePath } from 'next/cache'
 import { getAuthenticatedUser, requirePermission } from "@/lib/rbac"
+import { Prisma } from '@prisma/client'
 
 export async function getBookingData(tenantId: string) {
   try {
@@ -309,7 +310,7 @@ export async function createBookingStaff(tenantId: string, data: {
   phoneNumber?: string
   resourceId?: string
   skills?: string[]
-  availability?: Record<string, unknown>
+  availability?: Prisma.InputJsonValue
 }) {
   try {
     const user = await getAuthenticatedUser()
@@ -347,7 +348,7 @@ export async function updateBookingStaff(tenantId: string, staffId: string, data
   phoneNumber?: string | null
   resourceId?: string | null
   skills?: string[]
-  availability?: Record<string, unknown>
+  availability?: Prisma.InputJsonValue
   isActive?: boolean
 }) {
   try {
