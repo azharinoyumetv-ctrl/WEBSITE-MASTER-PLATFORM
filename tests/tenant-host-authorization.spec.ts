@@ -21,6 +21,12 @@ test.describe('tenant hostname authorization', () => {
     expect(isHostnameForTenant('tenant-uuid-123.wmp.dagangos.com', tenant)).toBe(true)
   })
 
+  test('keeps the requested locale when canonical checkout routes to project setup', async ({ page }) => {
+    await page.goto('/id/checkout')
+    await expect(page).toHaveURL(/\/id\/project-setup$/)
+    await expect(page.getByRole('heading', { name: 'Start Your Project' })).toBeVisible()
+  })
+
   test('rejects another tenant hostname and reserved product hosts', () => {
     expect(isHostnameForTenant('other.wmp.dagangos.com', tenant)).toBe(false)
     expect(isHostnameForTenant('store.dagangos.com', tenant)).toBe(false)
