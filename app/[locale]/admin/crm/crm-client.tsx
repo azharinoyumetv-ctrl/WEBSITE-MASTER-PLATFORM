@@ -339,7 +339,7 @@ export function CrmClient({ tenantId, initialContacts, initialTimeline, initialE
           </div>
       </div>
 
-      <div className="card mb-6 overflow-hidden">
+      <div className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="p-5 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="font-semibold text-slate-900">CRM Expenses</h3>
