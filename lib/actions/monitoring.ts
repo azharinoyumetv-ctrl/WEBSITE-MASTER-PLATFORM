@@ -369,3 +369,91 @@ export async function deleteMonitoringRule(tenantId: string, ruleId: string) {
     return { success: false, error: error.message }
   }
 }
+
+
+export async function getPlatformInstanceRegistry() {
+  try {
+    const user = await getAuthenticatedUser()
+    const normalizedRoles = (user.roles || []).map(role => role.toLowerCase())
+    const isPlatformOperator = normalizedRoles.some(role =>
+      role === 'platform_owner' || role === 'platform owner' || role === 'super-admin'
+    )
+
+    if (!isPlatformOperator) {
+      return { success: true, authorized: false, instances: [] }
+    }
+
+    const instances = await prisma.tenantInstance.findMany({
+      select: {
+        id: true,
+        tenantId: true,
+        instanceId: true,
+        instanceUrl: true,
+        status: true,
+        lastHeartbeat: true,
+        lastSyncAt: true,
+        syncErrorCount: true,
+        infraMetadata: true,
+        createdAt: true,
+        updatedAt: true,
+        tenant: {
+          select: {
+            companyName: true,
+            subdomain: true,
+            customDomain: true,
+            status: true,
+            plan: true,
+          },
+        },
+        domains: {
+          select: {
+            domain: true,
+            isPrimary: true,
+            isVerified: true,
+          },
+          orderBy: [{ isPrimary: 'desc' }, { domain: 'asc' }],
+        },
+        entitlements: {
+          select: {
+            enabledModules: true,
+            featureFlags: true,
+            quota: true,
+            updatedAt: true,
+          },
+          orderBy: { updatedAt: 'desc' },
+          take: 1,
+        },
+      },
+      orderBy: [{ status: 'asc' }, { lastHeartbeat: 'desc' }],
+    })
+
+    const now = Date.now()
+    return {
+      success: true,
+      authorized: true,
+      instances: instances.map(instance => {
+        const heartbeatAgeMs = instance.lastHeartbeat
+          ? now - instance.lastHeartbeat.getTime()
+          : null
+        const health = instance.status !== 'active'
+          ? 'inactive'
+          : heartbeatAgeMs === null || heartbeatAgeMs > 15 * 60 * 1000
+            ? 'offline'
+            : heartbeatAgeMs > 7 * 60 * 1000
+              ? 'degraded'
+              : 'healthy'
+
+        return {
+          ...instance,
+          health,
+          lastHeartbeat: instance.lastHeartbeat?.toISOString() || null,
+          lastSyncAt: instance.lastSyncAt?.toISOString() || null,
+          createdAt: instance.createdAt.toISOString(),
+          updatedAt: instance.updatedAt.toISOString(),
+        }
+      }),
+    }
+  } catch (error: any) {
+    return { success: false, authorized: false, instances: [], error: error.message }
+  }
+}
