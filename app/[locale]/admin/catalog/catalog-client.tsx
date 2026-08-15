@@ -42,6 +42,87 @@ function CategoryTree({ categories, level = 0, parentId = null, onEdit, onDelete
   )
 }
 
+type CatalogVariantDraft = {
+  name: string
+  sku: string
+  priceOffset: number | string
+  quantity: number | string
+}
+
+function VariantEditor({ variants, onChange }: {
+  variants: CatalogVariantDraft[]
+  onChange: (variants: CatalogVariantDraft[]) => void
+}) {
+  const updateVariant = (index: number, patch: Partial<CatalogVariantDraft>) => {
+    onChange(variants.map((variant, currentIndex) => currentIndex === index ? { ...variant, ...patch } : variant))
+  }
+
+  return (
+    <div className="col-span-2 space-y-2">
+      <div className="flex items-center justify-between">
+        <label className="form-label mb-0">Product Variants</label>
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          onClick={() => onChange([...variants, { name: '', sku: '', priceOffset: 0, quantity: 0 }])}
+        >
+          <Plus className="w-3 h-3" />
+          Add Variant
+        </button>
+      </div>
+      {variants.length === 0 ? (
+        <p className="text-xs text-slate-400">No variants. The base product will be sold directly.</p>
+      ) : (
+        <div className="space-y-2">
+          {variants.map((variant, index) => (
+            <div key={index} className="grid grid-cols-12 gap-2 rounded-lg border border-slate-200 p-3">
+              <input
+                aria-label={`Variant ${index + 1} name`}
+                className="form-input col-span-4"
+                placeholder="Name (e.g. Large)"
+                value={variant.name}
+                onChange={event => updateVariant(index, { name: event.target.value })}
+              />
+              <input
+                aria-label={`Variant ${index + 1} SKU`}
+                className="form-input col-span-3"
+                placeholder="SKU"
+                value={variant.sku}
+                onChange={event => updateVariant(index, { sku: event.target.value })}
+              />
+              <input
+                aria-label={`Variant ${index + 1} price offset`}
+                className="form-input col-span-2"
+                type="number"
+                placeholder="+ Price"
+                value={variant.priceOffset}
+                onChange={event => updateVariant(index, { priceOffset: event.target.value })}
+              />
+              <input
+                aria-label={`Variant ${index + 1} quantity`}
+                className="form-input col-span-2"
+                type="number"
+                min="0"
+                placeholder="Qty"
+                value={variant.quantity}
+                onChange={event => updateVariant(index, { quantity: event.target.value })}
+              />
+              <button
+                type="button"
+                aria-label={`Remove variant ${index + 1}`}
+                className="col-span-1 flex items-center justify-center text-red-500 hover:text-red-700"
+                onClick={() => onChange(variants.filter((_, currentIndex) => currentIndex !== index))}
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export function CatalogClient({ initialItems, initialCategories, tenantId }: { initialItems: any[], initialCategories: any[], tenantId: string }) {
   const [items, setItems] = useState(initialItems)
   const [categories, setCategories] = useState(initialCategories)
@@ -64,7 +145,9 @@ export function CatalogClient({ initialItems, initialCategories, tenantId }: { i
     categoryId: '',
     description: '',
     isVisible: true,
-    imageUrls: [] as string[]
+    imageUrls: [] as string[],
+    media: [] as Array<{ url: string; fileType: string; fileSize: number }>,
+    variants: [] as CatalogVariantDraft[]
   })
 
   const filtered = items.filter(item =>
@@ -80,14 +163,21 @@ export function CatalogClient({ initialItems, initialCategories, tenantId }: { i
     setIsSaving(true)
     const res = await createCatalogItem(tenantId, {
       ...newItem,
-      basePrice: parseFloat(newItem.basePrice) || 0
+      basePrice: parseFloat(newItem.basePrice) || 0,
+      variants: newItem.variants
+        .filter((variant: CatalogVariantDraft) => variant.name.trim())
+        .map((variant: CatalogVariantDraft) => ({
+          ...variant,
+          priceOffset: Number(variant.priceOffset) || 0,
+          quantity: Math.max(0, Number(variant.quantity) || 0),
+        })),
     })
     setIsSaving(false)
 
     if (res.success) {
       setItems([res.item, ...items])
       setShowAddModal(false)
-      setNewItem({ title: '', sku: '', basePrice: '', categoryId: '', description: '', isVisible: true, imageUrls: [] })
+      setNewItem({ title: '', sku: '', basePrice: '', categoryId: '', description: '', isVisible: true, imageUrls: [], media: [], variants: [] })
       toast.success('Product created successfully!')
     } else {
       toast.error(res.error || 'Failed to create product')
@@ -99,7 +189,14 @@ export function CatalogClient({ initialItems, initialCategories, tenantId }: { i
     setIsSaving(true)
     const res = await updateCatalogItem(tenantId, editingItem.id, {
       ...editingItem,
-      basePrice: parseFloat(editingItem.basePrice) || 0
+      basePrice: parseFloat(editingItem.basePrice) || 0,
+      variants: (editingItem.variants || [])
+        .filter((variant: CatalogVariantDraft) => variant.name.trim())
+        .map((variant: CatalogVariantDraft) => ({
+          ...variant,
+          priceOffset: Number(variant.priceOffset) || 0,
+          quantity: Math.max(0, Number(variant.quantity) || 0),
+        })),
     })
     setIsSaving(false)
     if (res.success) {
@@ -165,10 +262,19 @@ export function CatalogClient({ initialItems, initialCategories, tenantId }: { i
       const res = await uploadCatalogImage(tenantId, file.name, file.type, base64Data)
       if (res.success && res.publicUrl) {
         toast.success('Image uploaded successfully', { id: toastId })
+        const media = { url: res.publicUrl, fileType: file.type || 'image/jpeg', fileSize: file.size || 0 }
         if(isEdit) {
-          setEditingItem({...editingItem, imageUrls: [...(editingItem.imageUrls || []), res.publicUrl]})
+          setEditingItem({
+            ...editingItem,
+            imageUrls: [...(editingItem.imageUrls || []), res.publicUrl],
+            media: [...(editingItem.media || []), media],
+          })
         } else {
-          setNewItem({...newItem, imageUrls: [...(newItem.imageUrls || []), res.publicUrl]})
+          setNewItem({
+            ...newItem,
+            imageUrls: [...(newItem.imageUrls || []), res.publicUrl],
+            media: [...(newItem.media || []), media],
+          })
         }
       } else {
         toast.error(res.error || 'Upload failed', { id: toastId })
@@ -260,6 +366,9 @@ export function CatalogClient({ initialItems, initialCategories, tenantId }: { i
                 <div className="mt-2">
                   <p className="text-lg font-bold text-indigo-700">{formatCurrency(Number(item.basePrice))}</p>
                   <p className="text-xs text-slate-400 mt-1 line-clamp-2">{item.description}</p>
+                  {item.variants?.length > 0 && (
+                    <p className="text-xs text-indigo-600 mt-1">{item.variants.length} variant{item.variants.length === 1 ? '' : 's'}</p>
+                  )}
                 </div>
 
                 <div className="mt-3 pt-3 border-t border-slate-100 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -320,6 +429,10 @@ export function CatalogClient({ initialItems, initialCategories, tenantId }: { i
                   <label className="form-label">Description</label>
                   <textarea value={newItem.description} onChange={e => setNewItem({...newItem, description: e.target.value})} placeholder="Detailed product description..." className="form-textarea" rows={3} />
                 </div>
+                <VariantEditor
+                  variants={newItem.variants || []}
+                  onChange={variants => setNewItem({ ...newItem, variants })}
+                />
                 <div className="col-span-2">
                   <label className="form-label">Product Images</label>
                   <div className="flex flex-col gap-2">
@@ -330,7 +443,15 @@ export function CatalogClient({ initialItems, initialCategories, tenantId }: { i
                           <div key={idx} className="relative w-16 h-16 rounded-md overflow-hidden bg-slate-100 border border-slate-200">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={url} alt="Upload preview" className="w-full h-full object-cover" />
-                            <button onClick={() => setNewItem({...newItem, imageUrls: newItem.imageUrls.filter((_: any, i: number) => i !== idx)})} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"><Trash2 className="w-3 h-3" /></button>
+                            <button
+                              type="button"
+                              onClick={() => setNewItem({
+                                ...newItem,
+                                imageUrls: newItem.imageUrls.filter((_: any, i: number) => i !== idx),
+                                media: (newItem.media || []).filter((entry: any) => entry.url !== url),
+                              })}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"
+                            ><Trash2 className="w-3 h-3" /></button>
                           </div>
                         ))}
                       </div>
@@ -391,6 +512,10 @@ export function CatalogClient({ initialItems, initialCategories, tenantId }: { i
                   <label className="form-label">Description</label>
                   <textarea value={editingItem.description || ''} onChange={e => setEditingItem({...editingItem, description: e.target.value})} className="form-textarea" rows={3} />
                 </div>
+                <VariantEditor
+                  variants={editingItem.variants || []}
+                  onChange={variants => setEditingItem({ ...editingItem, variants })}
+                />
                 <div className="col-span-2">
                   <label className="form-label">Product Images</label>
                   <div className="flex flex-col gap-2">
@@ -401,7 +526,15 @@ export function CatalogClient({ initialItems, initialCategories, tenantId }: { i
                           <div key={idx} className="relative w-16 h-16 rounded-md overflow-hidden bg-slate-100 border border-slate-200">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={url} alt="Upload preview" className="w-full h-full object-cover" />
-                            <button onClick={() => setEditingItem({...editingItem, imageUrls: editingItem.imageUrls.filter((_: any, i: number) => i !== idx)})} className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"><Trash2 className="w-3 h-3" /></button>
+                            <button
+                              type="button"
+                              onClick={() => setEditingItem({
+                                ...editingItem,
+                                imageUrls: editingItem.imageUrls.filter((_: any, i: number) => i !== idx),
+                                media: (editingItem.media || []).filter((entry: any) => entry.url !== url),
+                              })}
+                              className="absolute top-1 right-1 bg-red-500 text-white rounded-full p-0.5"
+                            ><Trash2 className="w-3 h-3" /></button>
                           </div>
                         ))}
                       </div>
