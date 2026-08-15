@@ -3,14 +3,21 @@
 import { useState, useEffect } from 'react'
 import { Activity, Server, Database, Globe, AlertTriangle, CheckCircle2, Clock, Plus, Loader2, Trash2, Edit2, Play, Square, Download } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { getMonitoringStatus, getIncidentLogs, logIncident, resolveIncident, getMonitoringRules, createMonitoringRule, updateMonitoringRule, deleteMonitoringRule } from '@/lib/actions/monitoring'
+import { getMonitoringStatus, getIncidentLogs, logIncident, resolveIncident, getMonitoringRules, createMonitoringRule, updateMonitoringRule, deleteMonitoringRule, getPlatformInstanceRegistry } from '@/lib/actions/monitoring'
 import { MetricsButton } from './metrics-button'
 import toast from 'react-hot-toast'
 
-export function MonitoringClient({ tenantId, initialData, initialIncidents, initialRules = [] }: { tenantId: string, initialData: any, initialIncidents: any[], initialRules?: any[] }) {
+export function MonitoringClient({ tenantId, initialData, initialIncidents, initialRules = [], initialInstances = null }: {
+  tenantId: string
+  initialData: any
+  initialIncidents: any[]
+  initialRules?: any[]
+  initialInstances?: any[] | null
+}) {
   const [data, setData] = useState(initialData)
   const [incidents, setIncidents] = useState(initialIncidents)
   const [rules, setRules] = useState(initialRules)
+  const [platformInstances, setPlatformInstances] = useState<any[] | null>(initialInstances)
   const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Incident Modal
@@ -20,14 +27,16 @@ export function MonitoringClient({ tenantId, initialData, initialIncidents, init
 
   const handleRefresh = async () => {
     setIsRefreshing(true)
-    const [res, incRes, rulesRes] = await Promise.all([
+    const [res, incRes, rulesRes, registryRes] = await Promise.all([
       getMonitoringStatus(tenantId),
       getIncidentLogs(tenantId),
-      getMonitoringRules(tenantId)
+      getMonitoringRules(tenantId),
+      getPlatformInstanceRegistry(),
     ])
     if (res.success && res.monitoring) setData(res.monitoring)
     if (incRes.success && incRes.incidents) setIncidents(incRes.incidents)
     if (rulesRes.success && rulesRes.rules) setRules(rulesRes.rules)
+    if (registryRes.success && registryRes.authorized) setPlatformInstances(registryRes.instances || [])
     setIsRefreshing(false)
   }
 
@@ -145,6 +154,70 @@ export function MonitoringClient({ tenantId, initialData, initialIncidents, init
           </div>
         </div>
       </div>
+
+      {platformInstances !== null && (
+        <div className="card p-5 mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">Tenant VPS Registry</h3>
+              <p className="text-xs text-slate-500 mt-1">Platform-wide deployment health from registered instance heartbeats</p>
+            </div>
+            <span className="badge badge-neutral">{platformInstances.length} instances</span>
+          </div>
+          {platformInstances.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center py-6 border border-dashed rounded-lg">No tenant VPS instances have registered yet.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-slate-200 text-left text-xs text-slate-500">
+                    <th className="pb-2 pr-4 font-medium">Tenant</th>
+                    <th className="pb-2 pr-4 font-medium">Instance</th>
+                    <th className="pb-2 pr-4 font-medium">Health</th>
+                    <th className="pb-2 pr-4 font-medium">Heartbeat</th>
+                    <th className="pb-2 font-medium">Domains</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {platformInstances.map(instance => (
+                    <tr key={instance.id} className="border-b border-slate-100 last:border-0">
+                      <td className="py-3 pr-4">
+                        <p className="font-medium text-slate-900">{instance.tenant.companyName}</p>
+                        <p className="text-xs text-slate-400">{instance.tenant.plan}</p>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <a className="font-mono text-xs text-indigo-600 hover:underline" href={instance.instanceUrl} target="_blank" rel="noreferrer">
+                          {instance.instanceUrl}
+                        </a>
+                        <p className="text-xs text-slate-400 mt-1">{instance.syncErrorCount} sync errors</p>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <span className={cn(
+                          'badge text-[10px]',
+                          instance.health === 'healthy' ? 'badge-success' :
+                          instance.health === 'degraded' ? 'badge-warning' : 'badge-error'
+                        )}>{instance.health.toUpperCase()}</span>
+                      </td>
+                      <td className="py-3 pr-4 text-xs text-slate-500">
+                        {instance.lastHeartbeat ? new Date(instance.lastHeartbeat).toLocaleString() : 'Never'}
+                      </td>
+                      <td className="py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {instance.domains.length > 0 ? instance.domains.map((domain: any) => (
+                            <span key={domain.domain} className={cn('badge text-[10px]', domain.isVerified ? 'badge-success' : 'badge-neutral')}>
+                              {domain.domain}
+                            </span>
+                          )) : <span className="text-xs text-slate-400">None</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Services List */}
