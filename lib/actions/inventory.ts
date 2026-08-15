@@ -98,31 +98,75 @@ function computeStatus(qty: number, threshold: number): string {
   return 'optimal'
 }
 
-export async function adjustInventory(tenantId: string, balanceId: string, quantityAdjustment: number) {
+export async function adjustInventory(
+  tenantId: string,
+  balanceId: string,
+  quantityAdjustment: number,
+  batchId?: string,
+) {
   try {
     const user = await getAuthenticatedUser()
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
     await requirePermission(user.id, tenantId, 'inventory', 'write')
 
-    const balance = await prisma.tenantInventoryBalance.findUnique({
-      where: { id: balanceId, tenantId }
-    })
+    let updated: any
+    let updatedBatch: any = null
 
-    if (!balance) return { success: false, error: 'Balance not found' }
+    if (batchId) {
+      const result = await prisma.$transaction(async tx => {
+        const balance = await tx.tenantInventoryBalance.findFirst({ where: { id: balanceId, tenantId } })
+        if (!balance) throw new Error('Balance not found')
 
-    const newQty = Math.max(0, balance.quantityOnHand + quantityAdjustment)
-    const newStatus = computeStatus(newQty, balance.lowStockThreshold)
+        const batch = await tx.tenantInventoryBatch.findFirst({
+          where: {
+            id: batchId,
+            tenantId,
+            locationId: balance.locationId,
+            catalogItemId: balance.catalogItemId,
+          },
+        })
+        if (!batch) throw new Error('Selected batch does not belong to this inventory balance')
 
-    const updated = await prisma.tenantInventoryBalance.update({
-      where: { id: balanceId },
-      data: {
-        quantityOnHand: newQty,
-        status: newStatus
-      },
-      include: { catalogItem: true }
-    })
+        const nextQuantity = batch.quantityOnHand + quantityAdjustment
+        if (nextQuantity < 0) throw new Error('Adjustment exceeds stock available in the selected batch')
 
-    if (newStatus === 'low' || newStatus === 'critical') {
+        const nextBatch = await tx.tenantInventoryBatch.update({
+          where: { id: batch.id },
+          data: { quantityOnHand: nextQuantity },
+          include: { catalogItem: true, location: true },
+        })
+        await tx.tenantInventoryBatchMovement.create({
+          data: {
+            tenantId,
+            batchId: batch.id,
+            movementType: 'adjustment',
+            quantityDelta: quantityAdjustment,
+            reason: 'Manual inventory adjustment',
+            metadata: { balanceId },
+            createdBy: user.id,
+          },
+        })
+        const nextBalance = await syncBatchBalance(tx, tenantId, balance.locationId, balance.catalogItemId)
+        return { nextBalance, nextBatch }
+      })
+      updated = result.nextBalance
+      updatedBatch = result.nextBatch
+    } else {
+      const balance = await prisma.tenantInventoryBalance.findFirst({ where: { id: balanceId, tenantId } })
+      if (!balance) return { success: false, error: 'Balance not found' }
+
+      const newQty = Math.max(0, balance.quantityOnHand + quantityAdjustment)
+      updated = await prisma.tenantInventoryBalance.update({
+        where: { id: balanceId },
+        data: {
+          quantityOnHand: newQty,
+          status: computeStatus(newQty, balance.lowStockThreshold),
+        },
+        include: { catalogItem: true, location: true },
+      })
+    }
+
+    if (updated.status === 'low' || updated.status === 'critical') {
       try {
         const admins = await prisma.user.findMany({
           where: {
@@ -133,35 +177,42 @@ export async function adjustInventory(tenantId: string, balanceId: string, quant
                 role: {
                   name: {
                     in: ['platform_owner', 'platform owner', 'admin'],
-                    mode: 'insensitive'
-                  }
-                }
-              }
-            }
+                    mode: 'insensitive',
+                  },
+                },
+              },
+            },
           },
-          take: 3
+          take: 3,
         })
         for (const admin of admins) {
           await dispatchNotification(tenantId, admin.email, 'email', 'inventory_alert', {
             item_name: updated.catalogItem?.title || 'Inventory Item',
-            qty: String(newQty),
-            threshold: String(balance.lowStockThreshold),
-            status: newStatus.toUpperCase()
+            qty: String(updated.quantityOnHand),
+            threshold: String(updated.lowStockThreshold),
+            status: String(updated.status).toUpperCase(),
           })
         }
-      } catch (e) {
-        console.error("Failed to dispatch low stock alert:", e)
+      } catch (error) {
+        console.error('Failed to dispatch low stock alert:', error)
       }
     }
 
     revalidatePath('/admin/inventory')
-    return { success: true, balance: updated }
+    return { success: true, balance: updated, batch: updatedBatch }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
 }
 
-export async function transferStock(tenantId: string, sourceLocationId: string, targetLocationId: string, catalogItemId: string, quantity: number) {
+export async function transferStock(
+  tenantId: string,
+  sourceLocationId: string,
+  targetLocationId: string,
+  catalogItemId: string,
+  quantity: number,
+  batchId?: string,
+) {
   try {
     const user = await getAuthenticatedUser()
     if (user.tenantId !== tenantId) throw new Error("Unauthorized tenant access")
@@ -170,44 +221,111 @@ export async function transferStock(tenantId: string, sourceLocationId: string, 
     if (quantity <= 0) return { success: false, error: 'Quantity must be greater than zero' }
     if (sourceLocationId === targetLocationId) return { success: false, error: 'Source and target locations must be different' }
 
-    return await prisma.$transaction(async (tx) => {
-      // Check source balance
-      const sourceBalance = await tx.tenantInventoryBalance.findUnique({
-        where: { locationId_catalogItemId: { locationId: sourceLocationId, catalogItemId } }
+    if (batchId) {
+      const result = await prisma.$transaction(async tx => {
+        const [sourceBatch, targetLocation] = await Promise.all([
+          tx.tenantInventoryBatch.findFirst({
+            where: { id: batchId, tenantId, locationId: sourceLocationId, catalogItemId },
+          }),
+          tx.tenantInventoryLocation.findFirst({ where: { id: targetLocationId, tenantId } }),
+        ])
+        if (!sourceBatch) throw new Error('Selected source batch was not found')
+        if (!targetLocation) throw new Error('Target location was not found')
+        if (sourceBatch.quantityOnHand < quantity) throw new Error('Insufficient stock in the selected batch')
+
+        const nextSourceBatch = await tx.tenantInventoryBatch.update({
+          where: { id: sourceBatch.id },
+          data: { quantityOnHand: sourceBatch.quantityOnHand - quantity },
+          include: { catalogItem: true, location: true },
+        })
+        const targetBatch = await tx.tenantInventoryBatch.upsert({
+          where: {
+            tenantId_locationId_catalogItemId_lotNumber: {
+              tenantId,
+              locationId: targetLocationId,
+              catalogItemId,
+              lotNumber: sourceBatch.lotNumber,
+            },
+          },
+          update: { quantityOnHand: { increment: quantity } },
+          create: {
+            tenantId,
+            locationId: targetLocationId,
+            catalogItemId,
+            lotNumber: sourceBatch.lotNumber,
+            quantityOnHand: quantity,
+            receivedAt: new Date(),
+            expiresAt: sourceBatch.expiresAt,
+            supplier: sourceBatch.supplier,
+            notes: sourceBatch.notes,
+          },
+          include: { catalogItem: true, location: true },
+        })
+
+        await tx.tenantInventoryBatchMovement.createMany({
+          data: [
+            {
+              tenantId,
+              batchId: sourceBatch.id,
+              movementType: 'transfer_out',
+              quantityDelta: -quantity,
+              reason: 'Inventory transfer',
+              metadata: { targetLocationId, targetBatchId: targetBatch.id },
+              createdBy: user.id,
+            },
+            {
+              tenantId,
+              batchId: targetBatch.id,
+              movementType: 'transfer_in',
+              quantityDelta: quantity,
+              reason: 'Inventory transfer',
+              metadata: { sourceLocationId, sourceBatchId: sourceBatch.id },
+              createdBy: user.id,
+            },
+          ],
+        })
+
+        const [sourceBalance, targetBalance] = await Promise.all([
+          syncBatchBalance(tx, tenantId, sourceLocationId, catalogItemId),
+          syncBatchBalance(tx, tenantId, targetLocationId, catalogItemId),
+        ])
+        return { sourceBalance, targetBalance, sourceBatch: nextSourceBatch, targetBatch }
       })
 
-      if (!sourceBalance || sourceBalance.tenantId !== tenantId) {
-        throw new Error('Source balance not found')
-      }
+      revalidatePath('/admin/inventory')
+      return { success: true, ...result }
+    }
 
-      if (sourceBalance.quantityOnHand < quantity) {
-        throw new Error('Insufficient stock at source location')
-      }
+    const result = await prisma.$transaction(async tx => {
+      const sourceBalance = await tx.tenantInventoryBalance.findUnique({
+        where: { locationId_catalogItemId: { locationId: sourceLocationId, catalogItemId } },
+      })
+      if (!sourceBalance || sourceBalance.tenantId !== tenantId) throw new Error('Source balance not found')
+      if (sourceBalance.quantityOnHand < quantity) throw new Error('Insufficient stock at source location')
 
-      // Deduct from source
       await tx.tenantInventoryBalance.update({
         where: { id: sourceBalance.id },
-        data: { 
+        data: {
           quantityOnHand: sourceBalance.quantityOnHand - quantity,
-          status: computeStatus(sourceBalance.quantityOnHand - quantity, sourceBalance.lowStockThreshold)
-        }
+          status: computeStatus(sourceBalance.quantityOnHand - quantity, sourceBalance.lowStockThreshold),
+        },
       })
 
-      // Add to target
-      let targetBalance = await tx.tenantInventoryBalance.findUnique({
-        where: { locationId_catalogItemId: { locationId: targetLocationId, catalogItemId } }
+      const targetBalance = await tx.tenantInventoryBalance.findUnique({
+        where: { locationId_catalogItemId: { locationId: targetLocationId, catalogItemId } },
       })
-
       if (targetBalance) {
         if (targetBalance.tenantId !== tenantId) throw new Error('Target balance tenant mismatch')
         await tx.tenantInventoryBalance.update({
           where: { id: targetBalance.id },
-          data: { 
+          data: {
             quantityOnHand: targetBalance.quantityOnHand + quantity,
-            status: computeStatus(targetBalance.quantityOnHand + quantity, targetBalance.lowStockThreshold)
-          }
+            status: computeStatus(targetBalance.quantityOnHand + quantity, targetBalance.lowStockThreshold),
+          },
         })
       } else {
+        const targetLocation = await tx.tenantInventoryLocation.findFirst({ where: { id: targetLocationId, tenantId } })
+        if (!targetLocation) throw new Error('Target location was not found')
         await tx.tenantInventoryBalance.create({
           data: {
             tenantId,
@@ -215,13 +333,13 @@ export async function transferStock(tenantId: string, sourceLocationId: string, 
             catalogItemId,
             quantityOnHand: quantity,
             lowStockThreshold: sourceBalance.lowStockThreshold,
-            status: computeStatus(quantity, sourceBalance.lowStockThreshold)
-          }
+            status: computeStatus(quantity, sourceBalance.lowStockThreshold),
+          },
         })
       }
-
       return { success: true }
     })
+    return result
   } catch (error: any) {
     return { success: false, error: error.message }
   } finally {
@@ -509,6 +627,19 @@ export async function createInventoryBatch(tenantId: string, data: {
         },
         include: { catalogItem: true, location: true },
       })
+      if (quantityOnHand !== 0) {
+        await tx.tenantInventoryBatchMovement.create({
+          data: {
+            tenantId,
+            batchId: batch.id,
+            movementType: 'receipt',
+            quantityDelta: quantityOnHand,
+            reason: 'Batch created',
+            metadata: { lotNumber },
+            createdBy: user.id,
+          },
+        })
+      }
       const balance = await syncBatchBalance(tx, tenantId, data.locationId, data.catalogItemId)
       return { batch, balance }
     })
@@ -549,6 +680,20 @@ export async function updateInventoryBatch(
         },
         include: { catalogItem: true, location: true },
       })
+      const quantityDelta = batch.quantityOnHand - current.quantityOnHand
+      if (quantityDelta !== 0) {
+        await tx.tenantInventoryBatchMovement.create({
+          data: {
+            tenantId,
+            batchId: batch.id,
+            movementType: 'adjustment',
+            quantityDelta,
+            reason: 'Batch quantity updated',
+            metadata: { lotNumber: batch.lotNumber },
+            createdBy: user.id,
+          },
+        })
+      }
       const balance = await syncBatchBalance(tx, tenantId, current.locationId, current.catalogItemId)
       return { batch, balance }
     })
@@ -570,6 +715,19 @@ export async function deleteInventoryBatch(tenantId: string, batchId: string) {
       const current = await tx.tenantInventoryBatch.findFirst({ where: { id: batchId, tenantId } })
       if (!current) throw new Error('Batch not found')
       await tx.tenantInventoryBatch.deleteMany({ where: { id: batchId, tenantId } })
+      if (current.quantityOnHand !== 0) {
+        await tx.tenantInventoryBatchMovement.create({
+          data: {
+            tenantId,
+            batchId: null,
+            movementType: 'removal',
+            quantityDelta: -current.quantityOnHand,
+            reason: 'Batch deleted',
+            metadata: { batchId: current.id, lotNumber: current.lotNumber, locationId: current.locationId, catalogItemId: current.catalogItemId },
+            createdBy: user.id,
+          },
+        })
+      }
       return syncBatchBalance(tx, tenantId, current.locationId, current.catalogItemId)
     })
 
