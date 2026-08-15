@@ -4,7 +4,8 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 
-export default async function UserProfilePage({ params }: { params: { userId: string } }) {
+export default async function UserProfilePage({ params }: { params: Promise<{ userId: string }> }) {
+  const { userId } = await params
   const session = await getServerSession(authOptions)
   
   if (!session || !session.user) {
@@ -12,8 +13,7 @@ export default async function UserProfilePage({ params }: { params: { userId: st
   }
 
   const tenantId = (session.user as any).tenantId
-  const userId = params.userId
-  
+
   if (!tenantId || !userId) {
     return <div className="p-8 text-red-500">Error: User context is missing.</div>
   }
@@ -27,3 +27,4 @@ export default async function UserProfilePage({ params }: { params: { userId: st
 
   return <ProfileClient initialUser={initialUser} tenantId={tenantId} />
 }
+
