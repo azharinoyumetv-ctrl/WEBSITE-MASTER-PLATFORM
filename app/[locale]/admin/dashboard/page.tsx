@@ -7,7 +7,8 @@ import { getAnalytics } from '@/lib/actions/analytics'
 import { DashboardClient } from './dashboard-client'
 import prisma from '@/lib/prisma'
 
-export default async function AdminDashboard({ searchParams }: { searchParams: { days?: string } }) {
+export default async function AdminDashboard({ searchParams }: { searchParams: Promise<{ days?: string }> }) {
+  const resolvedSearchParams = await searchParams
   const session = await getServerSession(authOptions)
   
   if (!session || !session.user) {
@@ -29,7 +30,7 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     }
   }
 
-  const days = parseInt(searchParams?.days || '7') || 7
+  const days = parseInt(resolvedSearchParams.days || '7') || 7
 
   const [metricsRes, analyticsRes, monitoringRes] = await Promise.all([
     getDashboardMetrics(tenantId),
@@ -91,3 +92,4 @@ export default async function AdminDashboard({ searchParams }: { searchParams: {
     />
   )
 }
+

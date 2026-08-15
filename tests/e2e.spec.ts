@@ -107,7 +107,9 @@ test.describe('Website Master Platform E2E Audit', () => {
     await page.selectOption('select', { label: 'Electronics' });
     await page.click('button:has-text("Save Product")');
 
-    await expect(page.locator('.card-hover')).toContainText('E2E Testing Phone');
+    const createdProduct = page.locator('.card-hover').filter({ hasText: 'E2E Testing Phone' });
+    await expect(createdProduct).toHaveCount(1);
+    await expect(createdProduct).toContainText('E2E Testing Phone');
   });
 
   test('06. E-Commerce & Order Management', async ({ page }) => {
@@ -165,7 +167,7 @@ test.describe('Website Master Platform E2E Audit', () => {
 
     // Exercise the complete authenticated inventory CRUD path against the
     // disposable CI tenant instead of mutating production inventory.
-    await page.getByRole('button', { name: 'Add Stock' }).click();
+    await page.getByRole('button', { name: 'Add Stock' }).first().click();
     const addModal = page.locator('.fixed').filter({ has: page.getByRole('heading', { name: 'Add Stock' }) });
     await addModal.locator('select').nth(0).selectOption({ label: 'E2E Warehouse' });
     await addModal.locator('select').nth(1).selectOption({ label: 'Inventory CRUD Test Item' });
@@ -538,3 +540,4 @@ test.describe('Website Master Platform E2E Audit', () => {
     }
   });
 });
+

@@ -5,7 +5,8 @@ import { authOptions } from '@/lib/auth'
 import { redirect } from 'next/navigation'
 import { AdminState } from '../admin-state'
 
-export default async function AnalyticsPage({ searchParams }: { searchParams: { [key: string]: string | string[] | undefined } }) {
+export default async function AnalyticsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
+  const resolvedSearchParams = await searchParams
   const session = await getServerSession(authOptions)
   
   if (!session || !session.user) {
@@ -18,7 +19,7 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
     return <AdminState kind="context" title="Workspace context unavailable" description="Sign in through your assigned workspace before opening analytics." />
   }
 
-  const daysParam = searchParams.days as string
+  const daysParam = resolvedSearchParams.days as string
   const days = daysParam && !isNaN(parseInt(daysParam, 10)) ? parseInt(daysParam, 10) : 7
 
   const [res, schedulesRes, reportsRes] = await Promise.all([
@@ -46,3 +47,4 @@ export default async function AnalyticsPage({ searchParams }: { searchParams: { 
     />
   )
 }
+

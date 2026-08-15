@@ -2,12 +2,13 @@ import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 
-export default function ProjectSetupConfirmationPage({
+export default async function ProjectSetupConfirmationPage({
   searchParams,
 }: {
-  searchParams: { orderId?: string; status?: string }
+  searchParams: Promise<{ orderId?: string; status?: string }>
 }) {
-  const failed = searchParams.status === 'error'
+  const resolvedSearchParams = await searchParams
+  const failed = resolvedSearchParams.status === 'error'
 
   return (
     <main className="min-h-screen bg-slate-50 px-6 py-24">
@@ -23,9 +24,9 @@ export default function ProjectSetupConfirmationPage({
             ? 'We could not confirm the payment return. Please contact support if you completed a payment.'
             : 'We are confirming your payment. We will email your order confirmation and receipt as soon as the payment provider notifies us.'}
         </p>
-        {searchParams.orderId && (
+        {resolvedSearchParams.orderId && (
           <p className="mt-4 text-sm text-slate-500">
-            Reference: <span className="font-mono">{searchParams.orderId.slice(0, 8)}</span>
+            Reference: <span className="font-mono">{resolvedSearchParams.orderId.slice(0, 8)}</span>
           </p>
         )}
         <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
@@ -36,3 +37,4 @@ export default function ProjectSetupConfirmationPage({
     </main>
   )
 }
+
