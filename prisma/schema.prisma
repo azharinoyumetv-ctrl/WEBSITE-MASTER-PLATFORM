@@ -45,6 +45,7 @@ model SystemTenant {
   inventoryLocations        TenantInventoryLocation[]
   inventoryBalances         TenantInventoryBalance[]
   inventoryBatches          TenantInventoryBatch[]
+  inventoryBatchMovements   TenantInventoryBatchMovement[]
   crmContacts               TenantCrmContact[]
   crmExpenses               TenantCrmExpense[]
   crmTimeline               TenantCrmTimeline[]
@@ -656,10 +657,29 @@ model TenantInventoryBatch {
   tenant      SystemTenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   location    TenantInventoryLocation @relation(fields: [locationId], references: [id], onDelete: Cascade)
   catalogItem TenantCatalogItem       @relation(fields: [catalogItemId], references: [id], onDelete: Cascade)
+  movements   TenantInventoryBatchMovement[]
 
   @@unique([tenantId, locationId, catalogItemId, lotNumber])
   @@index([tenantId, expiresAt])
   @@map("tenant_inventory_batches")
+}
+
+model TenantInventoryBatchMovement {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenantId      String   @map("tenant_id") @db.Uuid
+  batchId       String?  @map("batch_id") @db.Uuid
+  movementType  String   @map("movement_type") @db.VarChar(32)
+  quantityDelta Int      @map("quantity_delta")
+  reason        String?  @db.Text
+  metadata      Json     @default("{}")
+  createdBy     String   @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz
+
+  tenant SystemTenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  batch  TenantInventoryBatch? @relation(fields: [batchId], references: [id], onDelete: SetNull)
+
+  @@index([tenantId, batchId, createdAt(sort: Desc)])
+  @@map("tenant_inventory_batch_movements")
 }
 
 // ============================================================
