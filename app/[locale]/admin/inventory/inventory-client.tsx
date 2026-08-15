@@ -291,7 +291,7 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
     setIsSavingBatch(true)
     const res = await createInventoryBatch(tenantId, { ...batchForm, quantityOnHand })
     setIsSavingBatch(false)
-    if (res.success) {
+    if (res.success && 'batch' in res && 'balance' in res) {
       setBatches(current => [...current, res.batch])
       mergeBatchBalance(res.balance)
       setBatchForm({ locationId: '', catalogItemId: '', lotNumber: '', quantityOnHand: '', receivedAt: '', expiresAt: '', supplier: '', notes: '' })
@@ -385,7 +385,7 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
                             const quantityOnHand = Number(value)
                             if (!Number.isFinite(quantityOnHand) || quantityOnHand < 0) return toast.error('Invalid quantity')
                             const res = await updateInventoryBatch(tenantId, batch.id, { quantityOnHand })
-                            if (res.success) {
+                            if (res.success && 'batch' in res && 'balance' in res) {
                               setBatches(current => current.map(item => item.id === batch.id ? res.batch : item))
                               mergeBatchBalance(res.balance)
                             } else toast.error(res.error || 'Failed to update batch')
@@ -396,7 +396,7 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
                           onClick={async () => {
                             if (!confirm(`Delete lot ${batch.lotNumber}?`)) return
                             const res = await deleteInventoryBatch(tenantId, batch.id)
-                            if (res.success) {
+                            if (res.success && 'balance' in res) {
                               setBatches(current => current.filter(item => item.id !== batch.id))
                               mergeBatchBalance(res.balance)
                             } else toast.error(res.error || 'Failed to delete batch')
