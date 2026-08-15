@@ -6,13 +6,14 @@ import { withTenantApiTelemetry } from '@/lib/api-telemetry'
 
 const tenantIdSchema = z.string().uuid()
 
-export async function GET(req: Request, { params }: { params: { tenantId: string } }) {
+export async function GET(req: Request, { params }: { params: Promise<{ tenantId: string }> }) {
   const startedAt = Date.now()
   const authError = await validateV1Request(req)
   if (authError) return authError
 
   try {
-    const parsedTenantId = tenantIdSchema.safeParse(params.tenantId)
+    const { tenantId: requestedTenantId } = await params
+    const parsedTenantId = tenantIdSchema.safeParse(requestedTenantId)
     if (!parsedTenantId.success) {
       return NextResponse.json({ success: false, error: 'Invalid tenantId' }, { status: 400 })
     }

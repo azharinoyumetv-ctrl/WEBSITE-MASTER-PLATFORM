@@ -309,6 +309,18 @@ async function main() {
     }
   })
 
+  await prisma.tenantCatalogItem.create({
+    data: {
+      tenantId: tenant.id,
+      categoryId: category.id,
+      title: 'Inventory CRUD Test Item',
+      sku: 'INV-CRUD-001',
+      basePrice: 125000,
+      imageUrls: [],
+      isVisible: true
+    }
+  })
+
   // 10. Seed CRM Contact
   await prisma.tenantCrmContact.create({
     data: {

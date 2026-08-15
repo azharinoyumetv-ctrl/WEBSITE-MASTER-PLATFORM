@@ -12,12 +12,13 @@ import { addonsList, packages } from '@/lib/constants/packages'
 import { COMPANY } from '@/lib/company'
 import type { Metadata } from 'next'
 
-export async function generateMetadata({ params }: { params: { slug?: string[], locale: string } }): Promise<Metadata> {
-  const headersList = headers()
+export async function generateMetadata({ params }: { params: Promise<{ slug?: string[], locale: string }> }): Promise<Metadata> {
+  const resolvedParams = await params
+  const headersList = await headers()
   const tenantId = headersList.get('x-tenant-id')
-  const locale = params.locale === 'id' ? 'id' : 'en'
+  const locale = resolvedParams.locale === 'id' ? 'id' : 'en'
   const isIndonesian = locale === 'id'
-  const slug = params.slug ? params.slug.join('/') : 'home'
+  const slug = resolvedParams.slug ? resolvedParams.slug.join('/') : 'home'
   const pageLabels: Record<string, { en: string, id: string }> = {
     home: { en: 'Home', id: 'Beranda' },
     about: { en: 'About Us', id: 'Tentang Kami' },
@@ -332,12 +333,13 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
   return null
 }
 
-export default async function SitePage({ params }: { params: { slug?: string[], locale: string } }) {
-  const headersList = headers()
+export default async function SitePage({ params }: { params: Promise<{ slug?: string[], locale: string }> }) {
+  const resolvedParams = await params
+  const headersList = await headers()
   const tenantId = headersList.get('x-tenant-id')
   const t = await getTranslations('Storefront')
 
-  const slug = params.slug ? params.slug.join('/') : 'home'
+  const slug = resolvedParams.slug ? resolvedParams.slug.join('/') : 'home'
 
   // Standard pages that have built-in fallback templates
   const standardPages = ['about', 'contact', 'support', 'products', 'shop', 'catalog', 'privacy', 'terms']
@@ -374,7 +376,7 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
 
   // Force standard pages to use fallback templates for absolute localization
   if (['shop', 'products', 'about', 'contact', 'support'].includes(slug)) {
-    return renderFallbackPage(slug, siteTitle, primaryColor, resolvedTenantId, params.locale, t)
+    return renderFallbackPage(slug, siteTitle, primaryColor, resolvedTenantId, resolvedParams.locale, t)
   }
 
   // If there's a DB page, render it
@@ -448,7 +450,7 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
 
   // If it's a standard page, render the built-in fallback template
   if (standardPages.includes(slug)) {
-    return renderFallbackPage(slug, siteTitle, primaryColor, resolvedTenantId, params.locale, t)
+    return renderFallbackPage(slug, siteTitle, primaryColor, resolvedTenantId, resolvedParams.locale, t)
   }
 
   // For all other unknown pages, show 404

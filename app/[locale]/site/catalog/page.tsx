@@ -5,6 +5,8 @@ export const metadata = {
   description: 'Explore DagangOS self-hosted digital business solutions by business need.',
 }
 
-export default function CatalogPage({ params }: { params: { locale: string } }) {
-  return <CatalogClient locale={params.locale} />
+export default async function CatalogPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params
+  return <CatalogClient locale={locale} />
 }
+

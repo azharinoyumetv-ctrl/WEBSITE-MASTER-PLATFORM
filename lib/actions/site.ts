@@ -35,7 +35,7 @@ export async function submitContactForm(tenantId: string, data: { name: string, 
     if (!parsed.success) return { success: false, error: 'Please provide a valid name, email, and message.' }
     data = parsed.data
 
-    const requestHeaders = headers()
+    const requestHeaders = await headers()
     const publicTenant = await resolvePublicTenantFromHost(
       requestHeaders.get('host') || '',
       requestHeaders.get('x-tenant-id'),

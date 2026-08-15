@@ -6,8 +6,8 @@ import { formatDate, getStatusBadgeClass } from '@/lib/utils'
 import { getTenantPublicUrl } from '@/lib/tenant-url'
 import { TenantDetailsClient } from './tenant-details-client'
 
-export default async function TenantDetailsPage({ params }: { params: { tenantId: string } }) {
-  const { tenantId } = params
+export default async function TenantDetailsPage({ params }: { params: Promise<{ tenantId: string }> }) {
+  const { tenantId } = await params
 
   const res = await getTenantById(tenantId)
   if (!res.success || !res.tenant) {
@@ -139,3 +139,4 @@ export default async function TenantDetailsPage({ params }: { params: { tenantId
     </div>
   )
 }
+

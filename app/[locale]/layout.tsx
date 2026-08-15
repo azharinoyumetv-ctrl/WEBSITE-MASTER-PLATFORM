@@ -22,8 +22,8 @@ const geistMono = localFont({
   display: 'swap',
 })
 
-function getMetadataBase() {
-  const headersList = headers()
+async function getMetadataBase() {
+  const headersList = await headers()
   const host = headersList.get('x-forwarded-host') || headersList.get('host')
   const protocol = headersList.get('x-forwarded-proto') || (host?.includes('localhost') ? 'http' : 'https')
   const canonicalFallback = `https://${getWmpBaseDomain()}`
@@ -39,7 +39,8 @@ function getMetadataBase() {
   return new URL(canonicalFallback)
 }
 
-export function generateMetadata({ params: { locale } }: { params: { locale: string } }): Metadata {
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params
   const isIndonesian = locale === 'id'
   const title = `${COMPANY.legalName} | ${COMPANY.productName}`
   const description = isIndonesian
@@ -48,7 +49,7 @@ export function generateMetadata({ params: { locale } }: { params: { locale: str
   const canonical = `/${isIndonesian ? 'id' : 'en'}`
 
   return {
-    metadataBase: getMetadataBase(),
+    metadataBase: await getMetadataBase(),
     title: {
       default: title,
       template: `%s | ${COMPANY.legalName}`,
@@ -95,11 +96,12 @@ export function generateMetadata({ params: { locale } }: { params: { locale: str
 
 export default async function RootLayout({
   children,
-  params: { locale }
+  params,
 }: {
   children: React.ReactNode
-  params: { locale: string }
+  params: Promise<{ locale: string }>
 }) {
+  const { locale } = await params
   const messages = await getMessages()
 
   return (

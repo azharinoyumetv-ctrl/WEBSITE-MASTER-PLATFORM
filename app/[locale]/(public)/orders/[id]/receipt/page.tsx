@@ -1,15 +1,17 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { use, useEffect, useState } from 'react'
 import { getPublicReceiptHtml } from '@/lib/actions/pos'
 import { notFound } from 'next/navigation'
+import Link from 'next/link'
 
-export default function ReceiptPage({ params }: { params: { id: string } }) {
+export default function ReceiptPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const [receiptHtml, setReceiptHtml] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    getPublicReceiptHtml(params.id).then(res => {
+    getPublicReceiptHtml(id).then(res => {
       if (res.success && res.receiptHtml) {
         setReceiptHtml(res.receiptHtml)
         setTimeout(() => {
@@ -18,7 +20,7 @@ export default function ReceiptPage({ params }: { params: { id: string } }) {
       }
       setLoading(false)
     })
-  }, [params.id])
+  }, [id])
 
   if (loading) {
     return (
@@ -44,12 +46,12 @@ export default function ReceiptPage({ params }: { params: { id: string } }) {
           >
             Print Receipt
           </button>
-          <a 
+          <Link
             href="/" 
             className="px-6 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg font-medium transition"
           >
             Back to Store
-          </a>
+          </Link>
         </div>
       </div>
     </div>

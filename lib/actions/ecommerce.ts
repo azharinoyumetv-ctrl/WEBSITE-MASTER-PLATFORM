@@ -151,7 +151,7 @@ export async function cancelOrder(tenantId: string, orderId: string, reason?: st
       }
     } else {
       const normalizedEmail = z.string().trim().email().max(255).safeParse(guestEmail)
-      const requestHeaders = headers()
+      const requestHeaders = await headers()
       const publicTenant = await resolvePublicTenantFromHost(
         requestHeaders.get('host') || '',
         requestHeaders.get('x-tenant-id'),
@@ -199,7 +199,7 @@ export async function createOrder(
     if (!parsed.success) throw new Error('Invalid order details')
     data = parsed.data
 
-    const requestHeaders = headers()
+    const requestHeaders = await headers()
     const publicTenant = await resolvePublicTenantFromHost(
       requestHeaders.get('host') || '',
       requestHeaders.get('x-tenant-id'),
@@ -262,7 +262,7 @@ export async function getUserOrders(tenantId: string, email: string) {
     const normalizedEmail = z.string().trim().email().max(255).safeParse(email)
     if (!normalizedEmail.success) throw new Error('A valid email address is required')
 
-    const requestHeaders = headers()
+    const requestHeaders = await headers()
     const publicTenant = await resolvePublicTenantFromHost(
       requestHeaders.get('host') || '',
       requestHeaders.get('x-tenant-id'),
