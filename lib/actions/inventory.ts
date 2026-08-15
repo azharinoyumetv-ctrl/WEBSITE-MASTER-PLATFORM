@@ -20,11 +20,16 @@ export async function getInventory(tenantId: string) {
       include: { catalogItem: true, location: true }
     })
 
-    const catalogItems = await prisma.tenantCatalogItem.findMany({
-      where: { tenantId }
-    })
+    const [catalogItems, batches] = await Promise.all([
+      prisma.tenantCatalogItem.findMany({ where: { tenantId } }),
+      prisma.tenantInventoryBatch.findMany({
+        where: { tenantId },
+        include: { catalogItem: true, location: true },
+        orderBy: [{ expiresAt: 'asc' }, { receivedAt: 'desc' }],
+      }),
+    ])
 
-    return { success: true, locations, balances, catalogItems }
+    return { success: true, locations, balances, catalogItems, batches }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
@@ -423,6 +428,153 @@ export async function bulkDeleteInventoryBalances(tenantId: string, balanceIds: 
 
     revalidatePath('/admin/inventory')
     return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+
+async function syncBatchBalance(
+  tx: any,
+  tenantId: string,
+  locationId: string,
+  catalogItemId: string,
+) {
+  const aggregate = await tx.tenantInventoryBatch.aggregate({
+    where: { tenantId, locationId, catalogItemId },
+    _sum: { quantityOnHand: true },
+  })
+  const quantityOnHand = aggregate._sum.quantityOnHand || 0
+  const existing = await tx.tenantInventoryBalance.findUnique({
+    where: { locationId_catalogItemId: { locationId, catalogItemId } },
+  })
+  const threshold = existing?.lowStockThreshold ?? 5
+
+  return tx.tenantInventoryBalance.upsert({
+    where: { locationId_catalogItemId: { locationId, catalogItemId } },
+    update: {
+      quantityOnHand,
+      status: computeStatus(quantityOnHand, threshold),
+    },
+    create: {
+      tenantId,
+      locationId,
+      catalogItemId,
+      quantityOnHand,
+      lowStockThreshold: threshold,
+      status: computeStatus(quantityOnHand, threshold),
+    },
+    include: { catalogItem: true, location: true },
+  })
+}
+
+export async function createInventoryBatch(tenantId: string, data: {
+  locationId: string
+  catalogItemId: string
+  lotNumber: string
+  quantityOnHand: number
+  receivedAt?: string
+  expiresAt?: string
+  supplier?: string
+  notes?: string
+}) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
+    const lotNumber = data.lotNumber.trim()
+    const quantityOnHand = Math.max(0, Math.floor(Number(data.quantityOnHand)))
+    if (!lotNumber) throw new Error('Lot number is required')
+    if (!Number.isFinite(quantityOnHand)) throw new Error('Batch quantity is invalid')
+
+    const result = await prisma.$transaction(async tx => {
+      const [location, catalogItem] = await Promise.all([
+        tx.tenantInventoryLocation.findFirst({ where: { id: data.locationId, tenantId } }),
+        tx.tenantCatalogItem.findFirst({ where: { id: data.catalogItemId, tenantId } }),
+      ])
+      if (!location || !catalogItem) throw new Error('Invalid location or catalog item')
+
+      const batch = await tx.tenantInventoryBatch.create({
+        data: {
+          tenantId,
+          locationId: data.locationId,
+          catalogItemId: data.catalogItemId,
+          lotNumber,
+          quantityOnHand,
+          receivedAt: data.receivedAt ? new Date(data.receivedAt) : new Date(),
+          expiresAt: data.expiresAt ? new Date(data.expiresAt) : null,
+          supplier: data.supplier?.trim() || null,
+          notes: data.notes?.trim() || null,
+        },
+        include: { catalogItem: true, location: true },
+      })
+      const balance = await syncBatchBalance(tx, tenantId, data.locationId, data.catalogItemId)
+      return { batch, balance }
+    })
+
+    revalidatePath('/admin/inventory')
+    return { success: true, ...result }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function updateInventoryBatch(
+  tenantId: string,
+  batchId: string,
+  data: { lotNumber?: string; quantityOnHand?: number; expiresAt?: string | null; supplier?: string; notes?: string },
+) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
+    const result = await prisma.$transaction(async tx => {
+      const current = await tx.tenantInventoryBatch.findFirst({ where: { id: batchId, tenantId } })
+      if (!current) throw new Error('Batch not found')
+
+      const batch = await tx.tenantInventoryBatch.update({
+        where: { id: batchId },
+        data: {
+          lotNumber: data.lotNumber?.trim() || undefined,
+          quantityOnHand: data.quantityOnHand === undefined
+            ? undefined
+            : Math.max(0, Math.floor(Number(data.quantityOnHand))),
+          expiresAt: data.expiresAt === undefined
+            ? undefined
+            : data.expiresAt ? new Date(data.expiresAt) : null,
+          supplier: data.supplier === undefined ? undefined : data.supplier.trim() || null,
+          notes: data.notes === undefined ? undefined : data.notes.trim() || null,
+        },
+        include: { catalogItem: true, location: true },
+      })
+      const balance = await syncBatchBalance(tx, tenantId, current.locationId, current.catalogItemId)
+      return { batch, balance }
+    })
+
+    revalidatePath('/admin/inventory')
+    return { success: true, ...result }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function deleteInventoryBatch(tenantId: string, batchId: string) {
+  try {
+    const user = await getAuthenticatedUser()
+    if (user.tenantId !== tenantId) throw new Error('Unauthorized tenant access')
+    await requirePermission(user.id, tenantId, 'inventory', 'write')
+
+    const balance = await prisma.$transaction(async tx => {
+      const current = await tx.tenantInventoryBatch.findFirst({ where: { id: batchId, tenantId } })
+      if (!current) throw new Error('Batch not found')
+      await tx.tenantInventoryBatch.deleteMany({ where: { id: batchId, tenantId } })
+      return syncBatchBalance(tx, tenantId, current.locationId, current.catalogItemId)
+    })
+
+    revalidatePath('/admin/inventory')
+    return { success: true, balance }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
