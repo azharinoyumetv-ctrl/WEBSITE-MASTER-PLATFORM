@@ -35,6 +35,7 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
   const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all')
   const [adjustModal, setAdjustModal] = useState<any | null>(null)
   const [adjustQty, setAdjustQty] = useState('')
+  const [adjustBatchId, setAdjustBatchId] = useState('')
   const [isAdjusting, setIsAdjusting] = useState(false)
 
   // Selection state for bulk operations
@@ -71,6 +72,7 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
   const [transferSourceBalanceId, setTransferSourceBalanceId] = useState('')
   const [transferTargetLocationId, setTransferTargetLocationId] = useState('')
   const [transferQty, setTransferQty] = useState('')
+  const [transferBatchId, setTransferBatchId] = useState('')
   const [isTransferring, setIsTransferring] = useState(false)
 
   // Sync state if initial balances change via revalidatePath
@@ -97,15 +99,27 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
     const newQty = parseInt(adjustQty)
     if (isNaN(newQty)) { toast.error('Invalid quantity'); return }
     
+    const matchingBatches = batches.filter(batch =>
+      batch.locationId === adjustModal.locationId && batch.catalogItemId === adjustModal.catalogItemId
+    )
+    if (matchingBatches.length > 0 && !adjustBatchId) {
+      toast.error('Select the batch that should be adjusted')
+      return
+    }
+
     setIsAdjusting(true)
-    const res = await adjustInventory(tenantId, adjustModal.id, newQty)
+    const res = await adjustInventory(tenantId, adjustModal.id, newQty, adjustBatchId || undefined)
     setIsAdjusting(false)
 
-    if (res.success) {
+    if (res.success && 'balance' in res) {
       setBalances(prev => prev.map(b => b.id === adjustModal.id ? { ...b, ...res.balance, catalogItem: b.catalogItem } : b))
+      if ('batch' in res && res.batch) {
+        setBatches(current => current.map(batch => batch.id === res.batch.id ? res.batch : batch))
+      }
       toast.success(`Adjusted ${adjustModal.catalogItem?.title} by ${newQty > 0 ? '+' : ''}${newQty}`)
       setAdjustModal(null)
       setAdjustQty('')
+      setAdjustBatchId('')
     } else {
       toast.error(res.error || 'Failed to adjust inventory')
     }
@@ -162,9 +176,16 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
     }
     const sourceBal = balances.find(b => b.id === transferSourceBalanceId)
     if (!sourceBal) return
+    const matchingBatches = batches.filter(batch =>
+      batch.locationId === sourceBal.locationId && batch.catalogItemId === sourceBal.catalogItemId && batch.quantityOnHand > 0
+    )
+    if (matchingBatches.length > 0 && !transferBatchId) {
+      toast.error('Select the source batch for this transfer')
+      return
+    }
 
     setIsTransferring(true)
-    const res = await transferStock(tenantId, sourceBal.locationId, transferTargetLocationId, sourceBal.catalogItemId, qty)
+    const res = await transferStock(tenantId, sourceBal.locationId, transferTargetLocationId, sourceBal.catalogItemId, qty, transferBatchId || undefined)
     setIsTransferring(false)
 
     if (res.success) {
@@ -173,6 +194,8 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
       setTransferSourceBalanceId('')
       setTransferTargetLocationId('')
       setTransferQty('')
+      setTransferBatchId('')
+      router.refresh()
     } else {
       toast.error((res as any).error || 'Transfer failed')
     }
@@ -729,6 +752,17 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
                   <p className="text-xs text-slate-400">Current Stock</p>
                 </div>
               </div>
+              {batches.some(batch => batch.locationId === adjustModal.locationId && batch.catalogItemId === adjustModal.catalogItemId) && (
+                <div>
+                  <label className="form-label">Batch / Lot *</label>
+                  <select className="form-select" value={adjustBatchId} onChange={e => setAdjustBatchId(e.target.value)}>
+                    <option value="">Select batch...</option>
+                    {batches.filter(batch => batch.locationId === adjustModal.locationId && batch.catalogItemId === adjustModal.catalogItemId).map(batch => (
+                      <option key={batch.id} value={batch.id}>{batch.lotNumber} — {batch.quantityOnHand} available</option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="form-label">Adjustment Quantity</label>
                 <input
@@ -743,7 +777,7 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
               </div>
             </div>
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setAdjustModal(null)} className="btn btn-secondary">Cancel</button>
+              <button onClick={() => { setAdjustModal(null); setAdjustBatchId('') }} className="btn btn-secondary">Cancel</button>
               <button onClick={doAdjust} disabled={isAdjusting} className="btn btn-primary" id="confirm-adjust-btn">
                 {isAdjusting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 {isAdjusting ? 'Adjusting...' : 'Confirm'}
@@ -788,7 +822,7 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
             <div className="p-6 space-y-4">
               <div>
                 <label className="form-label">Source Item & Location</label>
-                <select className="form-select" value={transferSourceBalanceId} onChange={e => setTransferSourceBalanceId(e.target.value)}>
+                <select className="form-select" value={transferSourceBalanceId} onChange={e => { setTransferSourceBalanceId(e.target.value); setTransferBatchId('') }}>
                   <option value="">Select source...</option>
                   {balances.map(b => (
                     <option key={b.id} value={b.id}>
@@ -797,6 +831,23 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
                   ))}
                 </select>
               </div>
+              {(() => {
+                const sourceBalance = balances.find(balance => balance.id === transferSourceBalanceId)
+                const sourceBatches = sourceBalance
+                  ? batches.filter(batch => batch.locationId === sourceBalance.locationId && batch.catalogItemId === sourceBalance.catalogItemId && batch.quantityOnHand > 0)
+                  : []
+                return sourceBatches.length > 0 ? (
+                  <div>
+                    <label className="form-label">Source Batch / Lot *</label>
+                    <select className="form-select" value={transferBatchId} onChange={e => setTransferBatchId(e.target.value)}>
+                      <option value="">Select batch...</option>
+                      {sourceBatches.map(batch => (
+                        <option key={batch.id} value={batch.id}>{batch.lotNumber} — {batch.quantityOnHand} available</option>
+                      ))}
+                    </select>
+                  </div>
+                ) : null
+              })()}
               <div>
                 <label className="form-label">Target Location</label>
                 <select className="form-select" value={transferTargetLocationId} onChange={e => setTransferTargetLocationId(e.target.value)}>
@@ -821,7 +872,7 @@ export function InventoryClient({ initialLocations, initialBalances, initialBatc
               </div>
             </div>
             <div className="p-6 border-t border-slate-100 flex justify-end gap-3">
-              <button onClick={() => setIsTransferModalOpen(false)} className="btn btn-secondary">Cancel</button>
+              <button onClick={() => { setIsTransferModalOpen(false); setTransferBatchId('') }} className="btn btn-secondary">Cancel</button>
               <button onClick={handleTransfer} disabled={isTransferring} className="btn btn-primary">
                 {isTransferring ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
                 {isTransferring ? 'Transferring...' : 'Complete Transfer'}
