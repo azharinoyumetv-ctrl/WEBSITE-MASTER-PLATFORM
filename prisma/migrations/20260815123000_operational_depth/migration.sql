@@ -22,6 +22,24 @@ CREATE UNIQUE INDEX "tenant_inventory_batches_tenant_location_item_lot_key"
 CREATE INDEX "tenant_inventory_batches_tenant_expiry_idx"
   ON "tenant_inventory_batches"("tenant_id", "expires_at");
 
+CREATE TABLE "tenant_inventory_batch_movements" (
+  "id" UUID NOT NULL DEFAULT gen_random_uuid(),
+  "tenant_id" UUID NOT NULL,
+  "batch_id" UUID,
+  "movement_type" VARCHAR(32) NOT NULL,
+  "quantity_delta" INTEGER NOT NULL,
+  "reason" TEXT,
+  "metadata" JSONB NOT NULL DEFAULT '{}',
+  "created_by" UUID NOT NULL,
+  "created_at" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "tenant_inventory_batch_movements_pkey" PRIMARY KEY ("id"),
+  CONSTRAINT "tenant_inventory_batch_movements_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "system_tenants"("id") ON DELETE CASCADE,
+  CONSTRAINT "tenant_inventory_batch_movements_batch_id_fkey" FOREIGN KEY ("batch_id") REFERENCES "tenant_inventory_batches"("id") ON DELETE SET NULL
+);
+
+CREATE INDEX "tenant_inventory_batch_movements_tenant_batch_created_idx"
+  ON "tenant_inventory_batch_movements"("tenant_id", "batch_id", "created_at" DESC);
+
 CREATE TABLE "tenant_crm_expenses" (
   "id" UUID NOT NULL DEFAULT gen_random_uuid(),
   "tenant_id" UUID NOT NULL,
