@@ -286,6 +286,9 @@ function handleRouting(
   }
 
   if (isPublicSite) {
+    if (isDemoHost(hostname) && !token && ['/', '/site'].includes(pathWithoutLocale)) {
+      return NextResponse.redirect(new URL(`/${localeInUrl}/demo`, getBaseUrl(request)))
+    }
     if (
       pathWithoutLocale === '/site' ||
       pathWithoutLocale.startsWith('/site/') ||
