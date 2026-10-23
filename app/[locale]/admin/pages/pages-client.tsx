@@ -6,6 +6,7 @@ import { cn, formatDate } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { saveAdminPage, deleteAdminPage } from '@/lib/actions/website'
 import { z } from 'zod'
+import { useLocale } from 'next-intl'
 
 const layoutBlockSchema = z.array(z.object({
   type: z.enum(['hero', 'text', 'features', 'catalog_grid', 'contact_form']),
@@ -14,6 +15,7 @@ const layoutBlockSchema = z.array(z.object({
 }))
 
 export function PagesClient({ initialPages, tenantId }: { initialPages: any[], tenantId: string }) {
+  const locale = useLocale()
   const [pages, setPages] = useState(initialPages)
   const [showEditor, setShowEditor] = useState(false)
   const [editingPage, setEditingPage] = useState<any>(null)
@@ -134,7 +136,7 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
               <h3 className="font-semibold mb-4 flex items-center gap-2">
                 <LayoutTemplate className="w-4 h-4" /> Layout Blocks (JSON Editor)
               </h3>
-              <p className="text-xs text-slate-500 mb-2">In a real app, this would be a drag-and-drop page builder. For now, edit the JSON representation.</p>
+              <p className="text-xs text-slate-500 mb-2">Edit your content blocks in JSON, then save the page to publish your changes. Open the website to check the finished layout.</p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <textarea
@@ -145,22 +147,22 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
                   {jsonError && <p className="text-xs text-red-500 mt-1 font-medium">{jsonError}</p>}
                 </div>
                 <div className="border border-slate-200 rounded-lg bg-slate-50 p-4 h-96 overflow-y-auto">
-                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Live Preview</h4>
+                  <h4 className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">Content outline</h4>
                   <div className="space-y-4">
                     {editingPage.layoutBlocks?.map((block: any, i: number) => (
                       <div key={i} className="p-3 bg-white rounded border border-slate-200 shadow-sm">
                         <div className="flex justify-between items-center mb-2">
                           <span className="text-xs font-bold text-indigo-600 uppercase">{block.type}</span>
                         </div>
-                        {block.type === 'hero' && <p className="text-sm font-medium">{block.data?.heading || 'No Heading'}</p>}
-                        {block.type === 'text' && <p className="text-xs text-slate-600 line-clamp-2">{block.data?.html || 'No Text'}</p>}
-                        {block.type === 'features' && <p className="text-xs text-slate-600">{block.data?.items?.length || 0} features configured</p>}
+                        {block.type === 'hero' && <p className="text-sm font-medium">{block.config?.title || block.data?.heading || 'No Heading'}</p>}
+                        {block.type === 'text' && <p className="text-xs text-slate-600 line-clamp-2">{block.config?.content || block.data?.html || 'No Text'}</p>}
+                        {block.type === 'features' && <p className="text-xs text-slate-600">{(block.config?.items || block.data?.items)?.length || 0} features configured</p>}
                         {block.type === 'catalog_grid' && <p className="text-xs text-slate-600">Shows up to {block.config?.limit || 4} items</p>}
                         {block.type === 'contact_form' && <p className="text-xs text-slate-600">Contact form block</p>}
                       </div>
                     ))}
                     {(!editingPage.layoutBlocks || editingPage.layoutBlocks.length === 0) && (
-                      <div className="text-center text-slate-400 text-xs py-10">No valid layout blocks to preview</div>
+                      <div className="text-center text-slate-400 text-xs py-10">No valid content blocks</div>
                     )}
                   </div>
                 </div>
@@ -258,7 +260,7 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
                     <span className="font-semibold text-slate-900">{page.title}</span>
                   </div>
                 </td>
-                <td className="font-mono text-sm text-slate-500">/{page.slug === 'home' ? '' : page.slug}</td>
+                <td className="font-mono text-sm text-slate-500">/{['home','/'].includes(page.slug) ? '' : page.slug}</td>
                 <td>
                   {page.isPublished ? (
                     <span className="badge badge-success"><CheckCircle2 className="w-3 h-3 mr-1" /> Published</span>
@@ -270,9 +272,10 @@ export function PagesClient({ initialPages, tenantId }: { initialPages: any[], t
                 <td>
                   <div className="flex items-center justify-end gap-2">
                     <a 
-                      href={`/site/${page.slug === 'home' ? '' : page.slug}`} 
+                      href={['home','/'].includes(page.slug) ? `/${locale}` : `/${locale}/site/${page.slug}`}
                       target="_blank" 
                       rel="noreferrer"
+                      aria-label={`View ${page.title}`}
                       className="btn btn-ghost btn-sm"
                     >
                       <Eye className="w-4 h-4" />
