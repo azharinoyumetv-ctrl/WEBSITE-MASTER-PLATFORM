@@ -6,6 +6,7 @@ import { getAuthenticatedUser, requirePermission } from '@/lib/rbac'
 import { getTenantPublicUrl } from '@/lib/tenant-url'
 import { decrypt } from '@/lib/crypto'
 import crypto from 'crypto'
+import { getXenditCredentials, validXenditUrl } from '@/lib/xendit-server'
 import { sendOrderConfirmationEmail } from './notifications'
 
 function secureEqual(left: string | null | undefined, right: string | null | undefined) {
@@ -16,43 +17,33 @@ function secureEqual(left: string | null | undefined, right: string | null | und
 }
 
 async function getXenditAuth(tenantId: string) {
-  const website = await prisma.tenantWebsite.findUnique({ where: { tenantId } })
-  if (!website?.xenditEnabled || !website.xenditEncryptedSecret) {
-    throw new Error('Xendit is not configured or enabled for this tenant');
-  }
-  // If the secret doesn't have 2 colons (it's legacy iv:ciphertext), handle it or expect it was rotated
-  let encryptedData = website.xenditEncryptedSecret;
-  if (website.xenditEncryptedSecretIv && !encryptedData.includes(':')) {
-     encryptedData = `${website.xenditEncryptedSecretIv}:${website.xenditEncryptedSecret}`;
-  }
-  const secret = decrypt(encryptedData);
-  if (!secret) throw new Error('Failed to decrypt Xendit secret');
-  return Buffer.from(secret + ':').toString('base64');
+  const { secret } = await getXenditCredentials(tenantId)
+  return Buffer.from(secret + ':').toString('base64')
 }
 
 export async function createInvoice(tenantId: string, orderId: string, amount: number, customerEmail?: string) {
   try {
-    const authHeader = await getXenditAuth(tenantId);
+    if (!Number.isSafeInteger(amount) || amount <= 0) throw new Error('Invalid invoice amount')
+    const { secret, tenant } = await getXenditCredentials(tenantId)
+    const finish = getTenantPublicUrl(tenant) + '/en/project-setup/confirmation?orderId=' + encodeURIComponent(orderId)
     const res = await fetch('https://api.xendit.co/v2/invoices', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${authHeader}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        external_id: orderId,
-        amount: amount,
-        payer_email: customerEmail || 'guest@example.com',
-        description: `Invoice for order ${orderId}`
-      })
-    });
-
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to create Xendit invoice');
-
-    return { success: true, invoiceUrl: data.invoice_url, invoiceId: data.id };
+      method: 'POST', redirect: 'manual', signal: AbortSignal.timeout(15000),
+      headers: { Authorization: 'Basic ' + Buffer.from(secret + ':').toString('base64'), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ external_id: orderId, amount, currency: 'IDR', ...(customerEmail ? { payer_email: customerEmail } : {}),
+        description: 'DagangOS Web order ' + orderId, invoice_duration: 86400, should_send_email: false,
+        success_redirect_url: finish, failure_redirect_url: finish }),
+    })
+    const data = await res.json()
+    if (!res.ok || data.external_id !== orderId || Number(data.amount) !== amount || data.currency !== 'IDR' || !validXenditUrl(data.invoice_url)) throw new Error('Xendit checkout could not be created')
+    const order = await prisma.tenantOrder.findFirst({ where: { id: orderId, tenantId }, select: { id: true } })
+    if (order) await prisma.tenantPayment.upsert({
+      where: { externalTransactionId: data.id },
+      create: { tenantId, orderId, processorKey: 'xendit', externalTransactionId: data.id, amount, currency: 'IDR', paymentStatus: 'initiated', metadata: data },
+      update: { metadata: data },
+    })
+    return { success: true, invoiceUrl: data.invoice_url, invoiceId: data.id }
   } catch (error: any) {
-    return { success: false, error: error.message };
+    return { success: false, error: error.message }
   }
 }
 

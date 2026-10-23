@@ -6,7 +6,7 @@ import { resolvePublicTenant } from '@/lib/tenant-context'
 
 type Gateway = 'doku' | 'xendit' | 'midtrans'
 
-const gatewayOrder: Gateway[] = ['doku', 'xendit', 'midtrans']
+const gatewayOrder: Gateway[] = ['xendit', 'doku', 'midtrans']
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (!tenant || !order || order.tenantId !== tenant.id) {
       return NextResponse.json({ success: false, error: 'Order was not found for this storefront' }, { status: 404 })
     }
-    if (order.orderStatus === 'cancelled' || order.orderStatus === 'completed') {
+    if (['paid', 'cancelled', 'completed'].includes(order.orderStatus)) {
       return NextResponse.json({ success: false, error: 'This order cannot be paid' }, { status: 409 })
     }
 
@@ -37,7 +37,8 @@ export async function POST(request: NextRequest) {
       (gateway === 'xendit' && website?.xenditEnabled) ||
       (gateway === 'midtrans' && website?.midtransEnabled),
     )
-    const gateway = preferredGateway && enabledGateways.includes(preferredGateway)
+    const platformCheckout = tenant.subdomain === 'default'
+    const gateway = platformCheckout ? 'xendit' : preferredGateway && enabledGateways.includes(preferredGateway)
       ? preferredGateway
       : enabledGateways[0]
 
