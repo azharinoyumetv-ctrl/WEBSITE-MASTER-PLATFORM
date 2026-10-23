@@ -6,6 +6,7 @@ import { PLATFORM_MODULES } from '@/lib/constants'
 import AdminLayoutClient from './admin-layout-client'
 import { User } from 'next-auth'
 import prisma from "@/lib/prisma"
+import { isDemoEnvironment } from '@/lib/demo-environment'
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions)
@@ -57,6 +58,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <AdminLayoutClient 
+      demoMode={isDemoEnvironment()}
       enabledModules={enabledModulesList}
       canManageTenants={normalizedRoles.includes('super-admin')}
       tenant={tenant}

@@ -386,7 +386,7 @@ export function TopBar({ onMobileMenuToggle, tenant, theme, resolvedTheme, toggl
   )
 }
 
-export default function AdminLayoutClient({ children, enabledModules, canManageTenants = false, user, tenant }: { children: React.ReactNode, enabledModules: string[], canManageTenants?: boolean, user?: { name: string, role: string }, tenant?: any }) {
+export default function AdminLayoutClient({ children, enabledModules, canManageTenants = false, demoMode = false, user, tenant }: { children: React.ReactNode, enabledModules: string[], canManageTenants?: boolean, demoMode?: boolean, user?: { name: string, role: string }, tenant?: any }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [mounted, setMounted] = useState(false)
@@ -474,6 +474,7 @@ export default function AdminLayoutClient({ children, enabledModules, canManageT
     ...group,
     items: group.items.filter(item =>
       (!item.requiredModule || enabledModules.includes(item.requiredModule)) &&
+      (!demoMode || !['/admin/modules','/admin/monitoring','/admin/feature-flags','/admin/settings'].includes(item.href)) &&
       (!item.platformOnly || canManageTenants)
     )
   })).filter(group => group.items.length > 0)
