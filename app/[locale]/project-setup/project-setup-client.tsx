@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { ArrowRight, Calculator, CheckCircle2, Loader2 } from 'lucide-react'
 import { toast } from 'react-hot-toast'
+import { PackageDetails, PurchaseScope, ProjectDeliveryGuide } from '@/components/ProjectPurchaseGuide'
 import {
   packages,
   addonsList,
@@ -163,6 +164,7 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
               ))}
             </div>
             {errors.package && <p className="text-sm text-red-600">{errors.package}</p>}
+            <PackageDetails packageKey={selectedPackage} />
           </div>
 
           <div className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_16px_45px_rgba(15,23,42,.08)] space-y-6">
@@ -258,6 +260,8 @@ export default function ProjectSetupClient({ tenantId }: { tenantId: string }) {
             })}
           </div>
         </div>
+
+        <div className="grid items-start gap-6 lg:grid-cols-[1fr_2fr]"><PurchaseScope /><ProjectDeliveryGuide /></div>
 
         <div className="relative isolate overflow-hidden bg-slate-950 text-white rounded-[1.75rem] p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6 shadow-2xl">
           <div className="absolute inset-0 dagangos-aurora opacity-80" />

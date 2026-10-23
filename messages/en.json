@@ -56,6 +56,108 @@
     "shop": "Shop",
     "contact": "Contact"
   },
+  "PurchaseGuide": {
+    "best_for": "Best for",
+    "included_in": "Included in {name}",
+    "already_included": "Already included",
+    "product_fit": "DagangOS Web is a project delivered on your own infrastructure. For a POS app with monthly or yearly billing, explore",
+    "audience": {
+      "landing_page": "A launch, campaign, or single offer",
+      "company_profile": "A company introducing its team and services",
+      "business_website": "A business managing content and staff access",
+      "ecommerce": "An online store managing products and orders",
+      "restaurant": "A restaurant managing menus and reservations",
+      "retail_pos": "A retailer connecting its website and store counter",
+      "custom": "A business with workflows that need a tailored scope"
+    },
+    "deliverables": {
+      "landing_page": [
+        "Responsive landing page",
+        "Contact form",
+        "Basic SEO setup",
+        "Content management access"
+      ],
+      "company_profile": [
+        "Multi-page company website",
+        "Content management system",
+        "Contact form integration",
+        "SEO-ready page structure"
+      ],
+      "business_website": [
+        "Company website and content management",
+        "Admin dashboard",
+        "User access and role controls",
+        "Analytics and notifications"
+      ],
+      "ecommerce": [
+        "Business website and admin workspace",
+        "Product catalog and storefront",
+        "Checkout and payment gateway setup",
+        "Orders and inventory management"
+      ],
+      "restaurant": [
+        "Restaurant website and admin workspace",
+        "Menu catalog",
+        "Booking and scheduling",
+        "Staff access and operational analytics"
+      ],
+      "retail_pos": [
+        "E-commerce storefront and checkout",
+        "Browser-based POS terminal",
+        "Payment gateway setup",
+        "Inventory tracking and synchronization"
+      ],
+      "custom": [
+        "Website, admin, commerce, POS, and inventory modules",
+        "CRM and booking modules",
+        "AI assistant integration",
+        "Analytics, notifications, and developer API portal"
+      ]
+    },
+    "scope_title": "What your setup price covers",
+    "scope_items": [
+      {
+        "title": "One-time implementation",
+        "description": "The selected package and agreed add-ons, deployed on your infrastructure. Your business keeps control of its data, VPS, and domain."
+      },
+      {
+        "title": "Hosting and domain costs",
+        "description": "VPS hosting, domain renewals, and third-party services are paid separately to your chosen providers."
+      },
+      {
+        "title": "Support and updates",
+        "description": "Handover and support follow the agreed project scope. Ongoing maintenance, backups, and managed hosting are optional services quoted separately."
+      },
+      {
+        "title": "Source code and intellectual property",
+        "description": "Standard pricing does not include source-code or IP transfer. These can be quoted separately for enterprise requirements."
+      }
+    ],
+    "delivery_title": "From payment to launch",
+    "delivery_description": "Payment is verified automatically. We review your requirements and agree the deliverables, revisions, and delivery date with you before development begins.",
+    "delivery_steps": [
+      {
+        "title": "Payment confirmed",
+        "description": "Xendit verifies the payment and your order is recorded."
+      },
+      {
+        "title": "Scope agreed",
+        "description": "We confirm your requirements, access needs, and delivery schedule."
+      },
+      {
+        "title": "Build and configure",
+        "description": "We implement the agreed package on your infrastructure."
+      },
+      {
+        "title": "Preview and review",
+        "description": "You review the preview and agreed revisions before launch."
+      },
+      {
+        "title": "Launch and handover",
+        "description": "We launch the approved project and hand over access."
+      }
+    ]
+  },
   "Storefront": {
     "dynamic_modular_active": "One-time delivery · Self-hosted · Indonesia-ready",
     "hero_title1": "Own the Platform.",
@@ -198,7 +300,7 @@
     "hosting_partner_desc": "Set up your own infrastructure with Hostinger before launch and get a 20% discount with referral code DAGANGOS.",
     "hosting_partner_cta": "Get 20% off with Hostinger",
     "order_platform": "Order Platform",
-    "cta_title": "Ready to power your digital agency?",
+    "cta_title": "Ready to build your business platform?",
     "cta_subtitle": "Claim your domain, customize your brand identity, and launch responsive pages with DagangOS today.",
     "choose_price_plan": "Choose Your Ownership Package",
     "about_title": "About",

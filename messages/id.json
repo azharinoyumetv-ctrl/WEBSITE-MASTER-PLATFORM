@@ -56,6 +56,108 @@
     "shop": "Toko",
     "contact": "Kontak"
   },
+  "PurchaseGuide": {
+    "best_for": "Cocok untuk",
+    "included_in": "Termasuk dalam {name}",
+    "already_included": "Sudah termasuk",
+    "product_fit": "DagangOS Web adalah proyek yang diterapkan pada infrastruktur Anda sendiri. Untuk aplikasi POS dengan tagihan bulanan atau tahunan, lihat",
+    "audience": {
+      "landing_page": "Peluncuran, kampanye, atau satu penawaran",
+      "company_profile": "Perusahaan yang memperkenalkan tim dan layanannya",
+      "business_website": "Bisnis yang mengelola konten dan akses staf",
+      "ecommerce": "Toko daring yang mengelola produk dan pesanan",
+      "restaurant": "Restoran yang mengelola menu dan reservasi",
+      "retail_pos": "Toko ritel yang menghubungkan situs dan kasir",
+      "custom": "Bisnis dengan alur kerja yang memerlukan lingkup khusus"
+    },
+    "deliverables": {
+      "landing_page": [
+        "Landing page responsif",
+        "Formulir kontak",
+        "Penyiapan SEO dasar",
+        "Akses pengelolaan konten"
+      ],
+      "company_profile": [
+        "Situs perusahaan dengan beberapa halaman",
+        "Sistem pengelolaan konten",
+        "Integrasi formulir kontak",
+        "Struktur halaman yang siap untuk SEO"
+      ],
+      "business_website": [
+        "Situs perusahaan dan pengelolaan konten",
+        "Dasbor admin",
+        "Kontrol akses dan peran pengguna",
+        "Analitik dan notifikasi"
+      ],
+      "ecommerce": [
+        "Situs bisnis dan ruang kerja admin",
+        "Katalog produk dan etalase toko",
+        "Penyiapan checkout dan gerbang pembayaran",
+        "Pengelolaan pesanan dan inventaris"
+      ],
+      "restaurant": [
+        "Situs restoran dan ruang kerja admin",
+        "Katalog menu",
+        "Reservasi dan penjadwalan",
+        "Akses staf dan analitik operasional"
+      ],
+      "retail_pos": [
+        "Etalase e-commerce dan checkout",
+        "Terminal POS berbasis browser",
+        "Penyiapan gerbang pembayaran",
+        "Pelacakan dan sinkronisasi inventaris"
+      ],
+      "custom": [
+        "Modul situs, admin, perdagangan, POS, dan inventaris",
+        "Modul CRM dan reservasi",
+        "Integrasi asisten AI",
+        "Analitik, notifikasi, dan portal API pengembang"
+      ]
+    },
+    "scope_title": "Yang dicakup biaya penyiapan Anda",
+    "scope_items": [
+      {
+        "title": "Implementasi sekali bayar",
+        "description": "Paket pilihan dan tambahan yang disepakati, diterapkan pada infrastruktur Anda. Bisnis Anda tetap mengendalikan data, VPS, dan domainnya."
+      },
+      {
+        "title": "Biaya hosting dan domain",
+        "description": "Hosting VPS, perpanjangan domain, dan layanan pihak ketiga dibayar terpisah kepada penyedia pilihan Anda."
+      },
+      {
+        "title": "Dukungan dan pembaruan",
+        "description": "Serah terima dan dukungan mengikuti lingkup proyek yang disepakati. Pemeliharaan rutin, pencadangan, dan hosting terkelola adalah layanan opsional dengan penawaran terpisah."
+      },
+      {
+        "title": "Kode sumber dan hak kekayaan intelektual",
+        "description": "Harga standar tidak mencakup pengalihan kode sumber atau HKI. Kebutuhan tersebut dapat ditawarkan terpisah untuk proyek enterprise."
+      }
+    ],
+    "delivery_title": "Dari pembayaran hingga peluncuran",
+    "delivery_description": "Pembayaran diverifikasi otomatis. Kami meninjau kebutuhan dan menyepakati hasil pekerjaan, revisi, serta tanggal penyelesaian bersama Anda sebelum pengembangan dimulai.",
+    "delivery_steps": [
+      {
+        "title": "Pembayaran dikonfirmasi",
+        "description": "Xendit memverifikasi pembayaran dan pesanan Anda tercatat."
+      },
+      {
+        "title": "Lingkup disepakati",
+        "description": "Kami mengonfirmasi kebutuhan, akses, dan jadwal penyelesaian."
+      },
+      {
+        "title": "Pembangunan dan konfigurasi",
+        "description": "Kami menerapkan paket yang disepakati pada infrastruktur Anda."
+      },
+      {
+        "title": "Pratinjau dan tinjauan",
+        "description": "Anda meninjau pratinjau dan revisi yang disepakati sebelum peluncuran."
+      },
+      {
+        "title": "Peluncuran dan serah terima",
+        "description": "Kami meluncurkan proyek yang disetujui dan menyerahkan akses."
+      }
+    ]
+  },
   "Storefront": {
     "dynamic_modular_active": "Sekali bayar · Self-hosted · Siap untuk Indonesia",
     "hero_title1": "Miliki Platformnya.",
@@ -198,7 +300,7 @@
     "hosting_partner_desc": "Siapkan infrastruktur Anda sendiri dengan Hostinger sebelum peluncuran dan dapatkan diskon 20% dengan kode referral DAGANGOS.",
     "hosting_partner_cta": "Dapatkan diskon 20% di Hostinger",
     "order_platform": "Pesan Platform",
-    "cta_title": "Siap menggerakkan agensi digital Anda?",
+    "cta_title": "Siap membangun platform bisnis Anda?",
     "cta_subtitle": "Klaim domain Anda, sesuaikan identitas merek Anda, dan luncurkan halaman responsif bersama DagangOS hari ini.",
     "choose_price_plan": "Pilih Paket Kepemilikan Anda",
     "about_title": "Tentang",

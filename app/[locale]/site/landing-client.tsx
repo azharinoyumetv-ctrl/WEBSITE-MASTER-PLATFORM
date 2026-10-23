@@ -5,18 +5,23 @@ import { ArrowUpRight, Calculator, Cloud, Layers3, ShieldCheck, Sparkles } from 
 import { useLocale, useTranslations } from 'next-intl'
 import Image from 'next/image'
 import Link from 'next/link'
-import { packages, addonsList } from '@/lib/constants/packages'
+import { packages, addonsList, getBillableAddonKeys, getIncludedAddonKeys } from '@/lib/constants/packages'
+import { PackageDetails, PurchaseScope, ProjectDeliveryGuide } from '@/components/ProjectPurchaseGuide'
 
 const PACKAGE_CALCULATOR_VERSION = 'v2'
 const HOSTINGER_REFERRAL_URL = 'https://www.hostinger.com?REFERRALCODE=DAGANGOS'
 
 export function LandingClient({ primaryColor }: { primaryColor: string }) {
   const t = useTranslations('Storefront')
+  const guide = useTranslations('PurchaseGuide')
   const locale = useLocale()
   const [selectedPackage, setSelectedPackage] = useState<string>('landing_page')
   const [enabledAddons, setEnabledAddons] = useState<string[]>([])
+  const includedAddons = new Set(getIncludedAddonKeys(selectedPackage))
+  const billableAddons = getBillableAddonKeys(selectedPackage, enabledAddons)
 
   const toggleAddon = (key: string) => {
+    if (includedAddons.has(key)) return
     setEnabledAddons(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key])
   }
 
@@ -31,8 +36,8 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
 
   const selectedPackageData = useMemo(() => packages[selectedPackage] || null, [selectedPackage])
   const enabledAddonsData = useMemo(
-    () => enabledAddons.map(key => addonsList.find(addon => addon.key === key)).filter(Boolean),
-    [enabledAddons],
+    () => getBillableAddonKeys(selectedPackage, enabledAddons).map(key => addonsList.find(addon => addon.key === key)).filter(Boolean),
+    [selectedPackage, enabledAddons],
   )
   const total = useMemo(() => {
     const pkgPrice = selectedPackageData?.price || 0
@@ -49,8 +54,9 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
       package: selectedPackage,
       v: PACKAGE_CALCULATOR_VERSION,
     })
-    if (enabledAddons.length > 0) {
-      params.set('addons', enabledAddons.join(','))
+    const payableAddons = getBillableAddonKeys(selectedPackage, enabledAddons)
+    if (payableAddons.length > 0) {
+      params.set('addons', payableAddons.join(','))
     }
     return `/${locale}/project-setup?${params.toString()}`
   }, [selectedPackage, enabledAddons, locale])
@@ -80,6 +86,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             <p className="mt-7 text-lg md:text-xl text-slate-300 max-w-2xl leading-relaxed">
               {t('hero_subtitle')}
             </p>
+            <p className="mt-4 max-w-2xl text-sm leading-relaxed text-slate-300">{guide('product_fit')} <a className="font-semibold text-emerald-200 underline underline-offset-4" href="https://dagangos.com/geraina/pricing">Geraina POS</a> · <a className="font-semibold text-emerald-200 underline underline-offset-4" href="https://dagangos.com/dapuros/pricing">DapurOS</a></p>
             <div className="mt-9 flex flex-wrap gap-3">
               <Link
                 href={projectSetupHref}
@@ -168,7 +175,10 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                   <button
                     key={key}
                     type="button"
-                    onClick={() => setSelectedPackage(key)}
+                    onClick={() => {
+                      setSelectedPackage(key)
+                      setEnabledAddons(previous => getBillableAddonKeys(key, previous))
+                    }}
                     aria-pressed={selectedPackage === key}
                     style={selectedPackage === key 
                       ? { borderColor: primaryColor, backgroundColor: `${primaryColor}08` } 
@@ -182,6 +192,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                     {selectedPackage === key && <span className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 via-cyan-400 to-sky-500" />}
                     <p className="font-bold text-sm text-slate-900">{getPackageCopy(key).name}</p>
                     <p className="text-xs text-slate-500 mt-1">{getPackageCopy(key).desc}</p>
+                    <p className="mt-2 text-xs font-medium text-slate-700">{guide('best_for')}: {guide(`audience.${key}`)}</p>
                     <p className="text-sm font-semibold mt-2" style={{ color: primaryColor }}>
                       {pkg.key === 'custom' ? `${t('starting_at')} ` : ''}{pkg.price > 0 ? formatRp(pkg.price) : t('custom_quote')} <span className="text-xs font-medium text-slate-500">{t('one_time')}</span>
                     </p>
@@ -191,10 +202,12 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             </div>
 
             {/* Add-ons selection checkbox list */}
+            <PackageDetails packageKey={selectedPackage} />
             <div>
               <h3 className="block text-sm font-semibold text-slate-700 mb-2">{t('optional_addons')}</h3>
               <div className="space-y-3">
                 {addonsList.map(addon => {
+                  const included = includedAddons.has(addon.key)
                   const inputId = `addon-${addon.key}`
                   const descriptionId = `${inputId}-description`
                   const addonCopy = getAddonCopy(addon.key)
@@ -205,7 +218,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                     style={enabledAddons.includes(addon.key) 
                       ? { borderColor: primaryColor, boxShadow: `0 0 0 1px ${primaryColor}` } 
                       : {}}
-                    className={`dagangos-play-card flex cursor-pointer flex-col gap-3 rounded-2xl border bg-white p-4 transition-all hover:bg-slate-50 hover:shadow-md sm:flex-row sm:items-center sm:justify-between ${
+                    className={`dagangos-play-card flex flex-col gap-3 rounded-2xl border bg-white p-4 transition-all sm:flex-row sm:items-center sm:justify-between ${included ? 'cursor-not-allowed opacity-75' : 'cursor-pointer hover:bg-slate-50 hover:shadow-md'} ${
                       enabledAddons.includes(addon.key) ? '' : 'border-slate-200'
                     }`}
                   >
@@ -213,7 +226,8 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                       <input 
                         id={inputId}
                         type="checkbox" 
-                        checked={enabledAddons.includes(addon.key)} 
+                        checked={included || enabledAddons.includes(addon.key)}
+                        disabled={included}
                         onChange={() => toggleAddon(addon.key)}
                         aria-describedby={descriptionId}
                         style={{ accentColor: primaryColor }}
@@ -224,7 +238,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                         <p id={descriptionId} className="text-slate-500 text-xs">{addonCopy.desc}</p>
                       </div>
                     </div>
-                    <span className="pl-7 text-sm font-semibold sm:pl-0 sm:text-right" style={{ color: primaryColor }}>{formatRp(addon.price)} <span className="text-xs font-medium text-slate-500">{t('one_time')}</span></span>
+                    <span className="pl-7 text-sm font-semibold sm:pl-0 sm:text-right" style={{ color: primaryColor }}>{included ? guide('already_included') : <>{formatRp(addon.price)} <span className="text-xs font-medium text-slate-500">{t('one_time')}</span></>}</span>
                   </label>
                 )})}
               </div>
@@ -245,7 +259,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
                 <span className="font-semibold text-slate-900">{formatRp(packages[selectedPackage]?.price || 0)}</span>
               </div>
               
-              {enabledAddons.map(key => {
+              {billableAddons.map(key => {
                 const addon = addonsList.find(a => a.key === key)
                 return (
                   <div key={key} className="flex justify-between text-xs">
@@ -264,7 +278,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
             <div className="bg-amber-50 border border-amber-200 text-amber-800 text-xs p-3 rounded-xl leading-relaxed mb-4">
               {t('infra_note')}
             </div>
-            <p className="mb-4 text-xs leading-relaxed text-slate-500">{t('ownership_note')}</p>
+            <div className="mb-4"><PurchaseScope /></div>
 
             <a
               href={HOSTINGER_REFERRAL_URL}
@@ -293,6 +307,7 @@ export function LandingClient({ primaryColor }: { primaryColor: string }) {
       </section>
 
       {/* Dynamic CTA */}
+      <div className="mx-auto max-w-7xl px-6 pb-20 md:px-8"><ProjectDeliveryGuide /></div>
       <section className="py-24 text-white relative isolate overflow-hidden dagangos-aurora">
         <div className="absolute inset-0 dagangos-grid opacity-40" />
         <div className="absolute right-0 top-0 h-80 w-80 rounded-full bg-sky-400/20 blur-3xl dagangos-orb" />

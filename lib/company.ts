@@ -1,5 +1,5 @@
 export const COMPANY = {
-  legalName: 'DagangOS Digital Indonesia',
+  legalName: 'PT DagangOS Digital Indonesia',
   productName: 'Website Master Platform',
   address: 'Subang, Jawa Barat, Indonesia',
   shortAddress: 'Subang, Jawa Barat',
