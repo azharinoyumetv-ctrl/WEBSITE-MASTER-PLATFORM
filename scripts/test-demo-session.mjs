@@ -40,3 +40,12 @@ test('demo starts actual admin with a secure host-only session cookie',async()=>
   const f=fixture(),response=await f.post();assert.equal(response.status,303);assert.equal(response.headers.get('location'),'https://demo.dagangos.com/en/admin/dashboard');assert.equal(f.state.creates,1);
   const [name,,options]=f.state.cookie;assert.equal(name,'__Secure-next-auth.session-token');assert.equal(options.httpOnly,true);assert.equal(options.secure,true);assert.equal(options.sameSite,'lax');assert.equal(options.domain,undefined);assert.equal(options.maxAge,3600);
 });
+test('workspace health can be read without permission to change settings',async()=>{
+  const calls=[];
+  const actions=load('../lib/actions/monitoring.ts',{
+    '@/lib/prisma':{__esModule:true,default:{$queryRaw:async()=>[{active_connections:1}],tenantIncidentLog:{findMany:async()=>[]},tenantPosSession:{count:async()=>1},tenantOrder:{count:async()=>3}}},
+    '@/lib/rbac':{getAuthenticatedUser:async()=>({id:'visitor',tenantId:'sample'}),requirePermission:async(...args)=>{calls.push(args);if(args[2]!=='monitoring'||args[3]!=='read')throw Error('Settings access denied');}},
+    './notifications':{dispatchNotification:async()=>{}},
+  },valid);
+  const result=await actions.getMonitoringStatus('sample');assert.equal(result.success,true);assert.equal(result.monitoring.systemStatus,'healthy');assert.deepEqual(calls,[['visitor','sample','monitoring','read']]);
+});
