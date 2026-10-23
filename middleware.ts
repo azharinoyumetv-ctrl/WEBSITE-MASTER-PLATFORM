@@ -258,7 +258,8 @@ function handleRouting(
   let tenantId = 'default'
   if (isPublicSite || pathname.startsWith('/api')) {
     tenantId = getTenantFromHost(hostname)
-    if (isDemoHost(hostname) && typeof token?.tenantSubdomain === 'string' && token.tenantSubdomain.startsWith('demo-')) tenantId = token.tenantSubdomain
+    const demoSubdomain = (token as {tenantSubdomain?:unknown} | null | undefined)?.tenantSubdomain
+    if (isDemoHost(hostname) && typeof demoSubdomain === 'string' && demoSubdomain.startsWith('demo-')) tenantId = demoSubdomain
   } else if ((token as any)?.tenantId) {
     tenantId = String((token as any).tenantId)
   }
