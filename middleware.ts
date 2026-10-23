@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
+import { isDemoHost } from './lib/demo-environment'
 
 export const config = {
   matcher: [
@@ -146,7 +147,8 @@ export default async function middleware(request: NextRequest) {
     return applySecurityHeaders(new NextResponse('Not Found', { status: 404 }), csp)
   }
 
-  const hostTenantId = getTenantFromHost(hostname)
+  const demoHost = isDemoHost(hostname)
+  const hostTenantId = demoHost ? 'default' : getTenantFromHost(hostname)
 
   const nextAction = request.headers.get('next-action')
   const referer = request.headers.get('referer') || ''
@@ -159,7 +161,7 @@ export default async function middleware(request: NextRequest) {
 
   // Public pages do not need JWT parsing. Protected admin routes and Server
   // Actions still validate the session before tenant routing continues.
-  const token = isProtected
+  const token = isProtected || demoHost
     ? await getToken({
         req: request,
         secret: process.env.NEXTAUTH_SECRET,
@@ -256,6 +258,7 @@ function handleRouting(
   let tenantId = 'default'
   if (isPublicSite || pathname.startsWith('/api')) {
     tenantId = getTenantFromHost(hostname)
+    if (isDemoHost(hostname) && typeof token?.tenantSubdomain === 'string' && token.tenantSubdomain.startsWith('demo-')) tenantId = token.tenantSubdomain
   } else if ((token as any)?.tenantId) {
     tenantId = String((token as any).tenantId)
   }
@@ -287,6 +290,7 @@ function handleRouting(
       pathWithoutLocale.startsWith('/site/') ||
       pathWithoutLocale.startsWith('/checkout') ||
       pathWithoutLocale.startsWith('/project-setup') ||
+      pathWithoutLocale === '/demo' ||
       pathWithoutLocale.startsWith('/orders') ||
       pathWithoutLocale === '/shop' ||
       pathWithoutLocale === '/about' ||

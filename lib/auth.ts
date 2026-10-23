@@ -9,6 +9,7 @@ import * as OTPAuth from "otpauth"
 import { checkRateLimit } from "@/lib/rate-limit"
 import { decrypt } from "@/lib/crypto"
 import { logger } from "@/lib/logger"
+import { isDemoEnvironment } from '@/lib/demo-environment'
 
 // Prefer the configured URL protocol when it is available. This keeps cookies
 // secure on the live HTTPS site while allowing explicit HTTP local test URLs to
@@ -17,7 +18,7 @@ const useSecureCookies = process.env.NEXTAUTH_URL
   ? process.env.NEXTAUTH_URL.startsWith('https://')
   : process.env.NODE_ENV === 'production'
 const cookiePrefix = useSecureCookies ? "__Secure-" : ""
-const baseDomain = process.env.NEXT_PUBLIC_BASE_DOMAIN 
+const baseDomain = !isDemoEnvironment() && process.env.NEXT_PUBLIC_BASE_DOMAIN
   ? (process.env.NEXT_PUBLIC_BASE_DOMAIN.startsWith('.') ? process.env.NEXT_PUBLIC_BASE_DOMAIN : `.${process.env.NEXT_PUBLIC_BASE_DOMAIN}`) 
   : undefined
 

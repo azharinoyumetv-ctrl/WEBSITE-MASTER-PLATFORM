@@ -8,6 +8,8 @@ import { NextIntlClientProvider } from 'next-intl'
 import { getMessages } from 'next-intl/server'
 import { COMPANY } from '@/lib/company'
 import { DeploymentRecovery } from '@/components/deployment-recovery'
+import { DemoBanner } from '@/components/DemoBanner'
+import { isDemoEnvironment } from '@/lib/demo-environment'
 import { getWmpBaseDomain, isReservedNonWmpHostname } from '@/lib/wmp-domain'
 
 const geistSans = localFont({
@@ -104,7 +106,8 @@ export default async function RootLayout({
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} font-sans antialiased ${isDemoEnvironment() ? 'pb-24' : ''}`}>
+        {isDemoEnvironment() && <DemoBanner locale={locale} />}
         <NextIntlClientProvider messages={messages} locale={locale}>
           <AuthProvider>
             <DeploymentRecovery />
