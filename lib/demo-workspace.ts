@@ -18,13 +18,13 @@ export async function createDemoWorkspace(packageKey: string) {
     await tx.tenantUserRole.create({data:{tenantId,userId:user.id,roleId:role.id}})
     const packageModules = packageModuleMap[packageKey] || []
     const permissionModules: Record<string,string> = {catalog_module:'catalog',ecommerce_module:'orders',inventory_module:'inventory',pos_module:'pos',booking_module:'booking',crm_module:'crm'}
-    const permissions = [...new Set(['website','analytics','monitoring',...packageModules.map(key=>permissionModules[key]).filter(Boolean)])]
+    const permissions = Array.from(new Set(['website','analytics','monitoring',...packageModules.map(key=>permissionModules[key]).filter(Boolean)]))
     for (const moduleKey of ['system',...permissions]) for (const actionKey of moduleKey==='system'||moduleKey==='analytics'||moduleKey==='monitoring'?['read']:['read','write','delete']) {
       const permission = await tx.tenantPermissionsRegistry.upsert({where:{moduleKey_actionKey:{moduleKey,actionKey}},update:{},create:{moduleKey,actionKey}})
       await tx.tenantRolePermission.create({data:{roleId:role.id,permissionId:permission.id}})
     }
     // The actual installed modules and workflows are used; external services are absent.
-    const modules = [...new Set(packageModules)].filter(key=>!['ai_module','api_module','notification_module','payment_module','rbac_module','user_management'].includes(key))
+    const modules = Array.from(new Set(packageModules)).filter(key=>!['ai_module','api_module','notification_module','payment_module','rbac_module','user_management'].includes(key))
     await tx.tenantModule.createMany({data:PLATFORM_MODULES.map(module=>({tenantId,moduleKey:module.key,isEnabled:modules.includes(module.key),activatedAt:new Date()}))})
     await tx.tenantWebsite.create({data:{tenantId,siteTitle:companyName,isActive:true,themeConfig:{demoPackage:packageKey,colors:{primary:'#175b4c',secondary:'#10b981',background:'#ffffff',text:'#111827'},navigationTree:[{label:'Home',target:'/'},{label:'About',target:'/site/about'},{label:'Contact',target:'/site/contact'}]},globalSeoMetadata:{description:'Working WMP demonstration using sample content.'}}})
     await tx.tenantPage.createMany({data:[
