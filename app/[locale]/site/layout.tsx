@@ -5,6 +5,7 @@ import { DagangOSBrand } from '@/components/DagangOSBrand'
 import { COMPANY } from '@/lib/company'
 import { getTenantPublicUrl } from '@/lib/tenant-url'
 import { headers } from 'next/headers'
+import { notFound } from 'next/navigation'
 import { getPublicWebsiteConfig } from '@/lib/actions/website'
 import { getTranslations } from 'next-intl/server'
 import { LanguageSwitcher } from '@/components/LanguageSwitcher'
@@ -45,14 +46,7 @@ export default async function SiteLayout({
       customDomain: null
     }
   } else {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <h1 className="text-3xl font-bold text-slate-800 mb-2">Site Not Found</h1>
-          <p className="text-slate-500">This website is currently inactive or does not exist.</p>
-        </div>
-      </div>
-    )
+    notFound()
   }
   
   // Parse theme configuration
