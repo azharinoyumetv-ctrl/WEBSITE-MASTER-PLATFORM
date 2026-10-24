@@ -28,6 +28,7 @@ export async function generateMetadata({ params }: { params: { slug?: string[], 
     catalog: { en: 'Solutions', id: 'Solusi' },
     terms: { en: 'Terms of Service', id: 'Syarat & Ketentuan' },
     privacy: { en: 'Privacy Policy', id: 'Kebijakan Privasi' },
+    refund: { en: 'Refund Policy', id: 'Kebijakan Refund' },
   }
   const pageDescriptions: Record<string, { en: string, id: string }> = {
     about: {
@@ -123,7 +124,7 @@ export async function generateMetadata({ params }: { params: { slug?: string[], 
   }
 
   if (!pageRes.success || !pageRes.page) {
-    if (!['shop', 'products', 'about', 'contact', 'support', 'terms', 'privacy'].includes(slug)) {
+    if (!['shop', 'products', 'about', 'contact', 'support', 'terms', 'privacy', 'refund'].includes(slug)) {
       notFound()
     }
     return createMetadata(`${pageLabel} | ${siteTitle}`, defaultDescription)
@@ -132,7 +133,7 @@ export async function generateMetadata({ params }: { params: { slug?: string[], 
   const pageSeo = pageRes.page.seoMetadata as any || {}
   const globalSeo = websiteRes.website.globalSeoMetadata as any || {}
 
-  if (['shop', 'products', 'about', 'contact', 'support', 'catalog', 'terms', 'privacy'].includes(slug)) {
+  if (['shop', 'products', 'about', 'contact', 'support', 'catalog', 'terms', 'privacy', 'refund'].includes(slug)) {
     const standardDescription = isIndonesian
       ? defaultDescription
       : pageSeo.description || globalSeo.description || defaultDescription
@@ -203,9 +204,9 @@ function renderFallbackPage(slug: string, siteTitle: string, primaryColor: strin
     return <SupportPageClient />
   }
 
-  if (slug === 'privacy' || slug === 'terms') {
-    const title = slug === 'privacy' ? t('privacy') : t('terms')
-    const baseName = slug === 'privacy' ? 'Privacy_Policy' : 'Terms_of_Service'
+  if (slug === 'privacy' || slug === 'terms' || slug === 'refund') {
+    const title = slug === 'refund' ? (locale === 'id' ? 'Kebijakan Refund' : 'Refund Policy') : slug === 'privacy' ? t('privacy') : t('terms')
+    const baseName = slug === 'refund' ? 'Refund_Policy' : slug === 'privacy' ? 'Privacy_Policy' : 'Terms_of_Service'
     const localizedFileName = `${baseName}_${locale}.md`
     const defaultFileName = `${baseName}.md`
 
@@ -340,7 +341,7 @@ export default async function SitePage({ params }: { params: { slug?: string[], 
   const slug = params.slug ? params.slug.join('/') : 'home'
 
   // Standard pages that have built-in fallback templates
-  const standardPages = ['about', 'contact', 'support', 'products', 'shop', 'catalog', 'privacy', 'terms']
+  const standardPages = ['about', 'contact', 'support', 'products', 'shop', 'catalog', 'privacy', 'terms', 'refund']
 
   // Try to get the website config & DB page
   let websiteConfig: any = null

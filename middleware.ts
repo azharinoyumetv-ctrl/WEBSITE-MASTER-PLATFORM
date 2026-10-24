@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { isDemoHost } from './lib/demo-environment'
+import { resolvePublicRouteAlias } from './lib/public-route-aliases'
 
 export const config = {
   matcher: [
@@ -279,10 +280,11 @@ function handleRouting(
 
   requestHeaders.set('X-Next-Intl-Locale', localeInUrl)
 
-  if (pathWithoutLocale === '/login') {
+  const publicAlias = resolvePublicRouteAlias(pathWithoutLocale, getTenantFromHost(hostname) === 'default')
+  if (publicAlias) {
     const origin = getBaseUrl(request)
-    const redirectUrl = new URL(`/${localeInUrl}/auth/login${request.nextUrl.search}`, origin)
-    return NextResponse.redirect(redirectUrl)
+    const redirectUrl = new URL(`/${localeInUrl}${publicAlias}${request.nextUrl.search}`, origin)
+    return NextResponse.redirect(redirectUrl, publicAlias.startsWith('/auth/') ? 307 : 308)
   }
 
   if (isPublicSite) {

@@ -4,7 +4,7 @@ import { getWmpBaseDomain } from '@/lib/wmp-domain'
 export default function sitemap(): MetadataRoute.Sitemap {
   const baseUrl = `https://${getWmpBaseDomain()}`
 
-  const routes = ['', '/site/about', '/site/catalog', '/site/shop', '/site/contact', '/site/support', '/site/terms', '/site/privacy']
+  const routes = ['', '/site/about', '/site/catalog', '/site/shop', '/site/contact', '/site/support', '/site/terms', '/site/privacy', '/site/refund']
   const locales = ['en', 'id'] as const
 
   return locales.flatMap((locale) => routes.map((route) => {

@@ -211,10 +211,11 @@ export default async function SiteLayout({
           <div className="relative border-t border-white/10 pt-6 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="flex flex-col md:flex-row items-center gap-4">
               <p className="text-sm">&copy; {new Date().getFullYear()} {isCompanyStorefront ? COMPANY.legalName : tenant.companyName}. {tStore('all_rights')}</p>
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-3">
                 <Link href={`/${locale}/site/terms`} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('terms')}</Link>
                 <span className="text-slate-700 text-xs">&bull;</span>
                 <Link href={`/${locale}/site/privacy`} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{tStore('privacy')}</Link>
+                {isCompanyStorefront && <><span className="text-slate-700 text-xs">&bull;</span><Link href={`/${locale}/site/refund`} className="text-xs text-slate-500 hover:text-slate-300 transition-colors">{locale === 'id' ? 'Kebijakan Refund' : 'Refund Policy'}</Link></>}
               </div>
             </div>
             <p className="text-xs opacity-50">{tStore('powered_by')}</p>
